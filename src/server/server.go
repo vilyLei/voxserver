@@ -16,7 +16,7 @@ import (
 )
 // go build -o .\ ..\src\server\server.go
 
-func setupCORS(w *http.ResponseWriter) {
+func respApplyCORS(w *http.ResponseWriter) {
 	header := (*w).Header();
 	header.Set("Access-Control-Allow-Origin", "*")
 	header.Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
@@ -101,7 +101,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, errorTemplate);
 		return;
 	}
-	setupCORS(&w);
+	respApplyCORS(&w);
 
 	r.ParseForm()// parse some parameters, the default parsing process do not exec
     fmt.Println(r.Form) // print the client req info
