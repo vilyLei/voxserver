@@ -25,7 +25,7 @@ type Header struct {
 	OS      byte      // operating system type
 }
 // thanks: https://zetcode.com/golang/http-serve-image/
-// gzipped: https://www.cnblogs.com/chaselogs/p/9964487.html
+// gzipped, thanks: https://www.cnblogs.com/chaselogs/p/9964487.html
 
 func main() {
 
@@ -83,13 +83,6 @@ func commonResponse(w *http.ResponseWriter, pathStr *string) {
 		contentType := http.DetectContentType(buf);
 		header := wr.Header();
 		header.Set("Content-Type", contentType)
-		// header.Set("Content-Type", "image/png")
-		// header.Set("Content-Type", "image/jpeg")
-		// header.Set("Content-Type", "image/gif")
-		// header.Set("Content-Type", "text/html")
-		// header.Set("Content-Type", "application/javascript")
-		// header.Set("Content-Type", "application/json")
-		// w.Header().Set("Content-Type", "application/octet-stream")
 		wr.Write(buf)
 	}
 }
@@ -108,18 +101,8 @@ func gzipResponse(w *http.ResponseWriter, pathStr *string) {
 		// fmt.Println("contentType: ", contentType)
 		header := wr.Header();
 		header.Set("Content-Type", contentType)
-		/*
-		header.Set("Content-Type", "image/png")
-		header.Set("Content-Type", "image/jpeg")
-		header.Set("Content-Type", "image/gif")
-		// header.Set("Content-Type", "text/html")
-		header.Set("Content-Type", "application/javascript")
-		//*/
-		// header.Set("Content-Type", "application/json")
-		// header.Set("Content-Type", "application/x-gzip")
-		// header.Set("Content-Type", "application/octet-stream")
+
 		// header.Set("Accept-Encoding", "gzip,deflate")
-		// header.Set("Accept-Encoding", "gzip")
 		header.Set("Content-encoding", "gzip")
 		header.Set("Server", "golang")
 		header.Set("Vary", "Accept-Encoding")
@@ -140,8 +123,8 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	setupCORS(&w);
 
-	r.ParseForm() //解析参数，默认是不会解析的
-    fmt.Println(r.Form) //这些信息是输出到服务器端的打印信息
+	r.ParseForm()// parse some parameters, the default parsing process do not exec
+    fmt.Println(r.Form) // print the client req info
     fmt.Println("path", r.URL.Path)
     fmt.Println("scheme", r.URL.Scheme)
     fmt.Println(r.Form["url_long"])
@@ -152,57 +135,5 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 	pathStr := r.URL.Path
 	// commonResponse(&w, &pathStr);
 	gzipResponse(&w, &pathStr)
-	/*
-	// 一种正确的实现
-	pathstr := r.URL.Path
-    fmt.Println("pathstr", pathstr)
-    buf, err := ioutil.ReadFile("."+pathstr)
-
-    if err != nil {
-        // log.Fatal(err)
-		fmt.Println("Error: ", err)
-		// fmt.Fprintf(w, "Error: illegal request !!!");
-		fmt.Fprintf(w, errorTemplate);
-    }else {
-		w.Header().Set("Content-Type", "image/png")
-		w.Header().Set("Content-Type", "image/jpeg")
-		w.Header().Set("Content-Type", "image/gif")
-		w.Header().Set("Content-Type", "text/html")
-		w.Header().Set("Content-Type", "application/javascript")
-		w.Header().Set("Content-Type", "application/json")
-		// w.Header().Set("Content-Type", "application/octet-stream")
-		w.Write(buf)
-	}
-	//*/
-	/**
-	pathstr := r.URL.Path
-    fmt.Println("pathstr", pathstr)
-    buf, err := ioutil.ReadFile("."+pathstr)
-	if err != nil {
-        // log.Fatal(err)
-		fmt.Println("Error: ", err)
-		// fmt.Fprintf(w, "Error: illegal request !!!");
-		fmt.Fprintf(w, errorTemplate);
-    }else {
-		contentType := http.DetectContentType(buf);
-		// fmt.Println("contentType: ", contentType)
-		header := w.Header();
-		header.Set("Content-Type", contentType)
-		// header.Set("Content-Type", "application/json")
-		// header.Set("Content-Type", "application/x-gzip")
-		// header.Set("Content-Type", "application/octet-stream")
-		// header.Set("Accept-Encoding", "gzip,deflate")
-		// header.Set("Accept-Encoding", "gzip")
-		header.Set("Content-encoding", "gzip")
-		header.Set("Server", "golang")
-		header.Set("Vary", "Accept-Encoding")
-		var zBuf bytes.Buffer
-		zw := gzip.NewWriter(&zBuf)
-		if _, err = zw.Write(buf); err != nil {
-		    fmt.Println("gzip is faild,err:", err)
-		}
-		zw.Close()
-		w.Write(zBuf.Bytes())
-	}
-	//*/
+	
 }
