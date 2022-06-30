@@ -10,7 +10,7 @@ import (
     "io/ioutil"
     //"log"
     "path/filepath"
-    "time"
+    // "time"
     "net/http"
     "bytes"
 )
@@ -119,14 +119,20 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 }
 func main() {
 
-	for i ,v := range os.Args {
-		fmt.Println(i, v)
+	// for i ,v := range os.Args {
+	// 	fmt.Println(i, v)
+	// }
+	var portStr string = "9090";
+	argsLen := len(os.Args)
+	// fmt.Println("argsLen: ", argsLen)
+	if argsLen > 1 {
+		portStr = "" + os.Args[1];
+		fmt.Println("init current port: ", portStr)
 	}
-
     handler := http.HandlerFunc(handleRequest)
 
     http.Handle("/static/", handler)
 
-    fmt.Println("Server started at port 9090")
-    http.ListenAndServe(":9090", nil)
+    fmt.Println("Server started at port: ", portStr)
+    http.ListenAndServe(":"+portStr, nil)
 }
