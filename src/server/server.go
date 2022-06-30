@@ -15,27 +15,7 @@ import (
     "bytes"
 )
 // go build -o .\ ..\src\server\server.go
-// The gzip file stores a header giving metadata about the compressed file.
-// That header is exposed as the fields of the Writer and Reader structs.
-type Header struct {
-	Comment string    // comment
-	Extra   []byte    // "extra data"
-	ModTime time.Time // modification time
-	Name    string    // file name
-	OS      byte      // operating system type
-}
-// thanks: https://zetcode.com/golang/http-serve-image/
-// gzipped, thanks: https://www.cnblogs.com/chaselogs/p/9964487.html
 
-func main() {
-
-    handler := http.HandlerFunc(handleRequest)
-
-    http.Handle("/static/", handler)
-
-    fmt.Println("Server started at port 9090")
-    http.ListenAndServe(":9090", nil)
-}
 func setupCORS(w *http.ResponseWriter) {
 	header := (*w).Header();
 	header.Set("Access-Control-Allow-Origin", "*")
@@ -136,4 +116,17 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 	// commonResponse(&w, &pathStr);
 	gzipResponse(&w, &pathStr)
 	
+}
+func main() {
+
+	for i ,v := range os.Args {
+		fmt.Println(i, v)
+	}
+
+    handler := http.HandlerFunc(handleRequest)
+
+    http.Handle("/static/", handler)
+
+    fmt.Println("Server started at port 9090")
+    http.ListenAndServe(":9090", nil)
 }
