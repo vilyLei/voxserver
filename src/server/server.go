@@ -68,73 +68,45 @@ func gzipit(source, target string) error {
 	_, err = io.Copy(archiver, reader)
 	return err
 }
-func handleRequest(w http.ResponseWriter, r *http.Request) {
+func commonResponse(w *http.ResponseWriter, pathStr *string) {
 
-	if r.Method == "OPTIONS" {
-		fmt.Fprintf(w, errorTemplate);
-		return;
-	}
-	setupCORS(&w);
+	wr := (*w)
+    fmt.Println("pathStr", *pathStr)
+    buf, err := ioutil.ReadFile("."+(*pathStr))
 
-	r.ParseForm() //解析参数，默认是不会解析的
-    fmt.Println(r.Form) //这些信息是输出到服务器端的打印信息
-    fmt.Println("path", r.URL.Path)
-    fmt.Println("scheme", r.URL.Scheme)
-    fmt.Println(r.Form["url_long"])
-    for k, v := range r.Form {
-        fmt.Println("key:", k)
-        fmt.Println("val:", strings.Join(v, ""))
-    }
-	/*
-	// 一种正确的实现
-	pathstr := r.URL.Path
-    fmt.Println("pathstr", pathstr)
-    buf, err := ioutil.ReadFile("."+pathstr)
-
-    if err != nil {
-        // log.Fatal(err)
+	if err != nil {
+		// log.Fatal(err)
 		fmt.Println("Error: ", err)
 		// fmt.Fprintf(w, "Error: illegal request !!!");
-		fmt.Fprintf(w, errorTemplate);
-    }else {
-		w.Header().Set("Content-Type", "image/png")
-		w.Header().Set("Content-Type", "image/jpeg")
-		w.Header().Set("Content-Type", "image/gif")
-		w.Header().Set("Content-Type", "text/html")
-		w.Header().Set("Content-Type", "application/javascript")
-		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintf(wr, errorTemplate);
+	}else {
+		contentType := http.DetectContentType(buf);
+		header := wr.Header();
+		header.Set("Content-Type", contentType)
+		// header.Set("Content-Type", "image/png")
+		// header.Set("Content-Type", "image/jpeg")
+		// header.Set("Content-Type", "image/gif")
+		// header.Set("Content-Type", "text/html")
+		// header.Set("Content-Type", "application/javascript")
+		// header.Set("Content-Type", "application/json")
 		// w.Header().Set("Content-Type", "application/octet-stream")
-		w.Write(buf)
+		wr.Write(buf)
 	}
-	//*/
-	// body, err := gzip.NewReader(r.Body)
-	// if err != nil {
-	//     fmt.Println("unzip is failed, err:", err)
-	// }
-	// defer body.Close()
-	// data, err := ioutil.ReadAll(body)
-	// if err != nil  {
-	//     fmt.Println("-------------read all is failed.err:", err)
-	// }
-	// fmt.Println("===string(data)=", string(data))
-	// respJson := []byte(`{
-	//     "rc": 70200,
-	//     "info_en": "success"    
-	// }`)
-	// w.Write(respJson)
-	
-	pathstr := r.URL.Path
-    fmt.Println("pathstr", pathstr)
-    buf, err := ioutil.ReadFile("."+pathstr)
+}
+func gzipResponse(w *http.ResponseWriter, pathStr *string) {
+
+	wr := (*w)
+    fmt.Println("pathStr", *pathStr)
+    buf, err := ioutil.ReadFile("."+(*pathStr))
 	if err != nil {
         // log.Fatal(err)
 		fmt.Println("Error: ", err)
 		// fmt.Fprintf(w, "Error: illegal request !!!");
-		fmt.Fprintf(w, errorTemplate);
+		fmt.Fprintf(wr, errorTemplate);
     }else {
 		contentType := http.DetectContentType(buf);
 		// fmt.Println("contentType: ", contentType)
-		header := w.Header();
+		header := wr.Header();
 		header.Set("Content-Type", contentType)
 		/*
 		header.Set("Content-Type", "image/png")
@@ -157,6 +129,80 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 		    fmt.Println("gzip is faild,err:", err)
 		}
 		zw.Close()
+		wr.Write(zBuf.Bytes())
+	}
+}
+func handleRequest(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method == "OPTIONS" {
+		fmt.Fprintf(w, errorTemplate);
+		return;
+	}
+	setupCORS(&w);
+
+	r.ParseForm() //解析参数，默认是不会解析的
+    fmt.Println(r.Form) //这些信息是输出到服务器端的打印信息
+    fmt.Println("path", r.URL.Path)
+    fmt.Println("scheme", r.URL.Scheme)
+    fmt.Println(r.Form["url_long"])
+    for k, v := range r.Form {
+        fmt.Println("key:", k)
+        fmt.Println("val:", strings.Join(v, ""))
+    }
+	pathStr := r.URL.Path
+	// commonResponse(&w, &pathStr);
+	gzipResponse(&w, &pathStr)
+	/*
+	// 一种正确的实现
+	pathstr := r.URL.Path
+    fmt.Println("pathstr", pathstr)
+    buf, err := ioutil.ReadFile("."+pathstr)
+
+    if err != nil {
+        // log.Fatal(err)
+		fmt.Println("Error: ", err)
+		// fmt.Fprintf(w, "Error: illegal request !!!");
+		fmt.Fprintf(w, errorTemplate);
+    }else {
+		w.Header().Set("Content-Type", "image/png")
+		w.Header().Set("Content-Type", "image/jpeg")
+		w.Header().Set("Content-Type", "image/gif")
+		w.Header().Set("Content-Type", "text/html")
+		w.Header().Set("Content-Type", "application/javascript")
+		w.Header().Set("Content-Type", "application/json")
+		// w.Header().Set("Content-Type", "application/octet-stream")
+		w.Write(buf)
+	}
+	//*/
+	/**
+	pathstr := r.URL.Path
+    fmt.Println("pathstr", pathstr)
+    buf, err := ioutil.ReadFile("."+pathstr)
+	if err != nil {
+        // log.Fatal(err)
+		fmt.Println("Error: ", err)
+		// fmt.Fprintf(w, "Error: illegal request !!!");
+		fmt.Fprintf(w, errorTemplate);
+    }else {
+		contentType := http.DetectContentType(buf);
+		// fmt.Println("contentType: ", contentType)
+		header := w.Header();
+		header.Set("Content-Type", contentType)
+		// header.Set("Content-Type", "application/json")
+		// header.Set("Content-Type", "application/x-gzip")
+		// header.Set("Content-Type", "application/octet-stream")
+		// header.Set("Accept-Encoding", "gzip,deflate")
+		// header.Set("Accept-Encoding", "gzip")
+		header.Set("Content-encoding", "gzip")
+		header.Set("Server", "golang")
+		header.Set("Vary", "Accept-Encoding")
+		var zBuf bytes.Buffer
+		zw := gzip.NewWriter(&zBuf)
+		if _, err = zw.Write(buf); err != nil {
+		    fmt.Println("gzip is faild,err:", err)
+		}
+		zw.Close()
 		w.Write(zBuf.Bytes())
 	}
+	//*/
 }
