@@ -2,20 +2,16 @@ package main
 
 import (
 	"os"
-	// "path"
     "strings"
     "fmt"
 	"compress/gzip"
 	"io"
     "io/ioutil"
-    //"log"
     "path/filepath"
-    // "time"
     "net/http"
     "bytes"
 )
-// go build -o .\ ..\src\server\server.go
-// go build -o ./bin ./src/server/server.go
+// go build -o .\bin\ .\src\server\server.go
 
 func respApplyCORS(w *http.ResponseWriter) {
 	header := (*w).Header();
@@ -79,11 +75,9 @@ func gzipResponse(w *http.ResponseWriter, pathStr *string) {
 		fmt.Fprintf(wr, errorTemplate);
     }else {
 		contentType := http.DetectContentType(buf);
-		// fmt.Println("contentType: ", contentType)
 		header := wr.Header();
 		header.Set("Content-Type", contentType)
 
-		// header.Set("Accept-Encoding", "gzip,deflate")
 		header.Set("Content-encoding", "gzip")
 		header.Set("Server", "golang")
 		header.Set("Vary", "Accept-Encoding")
@@ -116,16 +110,12 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 	pathStr := r.URL.Path
 	// commonResponse(&w, &pathStr);
 	gzipResponse(&w, &pathStr)
-	
+
 }
 func main() {
 
-	// for i ,v := range os.Args {
-	// 	fmt.Println(i, v)
-	// }
 	var portStr string = "9090";
 	argsLen := len(os.Args)
-	// fmt.Println("argsLen: ", argsLen)
 	if argsLen > 1 {
 		portStr = "" + os.Args[1];
 		fmt.Println("init current port: ", portStr)
