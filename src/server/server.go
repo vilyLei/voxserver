@@ -1,5 +1,9 @@
 package main
-
+//git clone https://github.com/golang/tools.git $GOPATH/src/golang.org/x/tools
+//git clone https://github.com/golang/tools.git $GOPATH/src/golang.org/x/tools
+//go get -v github.com/ramya-rao-a/go-outline
+//go get -v github.com/sqs/goreturns
+//go get -v github.com/rogpeppe/godef
 import (
 	"os"
 	// "path"
