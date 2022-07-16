@@ -232,13 +232,12 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 		}
 		fmt.Println("rHeader bytesPosList: ", bytesPosList)
 		rangeFileResponse(&w, &pathStr, bytesPosList)
-		return
-	}
-
-	if hasRange {
-		wholeFileResponse(&w, &pathStr)
 	} else {
-		gzipResponse(&w, &pathStr)
+		if hasRange {
+			wholeFileResponse(&w, &pathStr)
+		} else {
+			gzipResponse(&w, &pathStr)
+		}
 	}
 
 }
