@@ -20,6 +20,7 @@ import (
 
 // go build -o .\ ..\src\server\server.go
 // go build -o ./bin ./src/server/server.go
+// go build ../src/server/server.go
 func SetRWriterStatus(w *http.ResponseWriter, code int) {
 	(*w).WriteHeader(code)
 }
@@ -69,34 +70,40 @@ func rangeFileResponse(w *http.ResponseWriter, pathStr *string, bytesPosList []i
 	header.Set("Content-Type", "application/octet-stream")
 	header.Set("Server", "golang")
 	if bytesTotalSize > 0 {
-		file, _ := os.Open("." + (*pathStr))
-		defer file.Close()
-		rbytesSize := 0
-		var segSize int64 = 1024
-		var pos int64
-		pos = int64(bytesPosList[0])
-		// 字节切片缓存 存放每次读取的字节
-		readBuf := make([]byte, segSize)
-		// 该字节切片用于存放文件所有字节
-		var buf []byte
-		for {
-			count, err := file.ReadAt(readBuf, pos)
-			if err == io.EOF {
-				break
+		file, err := os.Open("." + (*pathStr))
+		if err == nil {
+			fi, _ := file.Stat()
+			fileBytesTotal := fi.Size()
+			fmt.Println("rangeFileResponse(),file bytes total: ", fileBytesTotal)
+			defer file.Close()
+			rbytesSize := 0
+			var segSize int64 = 1024
+			var pos int64
+			pos = int64(bytesPosList[0])
+			// TODO(VILY): 需要优化，不能每次调用都创建这样一个内存块。但是这里要考虑并行或并发的问题。
+			readBuf := make([]byte, segSize)
+			// 该字节切片用于存放文件所有字节
+			var buf []byte
+			for {
+				count, err := file.ReadAt(readBuf, pos)
+				if err == io.EOF {
+					break
+				}
+				size := count + rbytesSize
+				if size > bytesTotalSize {
+					count -= (size - bytesTotalSize)
+				}
+				rbytesSize += count
+				currBytes := readBuf[:count]
+				buf = append(buf, currBytes...)
+				if rbytesSize >= bytesTotalSize {
+					break
+				}
+				pos += segSize
 			}
-			size := count + rbytesSize
-			if size > bytesTotalSize {
-				count -= (size - bytesTotalSize)
-			}
-			rbytesSize += count
-			currBytes := readBuf[:count]
-			buf = append(buf, currBytes...)
-			if rbytesSize >= bytesTotalSize {
-				break
-			}
-			pos += segSize
+			wr.Write(buf)
+			return
 		}
-		wr.Write(buf)
 		/*
 			gzipFlag := true
 			if gzipFlag {
@@ -116,10 +123,10 @@ func rangeFileResponse(w *http.ResponseWriter, pathStr *string, bytesPosList []i
 				wr.Write(buf)
 			}
 			//*/
-	} else {
-		var buf []byte
-		wr.Write(buf)
 	}
+
+	var buf []byte
+	wr.Write(buf)
 }
 
 func wholeFileResponse(w *http.ResponseWriter, pathStr *string) {
