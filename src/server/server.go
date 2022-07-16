@@ -60,6 +60,11 @@ func gzipit(source, target string) error {
 	_, err = io.Copy(archiver, reader)
 	return err
 }
+
+var segSize int64 = 4096
+var emptyBuf []byte
+var in_4096_buf []byte = make([]byte, 4096)
+
 func rangeFileResponse(w *http.ResponseWriter, pathStr *string, bytesPosList []int) {
 
 	wr := (*w)
@@ -74,15 +79,15 @@ func rangeFileResponse(w *http.ResponseWriter, pathStr *string, bytesPosList []i
 		if err == nil {
 			fi, _ := file.Stat()
 			fileBytesTotal := fi.Size()
-			fmt.Println("rangeFileResponse(),file bytes total: ", fileBytesTotal)
+			fmt.Println("rangeFileResponse(),file bytes total: ", fileBytesTotal, " read bytes total: ", bytesTotalSize)
 			defer file.Close()
+
 			rbytesSize := 0
-			var segSize int64 = 1024
-			var pos int64
-			pos = int64(bytesPosList[0])
-			// TODO(VILY): 需要优化，不能每次调用都创建这样一个内存块。但是这里要考虑并行或并发的问题。
-			readBuf := make([]byte, segSize)
-			// 该字节切片用于存放文件所有字节
+
+			pos := int64(bytesPosList[0])
+			// TODO(VILY): 需要优化，不能每次调用都创建这样一个内存块。但是这里要考虑并行或并发的问题。目前这样用无法解决并行问题。
+			readBuf := in_4096_buf
+
 			var buf []byte
 			for {
 				count, err := file.ReadAt(readBuf, pos)
@@ -104,29 +109,8 @@ func rangeFileResponse(w *http.ResponseWriter, pathStr *string, bytesPosList []i
 			wr.Write(buf)
 			return
 		}
-		/*
-			gzipFlag := true
-			if gzipFlag {
-
-				header.Set("Content-encoding", "gzip")
-				header.Set("Vary", "Accept-Encoding")
-				fmt.Println("rangeFileResponse(), gzip yes.")
-				var zBuf bytes.Buffer
-				zw := gzip.NewWriter(&zBuf)
-				if _, gzerr := zw.Write(buf); gzerr != nil {
-					fmt.Println("gzip is faild,err:", gzerr)
-				}
-				zw.Close()
-				wr.Write(zBuf.Bytes())
-			} else {
-				fmt.Println("rangeFileResponse(), gzip no.")
-				wr.Write(buf)
-			}
-			//*/
 	}
-
-	var buf []byte
-	wr.Write(buf)
+	wr.Write(emptyBuf)
 }
 
 func wholeFileResponse(w *http.ResponseWriter, pathStr *string) {
