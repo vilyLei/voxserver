@@ -15,9 +15,11 @@ import (
 	"path/filepath"
 	// "time"
 	"bytes"
+	"math"
 	"net/http"
 )
 
+// go mod init voxwebserver.com/main
 // go build -o .\ ..\src\server\server.go
 // go build -o ./bin ./src/server/server.go
 // go build ../src/server/server.go
@@ -61,9 +63,19 @@ func gzipit(source, target string) error {
 	return err
 }
 
+var Math_LN2 float64 = 0.6931471805599453
+
+func calcCeilPowerOfTwo(value float64) float64 {
+	return math.Pow(2, math.Ceil(math.Log(value)/math.Ln2))
+}
+func calcInBufIndex(po2 float64) float64 {
+	return math.Log(po2) / math.Ln2
+}
+
 var segSize int64 = 4096
 var emptyBuf []byte
 var in_4096_buf []byte = make([]byte, 4096)
+var in_bufs [32]*[]byte
 
 func rangeFileResponse(w *http.ResponseWriter, pathStr *string, bytesPosList []int) {
 
@@ -71,6 +83,11 @@ func rangeFileResponse(w *http.ResponseWriter, pathStr *string, bytesPosList []i
 
 	fmt.Println("rangeFileResponse(), pathStr", *pathStr)
 	bytesTotalSize := bytesPosList[1] - bytesPosList[0]
+	bufSizef64 := calcCeilPowerOfTwo(float64(bytesTotalSize))
+	inBufIndex := int32(calcInBufIndex(bufSizef64))
+	var bufNSize int32 = int32(bufSizef64)
+
+	fmt.Println("in_bufs[1]", in_bufs[1])
 	header := wr.Header()
 	header.Set("Content-Type", "application/octet-stream")
 	header.Set("Server", "golang")
@@ -79,7 +96,7 @@ func rangeFileResponse(w *http.ResponseWriter, pathStr *string, bytesPosList []i
 		if err == nil {
 			fi, _ := file.Stat()
 			fileBytesTotal := fi.Size()
-			fmt.Println("rangeFileResponse(),file bytes total: ", fileBytesTotal, " read bytes total: ", bytesTotalSize)
+			fmt.Println("rangeFileResponse(),file bytes total: ", fileBytesTotal, " read bytes total: ", bytesTotalSize, bufNSize, ",index:", inBufIndex)
 			defer file.Close()
 
 			rbytesSize := 0
@@ -99,6 +116,7 @@ func rangeFileResponse(w *http.ResponseWriter, pathStr *string, bytesPosList []i
 					count -= (size - bytesTotalSize)
 				}
 				rbytesSize += count
+				// 这样的内存处理过程消耗也不小
 				currBytes := readBuf[:count]
 				buf = append(buf, currBytes...)
 				if rbytesSize >= bytesTotalSize {
@@ -199,22 +217,22 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 
 	var bytesPosList []int
 	if rangeListSize > 0 {
-		fmt.Println("rHeader has bytes Range data")
-		for index, value := range rangeList {
+		// fmt.Println("rHeader has bytes Range data")
+		for _, value := range rangeList {
 			posList := strings.Split(value, "=")
 			if posList[0] == "bytes" && len(posList) == 2 {
 				posList := strings.Split(posList[1], "-")
-				fmt.Println("rHeader posList: ", posList)
+				// fmt.Println("rHeader posList: ", posList)
 				if len(posList) == 2 {
 					num0, _ := strconv.Atoi(posList[0])
 					num1, _ := strconv.Atoi(posList[1])
 					bytesPosList = append(bytesPosList, num0, num1)
-					fmt.Println("rHeader Range data: ", index, ":", value, ",num0, num1: ", num0, num1)
+					// fmt.Println("rHeader Range data: ", index, ":", value, ",num0, num1: ", num0, num1)
 					break
 				}
 			}
 		}
-		fmt.Println("rHeader bytesPosList: ", bytesPosList)
+		// fmt.Println("rHeader bytesPosList: ", bytesPosList)
 		rangeFileResponse(&w, &pathStr, bytesPosList)
 	} else {
 		if hasRange {
