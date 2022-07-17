@@ -113,9 +113,7 @@ func rangeFileResponse(w *http.ResponseWriter, pathStr *string, bytesPosList []i
 				in_bufs[readInBufIndex] = bufPtr
 				fmt.Println("read in -> create new buf(", bufIntSize, "bytes)")
 			}
-			// else {
-			// 	fmt.Println("use old read in buf ")
-			// }
+
 			segSize := bufIntSize
 			readInBuf := *bufPtr
 
@@ -131,19 +129,13 @@ func rangeFileResponse(w *http.ResponseWriter, pathStr *string, bytesPosList []i
 			}
 			writeOutBuf := *outBufPtr
 
-			// readInBuf := make([]byte, bufIntSize)
-
 			// fi, _ := file.Stat()
 			// fileBytesTotal := fi.Size()
-			// fmt.Println("rangeFileResponse(),file bytes total: ", fileBytesTotal, " read bytes total: ", bytesTotalSize, bufIntSize, ",index:", readInBufIndex)
 			defer file.Close()
 
 			rbytesSize := 0
 
 			pos := int64(bytesPosList[0])
-			// TODO(VILY): 需要优化，不能每次调用都创建这样一个内存块。但是这里要考虑并行或并发的问题。目前这样用无法解决并行问题。
-			//readBuf := readInBuf
-
 			//var buf []byte
 			var outPos int = 0
 			var segSizeInt = int(segSize)
@@ -171,9 +163,6 @@ func rangeFileResponse(w *http.ResponseWriter, pathStr *string, bytesPosList []i
 				pos += segSize
 				outPos += segSizeInt
 			}
-			// if len(buf) != bytesTotalSize {
-			// 	fmt.Println("read in range bytes error.")
-			// }
 			buf := writeOutBuf[:bytesTotalSize]
 			wr.Write(buf)
 		} else {
@@ -193,9 +182,7 @@ func wholeFileResponse(w *http.ResponseWriter, pathStr *string) {
 	fmt.Println("wholeFileResponse(), pathStr", *pathStr)
 	buf, err := ioutil.ReadFile("." + (*pathStr))
 	if err != nil {
-		// log.Fatal(err)
 		fmt.Println("Error: ", err)
-		// fmt.Fprintf(w, "Error: illegal request !!!");
 		fmt.Fprintf(wr, errorTemplate)
 	} else {
 
@@ -213,13 +200,10 @@ func gzipResponse(w *http.ResponseWriter, pathStr *string) {
 	fmt.Println("gzipResponse(), pathStr", *pathStr)
 	buf, err := ioutil.ReadFile("." + (*pathStr))
 	if err != nil {
-		// log.Fatal(err)
 		fmt.Println("Error: ", err)
-		// fmt.Fprintf(w, "Error: illegal request !!!");
 		fmt.Fprintf(wr, errorTemplate)
 	} else {
 		contentType := http.DetectContentType(buf)
-		// fmt.Println("contentType: ", contentType)
 		header := wr.Header()
 		header.Set("Content-Type", contentType)
 		header.Set("Server", "golang")
