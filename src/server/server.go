@@ -72,42 +72,60 @@ func calcInBufIndex(po2 float64) float64 {
 	return math.Log(po2) / math.Ln2
 }
 
-var segSize int64 = 4096
+// var segSize int64 = 4096
 var emptyBuf []byte
-var in_4096_buf []byte = make([]byte, 4096)
+
+// var in_4096_buf []byte = make([]byte, 4096)
 var in_bufs [32]*[]byte
 
 func rangeFileResponse(w *http.ResponseWriter, pathStr *string, bytesPosList []int) {
 
 	wr := (*w)
 
-	fmt.Println("rangeFileResponse(), pathStr", *pathStr)
-	bytesTotalSize := bytesPosList[1] - bytesPosList[0]
-	bufSizef64 := calcCeilPowerOfTwo(float64(bytesTotalSize))
-	inBufIndex := int32(calcInBufIndex(bufSizef64))
-	var bufNSize int32 = int32(bufSizef64)
+	// fmt.Println("rangeFileResponse(), pathStr", *pathStr)
+	beginPos := bytesPosList[0]
+	endPos := bytesPosList[1]
+	bytesTotalSize := endPos - beginPos
 
-	fmt.Println("in_bufs[1]", in_bufs[1])
 	header := wr.Header()
 	header.Set("Content-Type", "application/octet-stream")
 	header.Set("Server", "golang")
 	if bytesTotalSize > 0 {
 		file, err := os.Open("." + (*pathStr))
 		if err == nil {
-			fi, _ := file.Stat()
-			fileBytesTotal := fi.Size()
-			fmt.Println("rangeFileResponse(),file bytes total: ", fileBytesTotal, " read bytes total: ", bytesTotalSize, bufNSize, ",index:", inBufIndex)
+
+			bufSizef64 := calcCeilPowerOfTwo(float64(bytesTotalSize))
+			readInBufIndex := int32(calcInBufIndex(bufSizef64))
+			var bufIntSize int64 = int64(bufSizef64)
+			bufPtr := in_bufs[readInBufIndex]
+			if bufPtr == nil {
+				tempBuf := make([]byte, bufIntSize)
+				bufPtr = &tempBuf
+				in_bufs[readInBufIndex] = bufPtr
+				fmt.Println("create new read in buf(", bufIntSize, "bytes)")
+			}
+			// else {
+			// 	fmt.Println("use old read in buf ")
+			// }
+			segSize := bufIntSize
+			readInBuf := *bufPtr
+
+			// readInBuf := make([]byte, bufIntSize)
+
+			// fi, _ := file.Stat()
+			// fileBytesTotal := fi.Size()
+			// fmt.Println("rangeFileResponse(),file bytes total: ", fileBytesTotal, " read bytes total: ", bytesTotalSize, bufIntSize, ",index:", readInBufIndex)
 			defer file.Close()
 
 			rbytesSize := 0
 
 			pos := int64(bytesPosList[0])
 			// TODO(VILY): 需要优化，不能每次调用都创建这样一个内存块。但是这里要考虑并行或并发的问题。目前这样用无法解决并行问题。
-			readBuf := in_4096_buf
+			//readBuf := readInBuf
 
 			var buf []byte
 			for {
-				count, err := file.ReadAt(readBuf, pos)
+				count, err := file.ReadAt(readInBuf, pos)
 				if err == io.EOF {
 					break
 				}
@@ -117,12 +135,15 @@ func rangeFileResponse(w *http.ResponseWriter, pathStr *string, bytesPosList []i
 				}
 				rbytesSize += count
 				// 这样的内存处理过程消耗也不小
-				currBytes := readBuf[:count]
+				currBytes := readInBuf[:count]
 				buf = append(buf, currBytes...)
 				if rbytesSize >= bytesTotalSize {
 					break
 				}
 				pos += segSize
+			}
+			if len(buf) != bytesTotalSize {
+				fmt.Println("read in range bytes error.")
 			}
 			wr.Write(buf)
 			return
