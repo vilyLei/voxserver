@@ -19,6 +19,8 @@ import (
 	"net/http"
 )
 
+// nohup ./server &
+// export PATH=$PATH:/usr/local/go/bin
 // go mod init voxwebserver.com/main
 // go build -o .\ ..\src\server\server.go
 // go build -o ./bin ./src/server/server.go
