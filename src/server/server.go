@@ -146,10 +146,14 @@ func rangeFileResponse(w *http.ResponseWriter, pathStr *string, bytesPosList []i
 				fmt.Println("read in range bytes error.")
 			}
 			wr.Write(buf)
-			return
+		} else {
+			fmt.Println("read in file error.")
+			wr.Write(emptyBuf)
 		}
+	} else {
+		fmt.Println("bytes range error.")
+		wr.Write(emptyBuf)
 	}
-	wr.Write(emptyBuf)
 }
 
 func wholeFileResponse(w *http.ResponseWriter, pathStr *string) {
@@ -264,8 +268,53 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 }
+func testArray() {
+	arr := [5]int{0, 1, 2, 3, 4}
+	fmt.Println("arr: ", arr)
+	fmt.Println("arr[0]: ", arr[0])
+	subArr := arr[:3]
+	var refArr = arr[:2]
+	fmt.Println("subArr: ", subArr)
+	subArr[0] = 11
+	fmt.Printf("T01 &arr       : %p\n", &arr)
+	fmt.Printf("T01 &subArr    : %p\n", &subArr)
+	fmt.Printf("T01 &refArr    : %p\n", &refArr)
+	fmt.Printf("T01b &arr[0]   : %p\n", &arr[0])
+	fmt.Printf("T01b &subArr[0]: %p\n", &subArr[0])
+	fmt.Println("T01 arr: ", arr)
+	fmt.Println("T01 subArr: ", subArr)
+	arr[0] = 21
+	arr[1] = 22
+	fmt.Println("T02 arr: ", arr)
+	fmt.Println("T02 subArr: ", subArr)
+	fmt.Println("T02 refArr: ", refArr)
+
+	var bigArr [10]int
+
+	fmt.Println("bigArr: ", bigArr)
+	srcIntArr := []int{1, 2, 3, 4, 5}
+	dstIntArr := make([]int, 5)
+
+	fmt.Println("#### ##### ##### ##### ##### ####")
+	numberOfElementsCopied := copy(dstIntArr, srcIntArr)
+	fmt.Println("numberOfElementsCopied: ", numberOfElementsCopied)
+	fmt.Println("A srcIntArr: ", srcIntArr)
+	fmt.Println("A dstIntArr: ", dstIntArr)
+	srcIntArr[0] = 30
+	fmt.Println("B srcIntArr: ", srcIntArr)
+	fmt.Println("B dstIntArr: ", dstIntArr)
+	src1 := arr[:2]
+	dst1 := dstIntArr[:2]
+	numberOfElementsCopied = copy(dst1, src1)
+	fmt.Println("numberOfElementsCopied: ", numberOfElementsCopied)
+	fmt.Println("C srcIntArr: ", srcIntArr)
+	fmt.Println("C dstIntArr: ", dstIntArr)
+
+	// copy()
+}
 func main() {
 
+	testArray()
 	// for i ,v := range os.Args {
 	// 	fmt.Println(i, v)
 	// }
