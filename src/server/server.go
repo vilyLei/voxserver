@@ -76,7 +76,10 @@ func calcInBufIndex(po2 float64) float64 {
 var emptyBuf []byte
 
 // var in_4096_buf []byte = make([]byte, 4096)
+// 每次 for  循环最多读取 32kb
+var maxBufBytesSize float64 = 1024 * 32
 var in_bufs [32]*[]byte
+var out_bufs [32]*[]byte
 
 func rangeFileResponse(w *http.ResponseWriter, pathStr *string, bytesPosList []int) {
 
@@ -95,20 +98,36 @@ func rangeFileResponse(w *http.ResponseWriter, pathStr *string, bytesPosList []i
 		if err == nil {
 
 			bufSizef64 := calcCeilPowerOfTwo(float64(bytesTotalSize))
-			readInBufIndex := int32(calcInBufIndex(bufSizef64))
-			var bufIntSize int64 = int64(bufSizef64)
+			segBufSize := bufSizef64
+			if segBufSize > maxBufBytesSize {
+				segBufSize = maxBufBytesSize
+			}
+			readInBufIndex := int32(calcInBufIndex(segBufSize))
+			var bufIntSize int64 = int64(segBufSize)
 			bufPtr := in_bufs[readInBufIndex]
 			if bufPtr == nil {
 				tempBuf := make([]byte, bufIntSize)
 				bufPtr = &tempBuf
 				in_bufs[readInBufIndex] = bufPtr
-				fmt.Println("create new read in buf(", bufIntSize, "bytes)")
+				fmt.Println("read in -> create new buf(", bufIntSize, "bytes)")
 			}
 			// else {
 			// 	fmt.Println("use old read in buf ")
 			// }
 			segSize := bufIntSize
 			readInBuf := *bufPtr
+
+			// 存放读取结果
+			bufIntSize = int64(bufSizef64)
+			readInBufIndex = int32(calcInBufIndex(bufSizef64))
+			outBufPtr := out_bufs[readInBufIndex]
+			if outBufPtr == nil {
+				tempBuf := make([]byte, bufIntSize)
+				outBufPtr = &tempBuf
+				out_bufs[readInBufIndex] = outBufPtr
+				fmt.Println("write out -> create new  buf(", bufIntSize, "bytes)")
+			}
+			writeOutBuf := *outBufPtr
 
 			// readInBuf := make([]byte, bufIntSize)
 
@@ -123,7 +142,9 @@ func rangeFileResponse(w *http.ResponseWriter, pathStr *string, bytesPosList []i
 			// TODO(VILY): 需要优化，不能每次调用都创建这样一个内存块。但是这里要考虑并行或并发的问题。目前这样用无法解决并行问题。
 			//readBuf := readInBuf
 
-			var buf []byte
+			//var buf []byte
+			var outPos int = 0
+			var segSizeInt = int(segSize)
 			for {
 				count, err := file.ReadAt(readInBuf, pos)
 				if err == io.EOF {
@@ -134,17 +155,24 @@ func rangeFileResponse(w *http.ResponseWriter, pathStr *string, bytesPosList []i
 					count -= (size - bytesTotalSize)
 				}
 				rbytesSize += count
-				// 这样的内存处理过程消耗也不小
-				currBytes := readInBuf[:count]
-				buf = append(buf, currBytes...)
+				/*
+					// 这样的内存处理过程消耗也不小
+					currBytes := readInBuf[:count]
+					buf = append(buf, currBytes...)
+					//*/
+				dst := writeOutBuf[outPos : outPos+count]
+				src := readInBuf[:count]
+				copy(dst, src)
 				if rbytesSize >= bytesTotalSize {
 					break
 				}
 				pos += segSize
+				outPos += segSizeInt
 			}
-			if len(buf) != bytesTotalSize {
-				fmt.Println("read in range bytes error.")
-			}
+			// if len(buf) != bytesTotalSize {
+			// 	fmt.Println("read in range bytes error.")
+			// }
+			buf := writeOutBuf[:bytesTotalSize]
 			wr.Write(buf)
 		} else {
 			fmt.Println("read in file error.")
@@ -314,7 +342,7 @@ func testArray() {
 }
 func main() {
 
-	testArray()
+	// testArray()
 	// for i ,v := range os.Args {
 	// 	fmt.Println(i, v)
 	// }
