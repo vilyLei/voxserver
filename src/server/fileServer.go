@@ -33,6 +33,10 @@ func main() {
 	originHandle := http.StripPrefix("/static/", fs)
 	var handleWrapper = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		respApplyCORS(&w)
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 		originHandle.ServeHTTP(w, r)
 	})
 	http.Handle("/static/", handleWrapper)

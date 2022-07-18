@@ -211,6 +211,7 @@ func gzipResponse(w *http.ResponseWriter, pathStr *string) {
 		wr.WriteHeader(http.StatusOK)
 		header.Set("Content-Type", contentType)
 		header.Set("Server", "golang")
+		header.Set("Accept-Ranges", "bytes")
 
 		// fmt.Println("gzipResponse(),contentType: ", contentType)
 
@@ -222,16 +223,18 @@ func gzipResponse(w *http.ResponseWriter, pathStr *string) {
 		case "image/x-icon":
 			fmt.Println("gzipResponse(), skip gzip.")
 
-			//setContentLength
-			header.Set("ContentLength", "10")
+			//Content-Length
+			// header.Set("Content-Length", "150")
+			header.Set("Content-Range", "150")
 			wr.Write(buf)
 			return
 		default:
+			header.Set("Content-encoding", "gzip")
+			header.Set("Content-Length", "150")
 			fmt.Println("gzipResponse(), does gzip.")
 			break
 		}
 		// header.Set("Accept-Encoding", "gzip,deflate")
-		header.Set("Content-encoding", "gzip")
 		header.Set("Vary", "Accept-Encoding")
 		var zBuf bytes.Buffer
 		zw := gzip.NewWriter(&zBuf)
