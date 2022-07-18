@@ -25,6 +25,7 @@ import (
 // go build -o .\ ..\src\server\server.go
 // go build -o ./bin ./src/server/server.go
 // go build ../src/server/server.go
+// go run ../src/server/server.go
 func SetRWriterStatus(w *http.ResponseWriter, code int) {
 	(*w).WriteHeader(code)
 }
@@ -77,6 +78,8 @@ func calcInBufIndex(po2 float64) float64 {
 // var segSize int64 = 4096
 var emptyBuf []byte
 
+var svrRootPath = ""
+
 // var in_4096_buf []byte = make([]byte, 4096)
 // 每次 for  循环最多读取 32kb
 var maxBufBytesSize float64 = 1024 * 32
@@ -96,7 +99,7 @@ func rangeFileResponse(w *http.ResponseWriter, pathStr *string, bytesPosList []i
 	header.Set("Content-Type", "application/octet-stream")
 	header.Set("Server", "golang")
 	if bytesTotalSize > 0 {
-		file, err := os.Open("." + (*pathStr))
+		file, err := os.Open((*pathStr))
 		if err == nil {
 
 			bufSizef64 := calcCeilPowerOfTwo(float64(bytesTotalSize))
@@ -180,7 +183,7 @@ func wholeFileResponse(w *http.ResponseWriter, pathStr *string) {
 	wr := (*w)
 
 	fmt.Println("wholeFileResponse(), pathStr", *pathStr)
-	buf, err := ioutil.ReadFile("." + (*pathStr))
+	buf, err := ioutil.ReadFile((*pathStr))
 	if err != nil {
 		fmt.Println("Error: ", err)
 		fmt.Fprintf(wr, errorTemplate)
@@ -198,7 +201,7 @@ func gzipResponse(w *http.ResponseWriter, pathStr *string) {
 
 	wr := (*w)
 	fmt.Println("gzipResponse(), pathStr", *pathStr)
-	buf, err := ioutil.ReadFile("." + (*pathStr))
+	buf, err := ioutil.ReadFile((*pathStr))
 	if err != nil {
 		fmt.Println("Error: ", err)
 		fmt.Fprintf(wr, errorTemplate)
@@ -242,8 +245,8 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pathStr := r.URL.Path
-
+	pathStr := svrRootPath + r.URL.Path
+	fmt.Println("handleRequest pathStr: ", pathStr)
 	var rHeader = r.Header
 	hasRange := false
 	var rangeList []string
@@ -332,6 +335,11 @@ func main() {
 	// for i ,v := range os.Args {
 	// 	fmt.Println(i, v)
 	// }
+	rootPath, err := os.Getwd()
+	if err == nil {
+		//svrRootPath = rootPath
+		fmt.Println("rootPath: ", rootPath)
+	}
 	var portStr string = "9090"
 	argsLen := len(os.Args)
 	// fmt.Println("argsLen: ", argsLen)
