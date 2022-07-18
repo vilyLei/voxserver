@@ -78,7 +78,7 @@ func calcInBufIndex(po2 float64) float64 {
 // var segSize int64 = 4096
 var emptyBuf []byte
 
-var svrRootPath = ""
+var svrRootPath = "."
 
 // var in_4096_buf []byte = make([]byte, 4096)
 // 每次 for  循环最多读取 32kb
@@ -218,6 +218,7 @@ func gzipResponse(w *http.ResponseWriter, pathStr *string) {
 		case "image/png":
 		case "image/gif":
 		case "application/octet-stream":
+		case "image/x-icon":
 			fmt.Println("gzipResponse(), skip gzip.")
 			wr.Write(buf)
 			return
