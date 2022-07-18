@@ -208,10 +208,11 @@ func gzipResponse(w *http.ResponseWriter, pathStr *string) {
 	} else {
 		contentType := http.DetectContentType(buf)
 		header := wr.Header()
+		wr.WriteHeader(http.StatusOK)
 		header.Set("Content-Type", contentType)
 		header.Set("Server", "golang")
 
-		fmt.Println("gzipResponse(),contentType: ", contentType)
+		// fmt.Println("gzipResponse(),contentType: ", contentType)
 
 		switch contentType {
 		case "image/jpeg":
@@ -220,6 +221,9 @@ func gzipResponse(w *http.ResponseWriter, pathStr *string) {
 		case "application/octet-stream":
 		case "image/x-icon":
 			fmt.Println("gzipResponse(), skip gzip.")
+
+			//setContentLength
+			header.Set("ContentLength", "10")
 			wr.Write(buf)
 			return
 		default:
