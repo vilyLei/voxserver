@@ -1,0 +1,108 @@
+{
+    "demos": [
+        {
+            "name": "emptyRenderer",
+            "info": "空渲染器(empty renderer)"
+        },
+        {
+            "name": "simpleRendererScene",
+            "info": "简单的渲染器渲染场景(simple renderer scene)"
+        },
+        {
+            "name": "base3DEntityContainer",
+            "info": "base 3D entity container"
+        },
+        {
+            "name": "3DEntityContainer",
+            "info": "3D entity container(including: transform, bounds, mouse/touch event)"
+        },
+        {
+            "name": "cameraWalkRoad",
+            "info": "摄像机跟随(camera follow)"
+        },
+        {
+            "name": "cameraWalk",
+            "info": "摄像机轨迹控制(camera path control)"
+        },
+        {
+            "name": "multiGpu2",
+            "info": "多GPU上下文和多scene(multi gpu context and multi scenes)"
+        },
+        {
+            "name": "particle",
+            "info": "粒子Demo1(particle demo1)"
+        },
+        {
+            "name": "particle2",
+            "info": "粒子Demo2(particle demo2)"
+        },
+        {
+            "name": "vsmShadow",
+            "info": "阴影和雾(shadow and fog)"
+        },
+        {
+            "name": "multiLambertLights",
+            "info": "多光源、雾、粒子(multi-lights, fog and particles)"
+        },
+        {
+            "name": "wasmMultiThead",
+            "info": "webassembly和多线程(webassembly and multi-threads)"
+        },
+        {
+            "name": "distributedRuntime",
+            "info": "分布式运行时(distributed-runtime)"
+        },
+        {
+            "name": "distributedRuntimeLightViewer",
+            "info": "分布式运行时PBR Demo(distributed-runtime pbr light rendering Demo)"
+        },
+        {
+            "name": "reflectionInWater",
+            "info": "水中倒影(the reflection in water)"
+        },
+        {
+            "name": "9samplesCoreSSAO",
+            "info": "9个采样核心的SSAO(9 samples core SSAO)"
+        },
+        {
+            "name": "avatarClothes",
+            "info": "PBR Demo: Avatar clothes"
+        },
+        {
+            "name": "morphPipeAnimation",
+            "info": "morph pipe animation(dynamically upload geometry data to gpu)"
+        },
+        {
+            "name": "largeMorphPipeAnimation",
+            "info": "large morph pipe animation(dynamically upload geometry data to gpu)"
+        },
+        {
+            "name": "MorphSpecShapePipeAnimation",
+            "info": "free-shaped morph animation"
+        },
+        {
+            "name": "RbtDrama2",
+            "info": "Robot Drama(a 3D Robot Game App Demo)"
+        },
+        {
+            "name": "slickRoad",
+            "info": "Road Editor"
+        },
+        {
+            "name": "slickRoadViewer",
+            "info": "Road model viewer"
+        },
+        {
+            "name": "renderingVerifier",
+            "info": "1000W+ triangles rendering verifier"
+        },
+        {
+            "name": "textureAtlas",
+            "info": "texture atlas system"
+        },
+        {
+            "name": "ancientApple",
+            "info": "ancient apple"
+        }
+    ]
+}
