@@ -228,27 +228,6 @@ func sendBytesBuf(w *http.ResponseWriter, sendBuf *[]byte, sendSize int) {
 	wr.WriteHeader(http.StatusOK)
 	wr.Write((*sendBuf))
 }
-func wholeFileResponse(w *http.ResponseWriter, pathStr *string) {
-
-	wr := (*w)
-
-	fmt.Println("wholeFileResponse(), pathStr", *pathStr)
-	buf, err := ioutil.ReadFile((*pathStr))
-	if err != nil {
-		fmt.Println("Error: ", err)
-		fmt.Fprintf(wr, errorTemplate)
-	} else {
-
-		contentType := http.DetectContentType(buf)
-		header := wr.Header()
-		header.Set("Content-Type", contentType)
-		header.Set("Server", "golang")
-		header.Set("Accept-Ranges", "bytes")
-		header.Set("Content-Length", strconv.Itoa(len(buf)))
-		wr.WriteHeader(http.StatusOK)
-		wr.Write(buf)
-	}
-}
 func gzipResponse(w *http.ResponseWriter, pathStr *string) {
 
 	wr := (*w)
@@ -258,6 +237,10 @@ func gzipResponse(w *http.ResponseWriter, pathStr *string) {
 		fmt.Println("Error: ", err)
 		fmt.Fprintf(wr, errorTemplate)
 	} else {
+		fi, err := os.Stat(*pathStr)
+		if err == nil {
+
+		}
 		sendSize := len(buf)
 		fmt.Println("gzipResponse(), file sendSize: ", sendSize)
 		contentType := http.DetectContentType(buf)
@@ -265,7 +248,7 @@ func gzipResponse(w *http.ResponseWriter, pathStr *string) {
 		// if strings.Contains(contentType, "text/plain") {
 		// 	contentType = "application/json"
 		// }
-		// wr.WriteHeader(http.StatusOK)
+
 		header.Set("Content-Type", contentType)
 		header.Set("Server", "golang")
 
@@ -354,11 +337,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 		// fmt.Println("rHeader bytesPosList: ", bytesPosList)
 		rangeFileResponse(&w, &pathStr, bytesPosList)
 	} else {
-		if hasRange {
-			wholeFileResponse(&w, &pathStr)
-		} else {
-			gzipResponse(&w, &pathStr)
-		}
+		gzipResponse(&w, &pathStr)
 	}
 
 }
