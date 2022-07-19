@@ -12,13 +12,14 @@ import (
 	"strings"
 
 	//"log"
-	"path/filepath"
-	// "time"
 	"bytes"
 	"math"
 	"net/http"
+	"path/filepath"
+	"time"
 )
 
+// strconv.Itoa
 // nohup ./server &
 // export PATH=$PATH:/usr/local/go/bin
 // go mod init voxwebserver.com/main
@@ -29,13 +30,29 @@ import (
 func SetRWriterStatus(w *http.ResponseWriter, code int) {
 	(*w).WriteHeader(code)
 }
-func respApplyCORS(w *http.ResponseWriter) {
+func testCORS(w *http.ResponseWriter, r *http.Request) bool {
 	header := (*w).Header()
 	header.Set("Access-Control-Allow-Origin", "*")
 	// header.Set("Access-Control-Allow-Credentials", "true")
 	//header.Set("Access-Control-Allow-Headers", "Range, Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
 	header.Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
 	header.Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT")
+	if r.Method == "OPTIONS" {
+		(*w).WriteHeader(http.StatusNoContent)
+		return false
+	}
+	return true
+}
+
+var unixEpochTime = time.Unix(0, 0)
+
+func isZeroTime(t time.Time) bool {
+	return t.IsZero() || t.Equal(unixEpochTime)
+}
+func setLastModified(w http.ResponseWriter, modtime time.Time) {
+	if !isZeroTime(modtime) {
+		w.Header().Set("Last-Modified", modtime.UTC().Format(http.TimeFormat))
+	}
 }
 
 var errorTemplate string = `
@@ -81,31 +98,46 @@ var emptyBuf []byte
 var svrRootPath = "."
 
 // var in_4096_buf []byte = make([]byte, 4096)
-// 每次 for  循环最多读取 32kb
-var maxBufBytesSize float64 = 1024 * 32
+// 每次 for 循环最多读取 128 kb bytes
+var maxSegBufSize float64 = 1024 * 128
+
+var maxBytesSize int = 1024 * 1024 * 128
+
 var in_bufs [32]*[]byte
 var out_bufs [32]*[]byte
 
-func rangeFileResponse(w *http.ResponseWriter, pathStr *string, bytesPosList []int) {
+func readFileBySteps(w *http.ResponseWriter, pathStr *string, beginPos int, endPos int) (*[]byte, int) {
 
-	wr := (*w)
+	// fmt.Println("readFileBySteps(), pathStr", *pathStr)
 
-	// fmt.Println("rangeFileResponse(), pathStr", *pathStr)
-	beginPos := bytesPosList[0]
-	endPos := bytesPosList[1]
+	if beginPos < 0 {
+		beginPos = 0
+	}
 	bytesTotalSize := endPos - beginPos
 
-	header := wr.Header()
-	header.Set("Content-Type", "application/octet-stream")
-	header.Set("Server", "golang")
+	sendBuf := emptyBuf
+	sendSize := 0
+
 	if bytesTotalSize > 0 {
 		file, err := os.Open((*pathStr))
 		if err == nil {
 
+			fi, _ := file.Stat()
+			fileBytesTotal := int(fi.Size())
+			if endPos > fileBytesTotal {
+				endPos = fileBytesTotal
+				bytesTotalSize = endPos - beginPos
+			}
+			if bytesTotalSize < 0 {
+				sendBytesBuf(w, &sendBuf, sendSize)
+				return &emptyBuf, sendSize
+			}
+			// fmt.Println("readFileBySteps(), beginPos:", beginPos, ", endPos", endPos, ",fileBytesTotal: ", fileBytesTotal, ",bytesTotalSize: ", bytesTotalSize)
+
 			bufSizef64 := calcCeilPowerOfTwo(float64(bytesTotalSize))
 			segBufSize := bufSizef64
-			if segBufSize > maxBufBytesSize {
-				segBufSize = maxBufBytesSize
+			if segBufSize > maxSegBufSize {
+				segBufSize = maxSegBufSize
 			}
 			readInBufIndex := int32(calcInBufIndex(segBufSize))
 			var bufIntSize int64 = int64(segBufSize)
@@ -132,52 +164,70 @@ func rangeFileResponse(w *http.ResponseWriter, pathStr *string, bytesPosList []i
 			}
 			writeOutBuf := *outBufPtr
 
-			// fi, _ := file.Stat()
-			// fileBytesTotal := fi.Size()
 			defer file.Close()
 
 			rbytesSize := 0
 
-			pos := int64(bytesPosList[0])
-			//var buf []byte
+			pos := int64(beginPos)
+
 			var outPos int = 0
 			var segSizeInt = int(segSize)
 			for {
 				count, err := file.ReadAt(readInBuf, pos)
-				if err == io.EOF {
-					break
-				}
 				size := count + rbytesSize
 				if size > bytesTotalSize {
 					count -= (size - bytesTotalSize)
 				}
-				rbytesSize += count
-				/*
-					// 这样的内存处理过程消耗也不小
-					currBytes := readInBuf[:count]
-					buf = append(buf, currBytes...)
-					//*/
 				dst := writeOutBuf[outPos : outPos+count]
 				src := readInBuf[:count]
 				copy(dst, src)
+				if err == io.EOF {
+					fmt.Println("read in EOF error.")
+					break
+				}
+				rbytesSize += count
 				if rbytesSize >= bytesTotalSize {
 					break
 				}
 				pos += segSize
 				outPos += segSizeInt
 			}
-			buf := writeOutBuf[:bytesTotalSize]
-			wr.Write(buf)
+			sendBuf = writeOutBuf[:bytesTotalSize]
+			sendSize = len(sendBuf)
 		} else {
 			fmt.Println("read in file error.")
-			wr.Write(emptyBuf)
 		}
 	} else {
 		fmt.Println("bytes range error.")
-		wr.Write(emptyBuf)
 	}
+	return &sendBuf, sendSize
+
 }
 
+func rangeFileResponse(w *http.ResponseWriter, pathStr *string, bytesPosList []int) {
+
+	// fmt.Println("rangeFileResponse(), pathStr", *pathStr)
+	beginPos := bytesPosList[0]
+	endPos := bytesPosList[1]
+
+	// endPos = maxBytesSize
+
+	bufPtr, bufSize := readFileBySteps(w, pathStr, beginPos, endPos)
+	sendBytesBuf(w, bufPtr, bufSize)
+}
+func sendBytesBuf(w *http.ResponseWriter, sendBuf *[]byte, sendSize int) {
+
+	wr := (*w)
+
+	header := wr.Header()
+	header.Set("Content-Type", "application/octet-stream")
+	header.Set("Server", "golang")
+	header.Set("Accept-Ranges", "bytes")
+	header.Set("Content-Length", strconv.Itoa(sendSize))
+
+	wr.WriteHeader(http.StatusOK)
+	wr.Write((*sendBuf))
+}
 func wholeFileResponse(w *http.ResponseWriter, pathStr *string) {
 
 	wr := (*w)
@@ -193,7 +243,9 @@ func wholeFileResponse(w *http.ResponseWriter, pathStr *string) {
 		header := wr.Header()
 		header.Set("Content-Type", contentType)
 		header.Set("Server", "golang")
-
+		header.Set("Accept-Ranges", "bytes")
+		header.Set("Content-Length", strconv.Itoa(len(buf)))
+		wr.WriteHeader(http.StatusOK)
 		wr.Write(buf)
 	}
 }
@@ -206,52 +258,69 @@ func gzipResponse(w *http.ResponseWriter, pathStr *string) {
 		fmt.Println("Error: ", err)
 		fmt.Fprintf(wr, errorTemplate)
 	} else {
+		sendSize := len(buf)
+		fmt.Println("gzipResponse(), file sendSize: ", sendSize)
 		contentType := http.DetectContentType(buf)
 		header := wr.Header()
-		wr.WriteHeader(http.StatusOK)
+		// if strings.Contains(contentType, "text/plain") {
+		// 	contentType = "application/json"
+		// }
+		// wr.WriteHeader(http.StatusOK)
 		header.Set("Content-Type", contentType)
 		header.Set("Server", "golang")
-		header.Set("Accept-Ranges", "bytes")
 
-		// fmt.Println("gzipResponse(),contentType: ", contentType)
+		var sendBuf []byte = buf
+		fmt.Println("gzipResponse(),contentType: ", contentType)
 
 		switch contentType {
-		case "image/jpeg":
-		case "image/png":
-		case "image/gif":
-		case "application/octet-stream":
-		case "image/x-icon":
-			fmt.Println("gzipResponse(), skip gzip.")
-
-			//Content-Length
-			// header.Set("Content-Length", "150")
-			header.Set("Content-Range", "150")
-			wr.Write(buf)
-			return
+		case "image/jpeg", "image/png", "image/gif", "application/octet-stream", "image/x-icon":
+			fmt.Println("gzipResponse(), skip gzip, sendSize: ", sendSize)
+			if header.Get("Content-Encoding") == "" {
+				header.Set("Content-Length", strconv.Itoa(sendSize))
+			}
 		default:
-			header.Set("Content-encoding", "gzip")
-			header.Set("Content-Length", "150")
-			fmt.Println("gzipResponse(), does gzip.")
-			break
+			var zBuf bytes.Buffer
+			zw := gzip.NewWriter(&zBuf)
+
+			// header.Set("Content-Length", strconv.Itoa(sendSize))
+			// wr.WriteHeader(http.StatusFound)
+
+			if _, err = zw.Write(buf); err != nil {
+				fmt.Println("gzip is faild,err:", err)
+				header.Set("Content-Length", strconv.Itoa(sendSize))
+				zw.Close()
+			} else {
+				zw.Close()
+				sendBuf = zBuf.Bytes()
+				sendSize = len(sendBuf)
+
+				fmt.Println("gzipResponse(), does gzip, sendSize: ", len(sendBuf))
+
+				header.Set("Accept-Encoding", "gzip,deflate")
+				header.Set("Vary", "Accept-Encoding")
+				header.Set("Content-encoding", "gzip")
+
+				header.Set("Content-Length", strconv.Itoa(sendSize))
+
+				// for k, v := range header {
+				// 	fmt.Println("	header[", k, "]: ", v)
+				// }
+			}
 		}
-		// header.Set("Accept-Encoding", "gzip,deflate")
-		header.Set("Vary", "Accept-Encoding")
-		var zBuf bytes.Buffer
-		zw := gzip.NewWriter(&zBuf)
-		if _, err = zw.Write(buf); err != nil {
-			fmt.Println("gzip is faild,err:", err)
-		}
-		zw.Close()
-		wr.Write(zBuf.Bytes())
+
+		wr.WriteHeader(http.StatusOK)
+		wr.Write(sendBuf)
 	}
 }
 func handleRequest(w http.ResponseWriter, r *http.Request) {
-
-	respApplyCORS(&w)
-	if r.Method == "OPTIONS" {
-		w.WriteHeader(http.StatusNoContent)
+	if !testCORS(&w, r) {
 		return
 	}
+	// respApplyCORS(&w)
+	// if r.Method == "OPTIONS" {
+	// 	w.WriteHeader(http.StatusNoContent)
+	// 	return
+	// }
 
 	pathStr := svrRootPath + r.URL.Path
 	fmt.Println("handleRequest pathStr: ", pathStr)
@@ -292,50 +361,6 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-}
-func testArray() {
-	arr := [5]int{0, 1, 2, 3, 4}
-	fmt.Println("arr: ", arr)
-	fmt.Println("arr[0]: ", arr[0])
-	subArr := arr[:3]
-	var refArr = arr[:2]
-	fmt.Println("subArr: ", subArr)
-	subArr[0] = 11
-	fmt.Printf("T01 &arr       : %p\n", &arr)
-	fmt.Printf("T01 &subArr    : %p\n", &subArr)
-	fmt.Printf("T01 &refArr    : %p\n", &refArr)
-	fmt.Printf("T01b &arr[0]   : %p\n", &arr[0])
-	fmt.Printf("T01b &subArr[0]: %p\n", &subArr[0])
-	fmt.Println("T01 arr: ", arr)
-	fmt.Println("T01 subArr: ", subArr)
-	arr[0] = 21
-	arr[1] = 22
-	fmt.Println("T02 arr: ", arr)
-	fmt.Println("T02 subArr: ", subArr)
-	fmt.Println("T02 refArr: ", refArr)
-
-	var bigArr [10]int
-
-	fmt.Println("bigArr: ", bigArr)
-	srcIntArr := []int{1, 2, 3, 4, 5}
-	dstIntArr := make([]int, 5)
-
-	fmt.Println("#### ##### ##### ##### ##### ####")
-	numberOfElementsCopied := copy(dstIntArr, srcIntArr)
-	fmt.Println("numberOfElementsCopied: ", numberOfElementsCopied)
-	fmt.Println("A srcIntArr: ", srcIntArr)
-	fmt.Println("A dstIntArr: ", dstIntArr)
-	srcIntArr[0] = 30
-	fmt.Println("B srcIntArr: ", srcIntArr)
-	fmt.Println("B dstIntArr: ", dstIntArr)
-	src1 := arr[:2]
-	dst1 := dstIntArr[:2]
-	numberOfElementsCopied = copy(dst1, src1)
-	fmt.Println("numberOfElementsCopied: ", numberOfElementsCopied)
-	fmt.Println("C srcIntArr: ", srcIntArr)
-	fmt.Println("C dstIntArr: ", dstIntArr)
-
-	// copy()
 }
 func main() {
 
