@@ -21,13 +21,14 @@ import (
 )
 
 // strconv.Itoa
-// nohup ./server &
+// nohup ./webserver &
 // export PATH=$PATH:/usr/local/go/bin
 // go mod init voxwebserver.com/main
-// go build -o .\ ..\src\server\server.go
-// go build -o ./bin ./src/server/server.go
-// go build ../src/server/server.go
-// go run ../src/server/server.go
+// go build -o .\ ..\src\server\webserver.go
+// go build -o ./bin ./src/server/webserver.go
+// go build ../src/server/webserver.go
+// go run ../src/server/webserver.go
+
 func SetRWriterStatus(w *http.ResponseWriter, code int) {
 	(*w).WriteHeader(code)
 }
