@@ -8,6 +8,7 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
+	"io/fs"
 	"io/ioutil"
 	"strings"
 
@@ -106,7 +107,7 @@ var maxBytesSize int = 1024 * 1024 * 128
 var in_bufs [32]*[]byte
 var out_bufs [32]*[]byte
 
-func readFileBySteps(w *http.ResponseWriter, pathStr *string, beginPos int, endPos int) (*[]byte, int) {
+func readFileBySteps(w *http.ResponseWriter, pathStr *string, beginPos int, endPos int) (*[]byte, int, *fs.FileInfo) {
 
 	// fmt.Println("readFileBySteps(), pathStr", *pathStr)
 
@@ -117,12 +118,13 @@ func readFileBySteps(w *http.ResponseWriter, pathStr *string, beginPos int, endP
 
 	sendBuf := emptyBuf
 	sendSize := 0
-
+	var fiPtr *fs.FileInfo = nil
 	if bytesTotalSize > 0 {
 		file, err := os.Open((*pathStr))
 		if err == nil {
 
 			fi, _ := file.Stat()
+			fiPtr = &fi
 			fileBytesTotal := int(fi.Size())
 			if endPos > fileBytesTotal {
 				endPos = fileBytesTotal
@@ -130,7 +132,7 @@ func readFileBySteps(w *http.ResponseWriter, pathStr *string, beginPos int, endP
 			}
 			if bytesTotalSize < 0 {
 				sendBytesBuf(w, &sendBuf, sendSize)
-				return &emptyBuf, sendSize
+				return &emptyBuf, sendSize, fiPtr
 			}
 			// fmt.Println("readFileBySteps(), beginPos:", beginPos, ", endPos", endPos, ",fileBytesTotal: ", fileBytesTotal, ",bytesTotalSize: ", bytesTotalSize)
 
@@ -200,7 +202,7 @@ func readFileBySteps(w *http.ResponseWriter, pathStr *string, beginPos int, endP
 	} else {
 		fmt.Println("bytes range error.")
 	}
-	return &sendBuf, sendSize
+	return &sendBuf, sendSize, fiPtr
 
 }
 
@@ -212,13 +214,15 @@ func rangeFileResponse(w *http.ResponseWriter, pathStr *string, bytesPosList []i
 
 	// endPos = maxBytesSize
 
-	bufPtr, bufSize := readFileBySteps(w, pathStr, beginPos, endPos)
-	sendBytesBuf(w, bufPtr, bufSize)
+	bufPtr, bufSize, fiPtr := readFileBySteps(w, pathStr, beginPos, endPos)
+	sendBytesBuf(w, bufPtr, bufSize, fiPtr)
 }
-func sendBytesBuf(w *http.ResponseWriter, sendBuf *[]byte, sendSize int) {
+func sendBytesBuf(w *http.ResponseWriter, sendBuf *[]byte, sendSize int, fiPtr *fs.FileInfo) {
 
 	wr := (*w)
-
+	if fiPtr != nil {
+		setLastModified(wr, (*fiPtr).ModTime())
+	}
 	header := wr.Header()
 	header.Set("Content-Type", "application/octet-stream")
 	header.Set("Server", "golang")
@@ -239,7 +243,7 @@ func gzipResponse(w *http.ResponseWriter, pathStr *string) {
 	} else {
 		fi, err := os.Stat(*pathStr)
 		if err == nil {
-
+			setLastModified(wr, fi.ModTime())
 		}
 		sendSize := len(buf)
 		fmt.Println("gzipResponse(), file sendSize: ", sendSize)
@@ -308,11 +312,9 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 	pathStr := svrRootPath + r.URL.Path
 	fmt.Println("handleRequest pathStr: ", pathStr)
 	var rHeader = r.Header
-	hasRange := false
 	var rangeList []string
 	rangeListSize := 0
 	if _, v := rHeader["Range"]; v {
-		hasRange = true
 		rangeList = rHeader["Range"]
 		rangeListSize = len(rangeList)
 	}
