@@ -4,7 +4,7 @@
 
 // HTTP file system request handler
 
-package file
+package fileMod
 
 import (
 	"errors"
@@ -26,7 +26,7 @@ import (
 	"time"
 )
 
-// go mod init voxserver.com/file
+// go mod init voxserver.com/fileMod
 
 // A Dir implements FileSystem using the native file system restricted to a
 // specific directory tree.
@@ -260,6 +260,8 @@ var errNoOverlap = errors.New("invalid range: failed to overlap")
 // content must be seeked to the beginning of the file.
 // The sizeFunc is called at most once. Its error, if any, is sent in the HTTP response.
 func serveContent(w http.ResponseWriter, r *http.Request, name string, modtime time.Time, sizeFunc func() (int64, error), content io.ReadSeeker) {
+
+	log.Println("filefs::serveContent() bengin.")
 	setLastModified(w, modtime)
 	done, rangeReq := checkPreconditions(w, r, modtime)
 	if done {
@@ -298,11 +300,13 @@ func serveContent(w http.ResponseWriter, r *http.Request, name string, modtime t
 
 	// handle Content-Range header.
 	sendSize := size
+	log.Println("filefs::serveContent() sendSize: ", sendSize)
 	var sendContent io.Reader = content
 	if size >= 0 {
 		ranges, err := parseRange(rangeReq, size)
 		if err != nil {
 			if err == errNoOverlap {
+				log.Println("filefs::serveContent() err == errNoOverlap.")
 				w.Header().Set("Content-Range", fmt.Sprintf("bytes */%d", size))
 			}
 			http.Error(w, err.Error(), http.StatusRequestedRangeNotSatisfiable)
@@ -317,6 +321,7 @@ func serveContent(w http.ResponseWriter, r *http.Request, name string, modtime t
 		}
 		switch {
 		case len(ranges) == 1:
+			log.Println("filefs::serveContent() len(ranges) == 1.")
 			// RFC 7233, Section 4.1:
 			// "If a single part is being transferred, the server
 			// generating the 206 response MUST generate a
@@ -337,6 +342,7 @@ func serveContent(w http.ResponseWriter, r *http.Request, name string, modtime t
 			code = http.StatusPartialContent
 			w.Header().Set("Content-Range", ra.contentRange(size))
 		case len(ranges) > 1:
+			log.Println("filefs::serveContent() len(ranges) > 1.")
 			sendSize = rangesMIMESize(ranges, ctype, size)
 			code = http.StatusPartialContent
 
@@ -371,12 +377,20 @@ func serveContent(w http.ResponseWriter, r *http.Request, name string, modtime t
 			w.Header().Set("Content-Length", strconv.FormatInt(sendSize, 10))
 		}
 	}
+	// for test
+	header := w.Header()
+	for k, v := range header {
+		log.Println("filefs::serveContent() header[", k, "]: ", v)
+	}
 
 	w.WriteHeader(code)
+	log.Println("filefs::serveContent() w.WriteHeader(code), code: ", code)
 
 	if r.Method != "HEAD" {
+		log.Println("filefs::serveContent() ready io.CopyN(), r.Method: ", r.Method)
 		io.CopyN(w, sendContent, sendSize)
 	}
+	log.Println("filefs::serveContent() end.")
 }
 
 // scanETag determines if a syntactically valid ETag is present at s. If so,
@@ -634,7 +648,7 @@ func serveFile(w http.ResponseWriter, r *http.Request, fs FileSystem, name strin
 		localRedirect(w, r, "./")
 		return
 	}
-
+	log.Println("filefs::serveFile() file name: ", name)
 	f, err := fs.Open(name)
 	if err != nil {
 		msg, code := toHTTPError(err)
@@ -651,6 +665,7 @@ func serveFile(w http.ResponseWriter, r *http.Request, fs FileSystem, name strin
 	}
 
 	if redirect {
+		log.Println("filefs::serveFile() redirect.")
 		// redirect to canonical path: / at end of directory url
 		// r.URL.Path always begins with /
 		url := r.URL.Path
@@ -669,6 +684,7 @@ func serveFile(w http.ResponseWriter, r *http.Request, fs FileSystem, name strin
 
 	if d.IsDir() {
 		url := r.URL.Path
+		log.Println("filefs::serveFile() d.IsDir A, url: ", url)
 		// redirect if the directory name doesn't end in a slash
 		if url == "" || url[len(url)-1] != '/' {
 			localRedirect(w, r, path.Base(url)+"/")
@@ -691,6 +707,7 @@ func serveFile(w http.ResponseWriter, r *http.Request, fs FileSystem, name strin
 
 	// Still a directory? (we didn't find an index.html file)
 	if d.IsDir() {
+		log.Println("filefs::serveFile() d.IsDir B.")
 		if checkIfModifiedSince(r, d.ModTime()) == condFalse {
 			writeNotModified(w)
 			return
@@ -699,7 +716,8 @@ func serveFile(w http.ResponseWriter, r *http.Request, fs FileSystem, name strin
 		dirList(w, r, f)
 		return
 	}
-
+	log.Println("filefs::serveFile() file is not a dir, ready serveContent(), d.Name(): ", d.Name())
+	log.Println("		d.Name(): ", d.Name(), ",d.Size(): ", d.Size())
 	// serveContent will check modification time
 	sizeFunc := func() (int64, error) { return d.Size(), nil }
 	serveContent(w, r, d.Name(), d.ModTime(), sizeFunc, f)
@@ -727,6 +745,7 @@ func localRedirect(w http.ResponseWriter, r *http.Request, newPath string) {
 	if q := r.URL.RawQuery; q != "" {
 		newPath += "?" + q
 	}
+	log.Println("filefs::localRedirect()...")
 	w.Header().Set("Location", newPath)
 	w.WriteHeader(http.StatusMovedPermanently)
 }
@@ -888,6 +907,7 @@ func (f *fileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		upath = "/" + upath
 		r.URL.Path = upath
 	}
+	log.Println("filefs::ServeHTTP(), upath: ", upath)
 	serveFile(w, r, f.root, path.Clean(upath), true)
 }
 

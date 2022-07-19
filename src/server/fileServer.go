@@ -6,8 +6,18 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+
+	"voxserver.com/fileMod"
 )
 
+// go mod init voxserver.com/fileMod
+
+// go build ../src/server/fileserver.go
+// go run ../src/server/fileserver.go
+// go build -o ../../bin/ fileserver.go
+
+// go mod init voxserver.com/main
+// go mod edit -replace voxserver.com/fileMod=./fileMod
 /*
 var orig = http.StripPrefix("/static/", http.FileServer(http.Dir(".")))
 var wrapped = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -19,25 +29,30 @@ var wrapped = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 http.Handle("/static/", wrapped)
 */
-func respApplyCORS(w *http.ResponseWriter) {
+func corsTest(w *http.ResponseWriter, r *http.Request) bool {
 	header := (*w).Header()
 	header.Set("Access-Control-Allow-Origin", "*")
 	// header.Set("Access-Control-Allow-Credentials", "true")
 	//header.Set("Access-Control-Allow-Headers", "Range, Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
 	header.Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
 	header.Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT")
+	if r.Method == "OPTIONS" {
+		(*w).WriteHeader(http.StatusNoContent)
+		return false
+	}
+	return true
 }
 func main() {
 
-	fs := http.FileServer(http.Dir("./static"))
+	// fs1 := http.FileServer(http.Dir("./static"))
+	fs := fileMod.FileServer(fileMod.Dir("./static"))
 	originHandle := http.StripPrefix("/static/", fs)
 	var handleWrapper = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		respApplyCORS(&w)
-		if r.Method == "OPTIONS" {
-			w.WriteHeader(http.StatusNoContent)
-			return
+		flag := corsTest(&w, r)
+		if flag {
+			log.Println("file server handleWrapper call ServeHTTP().")
+			originHandle.ServeHTTP(w, r)
 		}
-		originHandle.ServeHTTP(w, r)
 	})
 	http.Handle("/static/", handleWrapper)
 
@@ -45,9 +60,14 @@ func main() {
 	// http.Handle("/static/", http.StripPrefix("/static/", fs))
 
 	// http.HandleFunc("/", serveTemplate)
-
-	log.Print("Listening on :9091...")
-	err := http.ListenAndServe(":9091", nil)
+	var portStr string = "9090"
+	argsLen := len(os.Args)
+	if argsLen > 1 {
+		portStr = "" + os.Args[1]
+	}
+	log.Println("init file server ver 0.1.1")
+	log.Println("file server init current port: ", portStr)
+	err := http.ListenAndServe(":"+portStr, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
