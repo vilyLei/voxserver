@@ -107,7 +107,7 @@ var maxBytesSize int = 1024 * 1024 * 128
 var in_bufs [32]*[]byte
 var out_bufs [32]*[]byte
 
-func readFileBySteps(w *http.ResponseWriter, pathStr *string, beginPos int, endPos int) (*[]byte, int, *fs.FileInfo) {
+func readFileBySteps(pathStr *string, beginPos int, endPos int) (*[]byte, int, *fs.FileInfo) {
 
 	// fmt.Println("readFileBySteps(), pathStr", *pathStr)
 
@@ -147,7 +147,7 @@ func readFileBySteps(w *http.ResponseWriter, pathStr *string, beginPos int, endP
 				tempBuf := make([]byte, bufIntSize)
 				bufPtr = &tempBuf
 				in_bufs[readInBufIndex] = bufPtr
-				fmt.Println("read in -> create new buf(", bufIntSize, "bytes)")
+				// fmt.Println("read in -> create new buf(", bufIntSize, "bytes)")
 			}
 
 			segSize := bufIntSize
@@ -161,7 +161,7 @@ func readFileBySteps(w *http.ResponseWriter, pathStr *string, beginPos int, endP
 				tempBuf := make([]byte, bufIntSize)
 				outBufPtr = &tempBuf
 				out_bufs[readInBufIndex] = outBufPtr
-				fmt.Println("write out -> create new  buf(", bufIntSize, "bytes)")
+				// fmt.Println("write out -> create new  buf(", bufIntSize, "bytes)")
 			}
 			writeOutBuf := *outBufPtr
 
@@ -213,7 +213,7 @@ func rangeFileResponse(w *http.ResponseWriter, pathStr *string, bytesPosList []i
 
 	// endPos = maxBytesSize
 
-	bufPtr, bufSize, fiPtr := readFileBySteps(w, pathStr, beginPos, endPos)
+	bufPtr, bufSize, fiPtr := readFileBySteps(pathStr, beginPos, endPos)
 	sendBytesBuf(w, bufPtr, bufSize, fiPtr)
 }
 func sendBytesBuf(w *http.ResponseWriter, sendBuf *[]byte, sendSize int, fiPtr *fs.FileInfo) {
@@ -234,7 +234,7 @@ func sendBytesBuf(w *http.ResponseWriter, sendBuf *[]byte, sendSize int, fiPtr *
 func gzipResponse(w *http.ResponseWriter, pathStr *string) {
 
 	wr := (*w)
-	fmt.Println("gzipResponse(), pathStr", *pathStr)
+	// fmt.Println("gzipResponse(), pathStr", *pathStr)
 	buf, err := ioutil.ReadFile((*pathStr))
 	if err != nil {
 		fmt.Println("Error: ", err)
@@ -245,7 +245,7 @@ func gzipResponse(w *http.ResponseWriter, pathStr *string) {
 			setLastModified(wr, fi.ModTime())
 		}
 		sendSize := len(buf)
-		fmt.Println("gzipResponse(), file sendSize: ", sendSize)
+		// fmt.Println("gzipResponse(), file sendSize: ", sendSize)
 		contentType := http.DetectContentType(buf)
 		header := wr.Header()
 		// if strings.Contains(contentType, "text/plain") {
@@ -260,7 +260,7 @@ func gzipResponse(w *http.ResponseWriter, pathStr *string) {
 
 		switch contentType {
 		case "image/jpeg", "image/png", "image/gif", "application/octet-stream", "image/x-icon":
-			fmt.Println("gzipResponse(), skip gzip, sendSize: ", sendSize)
+			// fmt.Println("gzipResponse(), skip gzip, sendSize: ", sendSize)
 			if header.Get("Content-Encoding") == "" {
 				header.Set("Content-Length", strconv.Itoa(sendSize))
 			}
@@ -309,7 +309,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 	// }
 
 	pathStr := svrRootPath + r.URL.Path
-	fmt.Println("handleRequest pathStr: ", pathStr)
+	// fmt.Println("handleRequest pathStr: ", pathStr)
 	var rHeader = r.Header
 	var rangeList []string
 	rangeListSize := 0
