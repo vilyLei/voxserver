@@ -276,7 +276,7 @@ func gzipResponse(w *http.ResponseWriter, pathStr *string) {
 				sendBuf = zBuf.Bytes()
 				sendSize = len(sendBuf)
 
-				fmt.Println("gzipResponse(), does gzip, sendSize: ", len(sendBuf))
+				// fmt.Println("gzipResponse(), does gzip, sendSize: ", len(sendBuf))
 
 				header.Set("Accept-Encoding", "gzip,deflate")
 				header.Set("Vary", "Accept-Encoding")
