@@ -131,7 +131,6 @@ func readFileBySteps(w *http.ResponseWriter, pathStr *string, beginPos int, endP
 				bytesTotalSize = endPos - beginPos
 			}
 			if bytesTotalSize < 0 {
-				sendBytesBuf(w, &sendBuf, sendSize)
 				return &emptyBuf, sendSize, fiPtr
 			}
 			// fmt.Println("readFileBySteps(), beginPos:", beginPos, ", endPos", endPos, ",fileBytesTotal: ", fileBytesTotal, ",bytesTotalSize: ", bytesTotalSize)
