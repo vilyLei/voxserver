@@ -94,12 +94,10 @@ func calcInBufIndex(po2 float64) float64 {
 	return math.Log(po2) / math.Ln2
 }
 
-// var segSize int64 = 4096
 var emptyBuf []byte
 
 var svrRootPath = "."
 
-// var in_4096_buf []byte = make([]byte, 4096)
 // 每次 for 循环最多读取 128 kb bytes
 var maxSegBufSize float64 = 1024 * 128
 
@@ -269,9 +267,6 @@ func gzipResponse(w *http.ResponseWriter, pathStr *string) {
 			var zBuf bytes.Buffer
 			zw := gzip.NewWriter(&zBuf)
 
-			// header.Set("Content-Length", strconv.Itoa(sendSize))
-			// wr.WriteHeader(http.StatusFound)
-
 			if _, err = zw.Write(buf); err != nil {
 				fmt.Println("gzip is faild,err:", err)
 				header.Set("Content-Length", strconv.Itoa(sendSize))
@@ -303,12 +298,6 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 	if !testCORS(&w, r) {
 		return
 	}
-	// respApplyCORS(&w)
-	// if r.Method == "OPTIONS" {
-	// 	w.WriteHeader(http.StatusNoContent)
-	// 	return
-	// }
-
 	pathStr := svrRootPath + r.URL.Path
 	// fmt.Println("handleRequest pathStr: ", pathStr)
 	var rHeader = r.Header
@@ -345,7 +334,6 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 }
 func main() {
 
-	// testArray()
 	// for i ,v := range os.Args {
 	// 	fmt.Println(i, v)
 	// }
