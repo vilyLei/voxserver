@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"runtime"
 	"strconv"
 
 	// "path"
@@ -103,6 +104,7 @@ var maxSegBufSize float64 = 1024 * 128
 
 var maxBytesSize int = 1024 * 1024 * 128
 
+var bufFlags [32]int
 var in_bufs [32]*[]byte
 var out_bufs [32]*[]byte
 
@@ -149,7 +151,10 @@ func readFileBySteps(pathStr *string, beginPos int, endPos int) (*[]byte, int, *
 				in_bufs[readInBufIndex] = bufPtr
 				// fmt.Println("read in -> create new buf(", bufIntSize, "bytes)")
 			}
-
+			bufFlags[readInBufIndex] += 1
+			if bufFlags[readInBufIndex] > 1 {
+				fmt.Println("readFileBySteps(), bufFlags[", readInBufIndex, "]: ", bufFlags[readInBufIndex])
+			}
 			segSize := bufIntSize
 			readInBuf := *bufPtr
 
@@ -195,7 +200,8 @@ func readFileBySteps(pathStr *string, beginPos int, endPos int) (*[]byte, int, *
 			}
 			sendBuf = writeOutBuf[:bytesTotalSize]
 			sendSize = bytesTotalSize
-			// fmt.Println("readFileBySteps(), beginPos:", beginPos, ", endPos", endPos, ",sendSize: ", sendSize)
+			// fmt.Println("readFileBySteps(), beginPos:", beginPos, ", endPos", endPos, ",sendSize: ", sendSize, ", len(sendBuf): ", len(sendBuf))
+			bufFlags[readInBufIndex] -= 1
 		} else {
 			fmt.Println("read in file error.")
 		}
@@ -355,6 +361,8 @@ func main() {
 
 	http.Handle("/static/", handler)
 
+	fmt.Println("cpus number: ", runtime.NumCPU())
+	fmt.Println("Web Server version 1.0.1")
 	fmt.Println("Web Server started at port: ", portStr)
 	http.ListenAndServe(":"+portStr, nil)
 }
