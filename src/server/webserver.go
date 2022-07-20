@@ -115,6 +115,7 @@ func readFileBySteps(pathStr *string, beginPos int, endPos int) (*[]byte, int, *
 	}
 	bytesTotalSize := endPos - beginPos
 
+	// fmt.Println("readFileBySteps(), XXXX beginPos: ", beginPos, ", endPos: ", endPos, ",bytesTotalSize: ", bytesTotalSize)
 	sendBuf := emptyBuf
 	sendSize := 0
 	var fiPtr *fs.FileInfo = nil
@@ -193,7 +194,8 @@ func readFileBySteps(pathStr *string, beginPos int, endPos int) (*[]byte, int, *
 				outPos += segSizeInt
 			}
 			sendBuf = writeOutBuf[:bytesTotalSize]
-			sendSize = len(sendBuf)
+			sendSize = bytesTotalSize
+			// fmt.Println("readFileBySteps(), beginPos:", beginPos, ", endPos", endPos, ",sendSize: ", sendSize)
 		} else {
 			fmt.Println("read in file error.")
 		}
