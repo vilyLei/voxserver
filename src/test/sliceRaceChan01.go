@@ -5,6 +5,8 @@ import (
 	"sync"
 )
 
+// go get -u github.com/go-delve/delve/cmd/dlv
+
 type ServiceData struct {
 	ch   chan int // 用来 同步的channel
 	data []int    // 存储数据的slice

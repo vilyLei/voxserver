@@ -17,7 +17,6 @@ func countInt() {
 }
 
 func sample02() {
-	//for i := 0; i < 10; i++ {
 	for i := 0; i < 60; i++ {
 		go countInt()
 	}
