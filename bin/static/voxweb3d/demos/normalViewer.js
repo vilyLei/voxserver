@@ -212,6 +212,7 @@ class DemoTransEditor {
     this.m_interact = null;
     this.m_transUI = new TransUI_1.TransUI();
     this.m_nvaUI = new NavigationUI_1.NavigationUI();
+    this.m_urlChecker = null;
     this.m_scale = 20.0;
     this.m_tip = null;
     this.m_viewer = null;
@@ -267,6 +268,7 @@ class DemoTransEditor {
       return url;
     };
 
+    this.m_urlChecker = urlChecker;
     let url = "static/cospace/engine/uiInteract/CoUIInteraction.umd.js";
     let uiInteractML = new ModuleLoader_1.ModuleLoader(2, () => {
       this.initInteract();
@@ -376,7 +378,7 @@ class DemoTransEditor {
       this.m_graph = CoRScene.createRendererSceneGraph();
       this.m_graph.addScene(this.m_rsc);
       this.m_graph.addScene(this.m_editUIRenderer);
-      this.m_outline = new PostOutline_1.PostOutline(rscene);
+      this.m_outline = new PostOutline_1.PostOutline(rscene, this.m_urlChecker);
     }
   }
 
@@ -5865,10 +5867,10 @@ Object.defineProperty(exports, "__esModule", {
 const ModuleLoader_1 = __webpack_require__("75f5");
 
 class PostOutline {
-  constructor(rscene) {
+  constructor(rscene, urlChecker = null) {
     this.m_rscene = rscene;
     let url = "static/cospace/renderEffect/occPostOutline/OccPostOutlineModule.umd.js";
-    new ModuleLoader_1.ModuleLoader(1).setCallback(() => {
+    new ModuleLoader_1.ModuleLoader(1, null, urlChecker).setCallback(() => {
       this.m_postOutline = OccPostOutlineModule.create();
       this.initOutline();
       this.m_rscene.appendRenderNode(this);
