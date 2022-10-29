@@ -5949,7 +5949,78 @@ const NormalViewer_1 = __webpack_require__("d8b4");
 
 const PromptSystem_1 = __webpack_require__("3f7d");
 
-const CoModuleLoader_1 = __webpack_require__("2a2b");
+const CoModuleLoader_1 = __webpack_require__("2a2b"); //*
+
+
+class LoadingUI {
+  constructor() {
+    this.m_bodyDiv = null;
+    this.m_infoDiv = null;
+  }
+
+  initUI() {
+    document.body.style.background = "#000000";
+
+    if (this.m_bodyDiv == null) {
+      this.m_bodyDiv = document.createElement('div');
+      this.m_bodyDiv.style.width = "100vw";
+      this.m_bodyDiv.style.height = "100vh";
+      this.m_bodyDiv.style.zIndex = "9999";
+      this.elementCenter(this.m_bodyDiv);
+      document.body.appendChild(this.m_bodyDiv);
+      document.body.style.margin = '0';
+    }
+  }
+
+  showInfo(str) {
+    if (this.m_infoDiv == null) {
+      this.m_infoDiv = document.createElement('div');
+      this.m_infoDiv.style.backgroundColor = "rgba(255,255,255,0.1)";
+      this.m_infoDiv.style.color = "#00ee00";
+      this.m_infoDiv.style.zIndex = "10000";
+      this.elementCenter(this.m_infoDiv);
+      this.m_bodyDiv.appendChild(this.m_infoDiv);
+    } // this.m_bodyDiv.parentElement.removeChild(this.m_bodyDiv);
+    // this.m_bodyDiv.parentElement.removeChild(this.m_bodyDiv);
+    // document.body.appendChild(this.m_bodyDiv);
+
+
+    this.m_infoDiv.innerHTML = str;
+  }
+
+  showLoadProgressInfo(progress) {
+    let str = "loading " + Math.round(100.0 * progress) + "% ";
+    this.showInfo(str);
+  }
+
+  showLoadStart() {
+    this.showInfo("loading 0%");
+  }
+
+  showLoaded() {
+    this.showInfo("100%");
+  }
+
+  loadFinish(index = 0) {
+    if (this.m_bodyDiv != null) {
+      this.m_bodyDiv.parentElement.removeChild(this.m_bodyDiv);
+      this.m_bodyDiv = null;
+    }
+  }
+
+  elementCenter(ele, top = "50%", left = "50%", position = "absolute") {
+    ele.style.textAlign = "center";
+    ele.style.display = "flex";
+    ele.style.flexDirection = "column";
+    ele.style.justifyContent = "center";
+    ele.style.alignItems = "center"; // ele.style.top = top;
+    // ele.style.left = left;
+    // ele.style.position = position;
+    // ele.style.transform = "translate(-50%, -50%)";
+  }
+
+} //*/
+
 
 class SceneAccessor {
   constructor() {}
@@ -5977,6 +6048,7 @@ class DemoVox3DEditor {
     this.m_transUI = new NVTransUI_1.NVTransUI();
     this.m_nvaUI = new NVNavigationUI_1.NVNavigationUI();
     this.m_scale = 20.0;
+    this.m_loadingUI = new LoadingUI();
     this.m_tip = null;
     this.m_viewer = null;
     this.m_graph = null;
@@ -5987,18 +6059,10 @@ class DemoVox3DEditor {
       e.preventDefault();
     };
 
-    console.log("DemoVox3DEditor::initialize() ..."); // //<a href="D:\Series\Breaking Bad">Click to open a folder</a>
-    // //D:\resource\
-    // let a = document.createElement('a');
-    // a.href = "D:\\resource\\";
-    // a.text = "ddfdfdfdf"
-    // document.body.appendChild(a);
-    // (a as any).style = 'display: none';
-    // a.click();
-    // // a.remove();
-    // return;
-
+    console.log("DemoVox3DEditor::initialize() ...");
     this.initEngineModule();
+    this.m_loadingUI.initUI();
+    this.m_loadingUI.showInfo("initializing rendering engine...");
   }
 
   initEngineModule() {
@@ -6023,11 +6087,13 @@ class DemoVox3DEditor {
         console.log("engine modules loaded ...");
         this.initRenderer();
         this.initScene();
+        this.m_loadingUI.showInfo("initializing editor system...");
         new CoModuleLoader_1.CoModuleLoader(3, () => {
           console.log("math module loaded ...");
           new CoModuleLoader_1.CoModuleLoader(7, () => {
             console.log("ageom module loaded ...");
             this.initEditUI();
+            this.m_loadingUI.loadFinish(0);
           }).load(url3).load(url4).load(url6).load(url7).load(url9).load(url10).load(url11);
         }).load(url2).load(url5).load(url8);
       }
