@@ -4,9 +4,9 @@
 	else if(typeof define === 'function' && define.amd)
 		define([], factory);
 	else if(typeof exports === 'object')
-		exports["CoEditApp"] = factory();
+		exports["CoSpace"] = factory();
 	else
-		root["CoEditApp"] = factory();
+		root["CoSpace"] = factory();
 })((typeof self !== 'undefined' ? self : this), function() {
 return /******/ (function(modules) { // webpackBootstrap
 /******/ 	// The module cache
@@ -95,336 +95,6 @@ return /******/ (function(modules) { // webpackBootstrap
 /******/ })
 /************************************************************************/
 /******/ ({
-
-/***/ "0396":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-class RectFrameQuery {
-  constructor() {
-    this.m_entities = null;
-    this.m_rect = CoMath.createAABB2D();
-  }
-
-  query(entities, total) {
-    this.m_entities = [];
-
-    if (total > 0) {
-      let list = this.m_entities;
-      const rect = this.m_rect;
-      let pv = CoMath.createVec3();
-      let cam = this.m_rscene.getCamera();
-      let st = this.m_rscene.getStage3D();
-
-      for (let i = 0; i < total; ++i) {
-        if (entities[i].mouseEnabled) {
-          let bounds = entities[i].getGlobalBounds();
-          pv.copyFrom(bounds.center);
-          cam.worldPosToScreen(pv);
-          pv.x += st.stageHalfWidth;
-          pv.y += st.stageHalfHeight;
-
-          if (rect.containsXY(pv.x, pv.y)) {
-            list.push(entities[i]);
-          }
-        }
-      }
-    }
-  }
-
-  initialize(rscene) {
-    if (this.m_rscene == null) {
-      this.m_rscene = rscene;
-    }
-  }
-
-  getEntities(min, max) {
-    const rect = this.m_rect;
-    rect.setTo(min.x, min.y, max.x - min.x, max.y - min.y);
-
-    if (rect.width * rect.height > 0) {
-      let rscene = this.m_rscene;
-      rscene.getSpace().renderingEntitySet.query(this);
-      return this.m_entities;
-    }
-
-    return null;
-  }
-
-}
-
-exports.RectFrameQuery = RectFrameQuery;
-
-/***/ }),
-
-/***/ "13fc":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-const ModuleLoader_1 = __webpack_require__("75f5");
-
-const ViewerCoSApp_1 = __webpack_require__("d5ec");
-
-const PostOutline_1 = __webpack_require__("dd5f");
-
-const TransUI_1 = __webpack_require__("6b2b");
-
-const NavigationUI_1 = __webpack_require__("6c5f");
-
-const NormalViewer_1 = __webpack_require__("d8b4");
-
-const PromptSystem_1 = __webpack_require__("3f7d");
-
-class SceneAccessor {
-  constructor() {}
-
-  renderBegin(rendererScene) {
-    let p = rendererScene.getRenderProxy();
-    p.clearDepth(1.0);
-  }
-
-  renderEnd(rendererScene) {}
-
-}
-/**
- * cospace renderer
- */
-
-
-class DemoTransEditor {
-  constructor() {
-    this.m_rsc = null;
-    this.m_editUIRenderer = null;
-    this.m_uirsc = null;
-    this.m_coUIScene = null;
-    this.m_interact = null;
-    this.m_transUI = new TransUI_1.TransUI();
-    this.m_nvaUI = new NavigationUI_1.NavigationUI();
-    this.m_urlChecker = null;
-    this.m_scale = 20.0;
-    this.m_tip = null;
-    this.m_viewer = null;
-    this.m_graph = null;
-  }
-
-  initialize() {
-    document.oncontextmenu = function (e) {
-      e.preventDefault();
-    };
-
-    console.log("DemoTransEditor::initialize() ..."); // //<a href="D:\Series\Breaking Bad">Click to open a folder</a>
-    // //D:\resource\
-    // let a = document.createElement('a');
-    // a.href = "D:\\resource\\";
-    // a.text = "ddfdfdfdf"
-    // document.body.appendChild(a);
-    // (a as any).style = 'display: none';
-    // a.click();
-    // // a.remove();
-    // return;
-
-    this.initEngineModule();
-  }
-
-  initEngineModule() {
-    let urlChecker = url => {
-      if (url.indexOf(".artvily.") > 0) {
-        return url;
-      }
-
-      let hostUrl = window.location.href;
-      url = url.trim();
-
-      if (hostUrl.indexOf(".artvily.") > 0) {
-        let i = url.lastIndexOf("/");
-        let j = url.indexOf(".", i); // hostUrl = "http://localhost:9000/test/";
-
-        hostUrl = "http://www.artvily.com:9090/";
-        let fileName = url.slice(i, j).toLocaleLowerCase();
-
-        if (fileName == "") {
-          console.error("err: ", url);
-          console.error("i, j: ", i, j);
-        }
-
-        let purl = hostUrl + url.slice(0, i) + fileName + ".js";
-        console.log("urlChecker(), fileName:-" + fileName + "-");
-        console.log("urlChecker(), purl: ", purl);
-        return purl;
-      }
-
-      return url;
-    };
-
-    this.m_urlChecker = urlChecker;
-    let url = "static/cospace/engine/uiInteract/CoUIInteraction.umd.js";
-    let uiInteractML = new ModuleLoader_1.ModuleLoader(2, () => {
-      this.initInteract();
-    }, urlChecker);
-    let url0 = "static/cospace/engine/renderer/CoRenderer.umd.js";
-    let url1 = "static/cospace/engine/rscene/CoRScene.umd.js";
-    let url2 = "static/cospace/math/CoMath.umd.js";
-    let url3 = "static/cospace/ageom/CoAGeom.umd.js";
-    let url4 = "static/cospace/coedit/CoEdit.umd.js";
-    let url5 = "static/cospace/comesh/CoMesh.umd.js";
-    let url6 = "static/cospace/coentity/CoEntity.umd.js";
-    let url7 = "static/cospace/particle/CoParticle.umd.js";
-    let url8 = "static/cospace/coMaterial/CoMaterial.umd.js";
-    let url9 = "static/cospace/cotexture/CoTexture.umd.js";
-    let url10 = "static/cospace/coui/CoUI.umd.js";
-    let url11 = "static/cospace/cotext/CoText.umd.js";
-    new ModuleLoader_1.ModuleLoader(2, () => {
-      if (this.isEngineEnabled()) {
-        console.log("engine modules loaded ...");
-        this.initRenderer();
-        this.initScene();
-        new ModuleLoader_1.ModuleLoader(3, () => {
-          console.log("math module loaded ...");
-          new ModuleLoader_1.ModuleLoader(7, () => {
-            console.log("ageom module loaded ...");
-            this.initEditUI();
-          }, urlChecker).load(url3).load(url4).load(url6).load(url7).load(url9).load(url10).load(url11);
-        }, urlChecker).load(url2).load(url5).load(url8);
-        this.m_vcoapp = new ViewerCoSApp_1.ViewerCoSApp();
-        this.m_vcoapp.initialize(() => {
-          this.initModel();
-        }, urlChecker, true);
-      }
-    }, urlChecker).addLoader(uiInteractML).load(url0).load(url1);
-    uiInteractML.load(url);
-  }
-
-  initEditUI() {
-    this.m_coUIScene = CoUI.createUIScene();
-    this.m_coUIScene.initialize(this.m_rsc, 512, 5);
-    this.m_uirsc = this.m_coUIScene.rscene;
-    this.m_graph.addScene(this.m_uirsc);
-    let promptSys = new PromptSystem_1.PromptSystem();
-    promptSys.initialize(this.m_coUIScene);
-    this.m_coUIScene.prompt = promptSys; // let tip = new RectTextTip();
-
-    let tip = CoUI.createRectTextTip();
-    tip.initialize(this.m_coUIScene, 2);
-    this.m_tip = tip;
-    this.m_transUI.tip = this.m_tip;
-    this.m_transUI.setOutline(this.m_outline);
-    this.m_transUI.initialize(this.m_rsc, this.m_editUIRenderer, this.m_coUIScene);
-    this.m_nvaUI.tip = this.m_tip;
-    this.m_nvaUI.initialize(this.m_rsc, this.m_editUIRenderer, this.m_coUIScene);
-    let minV = CoMath.createVec3(-100, 0, -100);
-    let maxV = minV.clone().scaleBy(-1);
-    let scale = 10.0;
-    let grid = CoEdit.createFloorLineGrid();
-    grid.initialize(this.m_rsc, 0, minV.scaleBy(scale), maxV.scaleBy(scale), 30);
-    let viewer = new NormalViewer_1.NormalViewer();
-    viewer.initialize(this.m_coUIScene, this.m_vcoapp, this.m_transUI);
-    viewer.open();
-    this.m_viewer = viewer;
-    let entitySC = viewer.normalScene.entityScene;
-    entitySC.initialize(this.m_rsc);
-  }
-
-  initScene() {}
-
-  isEngineEnabled() {
-    return typeof CoRenderer !== "undefined" && typeof CoRScene !== "undefined";
-  }
-
-  initInteract() {
-    let r = this.m_rsc;
-
-    if (r != null && this.m_interact == null && typeof CoUIInteraction !== "undefined") {
-      this.m_interact = CoUIInteraction.createMouseInteraction();
-      this.m_interact.initialize(this.m_rsc, 2, true);
-      this.m_interact.setSyncLookAtEnabled(true);
-    }
-  }
-
-  initRenderer() {
-    if (this.m_rsc == null) {
-      let RendererDevice = CoRScene.RendererDevice;
-      RendererDevice.SHADERCODE_TRACE_ENABLED = false;
-      RendererDevice.VERT_SHADER_PRECISION_GLOBAL_HIGHP_ENABLED = true;
-      RendererDevice.SetWebBodyColor("#606060");
-      let rparam = CoRScene.createRendererSceneParam();
-      rparam.setAttriAntialias(!RendererDevice.IsMobileWeb());
-      rparam.setCamPosition(1000.0, 1000.0, 1000.0);
-      rparam.setCamProject(45, 20.0, 9000.0);
-      let rscene = CoRScene.createRendererScene(rparam, 3);
-      rscene.setClearRGBColor3f(0.23, 0.23, 0.23); // console.log("60/255: ", 60/255);
-      // rscene.setClearUint24Color((60 << 16) + (60 << 8) + 60);
-
-      rscene.addEventListener(CoRScene.MouseEvent.MOUSE_DOWN, this, this.mouseDownListener); // rscene.addEventListener(CoRScene.KeyboardEvent.KEY_DOWN, this, this.keyDown);
-      // rscene.addEventListener(CoRScene.MouseEvent.MOUSE_BG_CLICK, this, this.mouseClickListener);
-      // rscene.addEventListener(CoRScene.MouseEvent.MOUSE_RIGHT_UP, this, this.mouseUpListener, true, true);
-
-      this.m_rsc = rscene;
-      let subScene = this.m_rsc.createSubScene(rparam, 3, false);
-      subScene.enableMouseEvent(true);
-      subScene.setAccessor(new SceneAccessor());
-      this.m_editUIRenderer = subScene;
-      this.m_graph = CoRScene.createRendererSceneGraph();
-      this.m_graph.addScene(this.m_rsc);
-      this.m_graph.addScene(this.m_editUIRenderer);
-      this.m_outline = new PostOutline_1.PostOutline(rscene, this.m_urlChecker);
-    }
-  }
-
-  mouseUpListener(evt) {
-    console.log("mouse up action...");
-  }
-
-  mouseDownListener(evt) {
-    console.log("DemoTransEditor::mouseDownListener() ...");
-  }
-
-  keyDown(evt) {
-    console.log("DemoTransEditor::keyDown() ..., evt.keyCode: ", evt.keyCode);
-    let KEY = CoRScene.Keyboard;
-
-    switch (evt.keyCode) {
-      case KEY.S:
-        break;
-
-      default:
-        break;
-    }
-  }
-
-  initModel() {}
-
-  run() {
-    if (this.m_graph != null) {
-      if (this.m_interact != null) {
-        this.m_interact.run();
-      }
-
-      if (this.m_transUI != null) {
-        this.m_transUI.run();
-      }
-
-      this.m_graph.run();
-    }
-  }
-
-}
-
-exports.DemoTransEditor = DemoTransEditor;
-exports.default = DemoTransEditor;
-
-/***/ }),
 
 /***/ "1dd7":
 /***/ (function(module, exports, __webpack_require__) {
@@ -612,6 +282,14 @@ class PackedLoader {
     this.m_urlChecker = urlChecker;
   }
 
+  setUrlChecker(urlChecker = null) {
+    this.m_urlChecker = urlChecker;
+  }
+
+  getUrlChecker() {
+    return this.m_urlChecker;
+  }
+
   getUid() {
     return this.m_uid;
   }
@@ -788,6 +466,73 @@ exports.PackedLoader = PackedLoader;
 
 /***/ }),
 
+/***/ "259d":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+class NVRectFrameQuery {
+  constructor() {
+    this.m_entities = null;
+    this.m_rect = CoMath.createAABB2D();
+  }
+
+  query(entities, total) {
+    this.m_entities = [];
+
+    if (total > 0) {
+      let list = this.m_entities;
+      const rect = this.m_rect;
+      let pv = CoMath.createVec3();
+      let cam = this.m_rscene.getCamera();
+      let st = this.m_rscene.getStage3D();
+
+      for (let i = 0; i < total; ++i) {
+        if (entities[i].mouseEnabled) {
+          let bounds = entities[i].getGlobalBounds();
+          pv.copyFrom(bounds.center);
+          cam.worldPosToScreen(pv);
+          pv.x += st.stageHalfWidth;
+          pv.y += st.stageHalfHeight;
+
+          if (rect.containsXY(pv.x, pv.y)) {
+            list.push(entities[i]);
+          }
+        }
+      }
+    }
+  }
+
+  initialize(rscene) {
+    if (this.m_rscene == null) {
+      this.m_rscene = rscene;
+    }
+  }
+
+  getEntities(min, max) {
+    const rect = this.m_rect;
+    rect.setTo(min.x, min.y, max.x - min.x, max.y - min.y);
+
+    if (rect.width * rect.height > 0) {
+      let rscene = this.m_rscene;
+      rscene.getSpace().renderingEntitySet.query(this);
+      return this.m_entities;
+    }
+
+    return null;
+  }
+
+}
+
+exports.NVRectFrameQuery = NVRectFrameQuery;
+
+/***/ }),
+
 /***/ "268d":
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -854,6 +599,235 @@ class ButtonBuilder {
 }
 
 exports.ButtonBuilder = ButtonBuilder;
+
+/***/ }),
+
+/***/ "2a2b":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const ModuleLoader_1 = __webpack_require__("75f5"); //CoModuleLoader
+
+
+class CoModuleLoader extends ModuleLoader_1.ModuleLoader {
+  /**
+   * @param times 记录总共需要的加载完成操作的响应次数。这个次数可能是由load直接产生，也可能是由于别的地方驱动。
+   * @param callback 完成所有响应的之后的回调
+   */
+  constructor(times, callback = null) {
+    super(times, callback, null);
+
+    let urlChecker = url => {
+      if (url.indexOf(".artvily.") > 0) {
+        return url;
+      }
+
+      let hostUrl = window.location.href;
+      url = url.trim();
+
+      if (hostUrl.indexOf(".artvily.") > 0) {
+        let i = url.lastIndexOf("/");
+        let j = url.indexOf(".", i); // hostUrl = "http://localhost:9000/test/";
+
+        hostUrl = "http://www.artvily.com:9090/";
+        let fileName = url.slice(i, j).toLocaleLowerCase();
+
+        if (fileName == "") {
+          console.error("err: ", url);
+          console.error("i, j: ", i, j);
+        }
+
+        let purl = hostUrl + url.slice(0, i) + fileName + ".js";
+        console.log("urlChecker(), fileName:-" + fileName + "-");
+        console.log("urlChecker(), purl: ", purl);
+        return purl;
+      }
+
+      return url;
+    };
+
+    this.setUrlChecker(urlChecker);
+  }
+
+}
+
+exports.CoModuleLoader = CoModuleLoader;
+
+/***/ }),
+
+/***/ "3120":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+/**
+ * NVNavigationUI
+ */
+
+class NVNavigationUI {
+  constructor() {
+    this.m_rsc = null;
+    this.m_editUIRenderer = null;
+    this.m_uirsc = null;
+    this.m_coUIScene = null;
+    this.tip = null;
+    this.m_navBtns = [];
+    this.m_bgLabel = null;
+  }
+
+  initialize(rsc, editUIRenderer, coUIScene) {
+    if (this.m_coUIScene == null) {
+      this.m_rsc = rsc;
+      this.m_editUIRenderer = editUIRenderer;
+      this.m_coUIScene = coUIScene;
+      this.init();
+    }
+  }
+
+  init() {
+    let editsc = this.m_editUIRenderer;
+    this.initUI();
+  }
+
+  initUI() {
+    this.m_uirsc = this.m_coUIScene.rscene;
+    this.initNavigationUI();
+  }
+
+  resize(evt) {
+    let st = this.m_coUIScene.getStage();
+    this.m_bgLabel.setScaleX(st.stageWidth / this.m_bgLabelW);
+    this.m_bgLabel.setY(st.stageHeight - this.m_bgLabelH);
+    this.m_bgLabel.update();
+  }
+
+  initNavigationUI() {
+    let uiScene = this.m_coUIScene;
+    let tta = uiScene.transparentTexAtlas;
+    let px = 0;
+    let py = 0;
+    let pw = 90;
+    let ph = 40;
+    let st = this.m_coUIScene.getStage();
+    this.m_bgLabelW = st.stageWidth;
+    this.m_bgLabelH = ph;
+    let bgLabel = CoUI.createColorLabel();
+    bgLabel.initialize(this.m_bgLabelW, this.m_bgLabelH);
+    bgLabel.setY(st.stageHeight - ph);
+    bgLabel.setColor(bgLabel.getColor().setRGB3Bytes(40, 40, 40));
+    uiScene.addEntity(bgLabel);
+    this.m_bgLabel = bgLabel;
+    let EB = CoRScene.EventBase;
+    uiScene.getStage().addEventListener(EB.RESIZE, this, this.resize);
+    let keys = ["file", "edit", "model", "normal", "texture", "material", "light", "animation", "particle", "rendering", "physics", "help"];
+    let urls = ["文件", "编辑", "模型", "法线", "纹理", "材质", "灯光", "动画", "粒子", "渲染", "物理", "帮助"];
+    let infos = ["File system operations.", "Editing operations.", "Geometry model operations.", "Normal data operations.", "Texture data operations.", "Material system operations.", "Light system operations.", "Animation system operations.", "Paiticle system operations.", "Rendering system operations.", "Physics system operations.", "Help infomation."];
+    keys = urls.slice(0, 2);
+    urls = urls.slice(0, 2);
+    infos = infos.slice(0, 2);
+    keys.push("help");
+    urls.push("帮助");
+    infos.push("Help infomation");
+    let layouter = uiScene.layout.createLeftTopLayouter();
+    let fontColor = CoMaterial.createColor4().setRGB3Bytes(170, 170, 170);
+    let bgColor = CoMaterial.createColor4(1, 1, 1, 0);
+
+    for (let i = 0; i < urls.length; ++i) {
+      let img = tta.createCharsCanvasFixSize(pw, ph, urls[i], 30, fontColor, bgColor);
+      tta.addImageToAtlas(urls[i], img);
+    }
+
+    px = 0;
+    py = st.stageHeight - ph;
+
+    for (let i = 0; i < urls.length; ++i) {
+      let btn = this.crateBtn(urls, pw, ph, px + pw * i, py, i, keys[i], infos[i]);
+      this.tip.addEntity(btn);
+      this.m_navBtns.push(btn);
+      layouter.addUIEntity(btn);
+    }
+
+    this.m_coUIScene.prompt.setPromptListener(() => {
+      console.log("prompt panel confirm...");
+    }, () => {
+      console.log("prompt panel cancel...");
+    });
+  }
+
+  crateBtn(urls, pw, ph, px, py, labelIndex, idns, info) {
+    let colorClipLabel = CoUI.createClipColorLabel();
+    colorClipLabel.initializeWithoutTex(pw, ph, 4);
+    colorClipLabel.getColorAt(0).setRGB3Bytes(40, 40, 40);
+    colorClipLabel.getColorAt(1).setRGB3Bytes(50, 50, 50);
+    colorClipLabel.getColorAt(2).setRGB3Bytes(40, 40, 60);
+    let tta = this.m_coUIScene.transparentTexAtlas;
+    let iconLable = CoUI.createClipLabel();
+    iconLable.transparent = true;
+    iconLable.premultiplyAlpha = true;
+    iconLable.initialize(tta, [urls[labelIndex]]);
+    let btn = CoUI.createButton();
+    btn.uuid = idns;
+    btn.info = CoUI.createTipInfo().alignBottom().setContent(info);
+    btn.addLabel(iconLable);
+    btn.initializeWithLable(colorClipLabel);
+    btn.setXY(px, py);
+    this.m_coUIScene.addEntity(btn, 1);
+    btn.addEventListener(CoRScene.MouseEvent.MOUSE_UP, this, this.btnMouseUpListener);
+    return btn;
+  }
+
+  btnMouseUpListener(evt) {
+    // console.log("btnMouseUpListener(), evt.currentTarget: ", evt.currentTarget);
+    let uuid = evt.uuid;
+    console.log("btnMouseUpListener(), uuid: ", uuid);
+
+    switch (uuid) {
+      case "file":
+      case "edit":
+      case "model":
+      case "normal":
+      case "texture":
+      case "material":
+      case "light":
+      case "animation":
+      case "particle":
+        this.m_coUIScene.prompt.showPrompt("It can't be used now!");
+        break;
+
+      case "help":
+        this.toHelp();
+        break;
+
+      default:
+        break;
+    }
+  }
+
+  toHelp() {
+    let a = document.createElement('a');
+    a.href = "https://blog.csdn.net/vily_lei/article/details/127544595?spm=1001.2014.3001.5501";
+    a.target = "_blank";
+    document.body.appendChild(a);
+    a.style = 'display: none';
+    a.click();
+    a.remove();
+  }
+
+  run() {}
+
+}
+
+exports.NVNavigationUI = NVNavigationUI;
 
 /***/ }),
 
@@ -1384,47 +1358,118 @@ exports.NormalEntityNode = NormalEntityNode;
 
 /***/ }),
 
-/***/ "43fc":
+/***/ "4709":
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
- // import { DemoBase as Demo } from "./demo/DemoBase";
-// import { DemoMouseEvent as Demo } from "./demo/DemoMouseEvent";
-// import { DemoCoBase as Demo } from "./demo/DemoCoBase";
-// import { DemoCoMesh as Demo } from "./demo/DemoCoMesh";
-// import { DemoCoAGeom as Demo } from "./demo/DemoCoAGeom";
-// import { DemoMoveObj as Demo } from "./demo/DemoMoveObj";
+
 
 Object.defineProperty(exports, "__esModule", {
   value: true
-}); // import { DemoEditTrans as Demo } from "./demo/DemoEditTrans";
+});
 
-const DemoTransEditor_1 = __webpack_require__("13fc"); // import { DemoUIAtlas as Demo } from "./demo/DemoUIAtlas";
-// import { DemoUIScene as Demo } from "./demo/DemoUIScene";
-// import { DemoUIPanel as Demo } from "./demo/DemoUIPanel";
-// import { DemoText as Demo } from "./demo/DemoText";
-// import { DemoNormalViewer as Demo } from "./demo/DemoNormalViewer";
-// import { DemoKeyboardEvent as Demo } from "./demo/DemoKeyboardEvent";
-// import { DemoTransRecoder as Demo } from "./demo/DemoTransRecoder";
-
-
-let demoIns = new DemoTransEditor_1.DemoTransEditor();
-let ins = demoIns;
-
-function main() {
-  console.log("------ demo --- init ------");
-  ins.initialize();
-
-  function mainLoop(now) {
-    ins.run();
-    window.requestAnimationFrame(mainLoop);
+class NVUIRectLine {
+  constructor() {
+    this.m_entity = null;
+    this.m_pz = 0.0;
+    this.m_flag = false;
+    this.m_prePos = CoMath.createVec3();
+    this.m_currPos = CoMath.createVec3();
+    this.m_enabled = false;
+    this.bounds = CoMath.createAABB();
   }
 
-  window.requestAnimationFrame(mainLoop);
-  console.log("------ demo --- running ------");
+  initialize(rscene) {
+    if (this.m_entity == null) {
+      this.m_rscene = rscene;
+      this.m_entity = CoEntity.createDisplayEntity();
+      CoMesh.line.dynColorEnabled = true;
+      let material = CoMaterial.createLineMaterial(CoMesh.line.dynColorEnabled);
+      CoMesh.line.setBufSortFormat(material.getBufSortFormat());
+      let mesh = CoMesh.line.createRectXOY(0, 0, 1, 1);
+      this.m_entity.setMaterial(material);
+      this.m_entity.setMesh(mesh);
+      rscene.addEntity(this.m_entity);
+      this.disable();
+    }
+  }
+
+  enable() {
+    this.m_enabled = true;
+  }
+
+  disable() {
+    this.m_enabled = false;
+    this.setVisible(false);
+  }
+
+  isEnabled() {
+    return this.m_enabled;
+  }
+
+  isSelectEnabled() {
+    return this.m_flag && this.m_enabled && CoMath.Vector3D.Distance(this.m_prePos, this.m_currPos) > 0.98;
+  }
+
+  setVisible(v) {
+    if (this.m_entity != null) {
+      this.m_entity.setVisible(v);
+    }
+  }
+
+  isVisible() {
+    if (this.m_entity != null) {
+      return this.m_entity.getVisible();
+    }
+
+    return false;
+  }
+
+  setZ(pz) {
+    this.m_pz = pz;
+  }
+
+  begin(px, py) {
+    this.m_flag = true;
+
+    if (this.m_enabled) {
+      this.m_prePos.setXYZ(px, py, this.m_pz); // this.m_currPos.copyFrom( this.m_prePos );
+
+      this.move(px, py);
+    }
+  }
+
+  end(px, py) {
+    if (this.m_enabled) {
+      this.setVisible(false);
+    }
+
+    this.m_flag = false;
+  }
+
+  move(px, py) {
+    const v = this.m_prePos;
+
+    if (this.m_enabled && this.m_flag && CoMath.Vector3D.DistanceXYZ(v.x, v.y, 0, px, py, 0) > 1.0) {
+      if (this.m_entity != null) {
+        this.m_currPos.setXYZ(px, py, 0);
+        this.setVisible(true);
+        let b = this.bounds;
+        b.reset();
+        b.addPosition(this.m_prePos);
+        b.addXYZ(px, py, 0);
+        b.updateFast();
+        let et = this.m_entity;
+        et.setScaleXYZ(b.getWidth(), b.getHeight(), 1.0);
+        et.setPosition(b.min);
+        et.update();
+      }
+    }
+  }
+
 }
 
-main();
+exports.NVUIRectLine = NVUIRectLine;
 
 /***/ }),
 
@@ -1588,7 +1633,7 @@ class NormalEntityScene {
     this.entityManager = new NormalEntityManager_1.NormalEntityManager();
     this.exampleGroup = new NormalExampleGroup_1.NormalExampleGroup();
     this.m_uiscene = uiscene;
-    this.m_vcoapp = vcoapp;
+    this.m_coapp = vcoapp;
   }
 
   getUIScene() {
@@ -1629,7 +1674,7 @@ class NormalEntityScene {
   }
 
   loadModels(urls, typeNS = "") {
-    let group = new NormalEntityGroup_1.NormalEntityGroup(this.m_vcoapp);
+    let group = new NormalEntityGroup_1.NormalEntityGroup(this.m_coapp);
     group.rsc = this.rscene;
     group.uiscene = this.m_uiscene;
     group.transUI = this.transUI;
@@ -1865,6 +1910,344 @@ exports.NormalEntityMaterial = NormalEntityMaterial;
 
 /***/ }),
 
+/***/ "5dcb":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const UserEditEvent_1 = __webpack_require__("268d");
+
+const NVUIRectLine_1 = __webpack_require__("4709");
+
+const NVRectFrameQuery_1 = __webpack_require__("259d");
+/**
+ * NVTransUI
+ */
+
+
+class NVTransUI {
+  constructor() {
+    this.m_rsc = null;
+    this.m_editUIRenderer = null;
+    this.m_uirsc = null;
+    this.m_coUIScene = null;
+    this.m_outline = null;
+    this.tip = null;
+    this.m_transCtr = null;
+    this.m_selectFrame = null;
+    this.m_transBtns = [];
+    this.m_entityQuery = null;
+    this.m_selectList = null;
+    this.m_selectListeners = [];
+  }
+
+  setOutline(outline) {
+    this.m_outline = outline;
+  }
+
+  initialize(rsc, editUIRenderer, coUIScene) {
+    if (this.m_coUIScene == null) {
+      this.m_rsc = rsc;
+      this.m_editUIRenderer = editUIRenderer;
+      this.m_coUIScene = coUIScene;
+      this.init();
+    }
+  }
+
+  init() {
+    this.m_rsc.addEventListener(CoRScene.KeyboardEvent.KEY_DOWN, this, this.keyDown);
+    this.m_rsc.addEventListener(CoRScene.MouseEvent.MOUSE_BG_CLICK, this, this.mouseClickListener);
+    this.m_rsc.addEventListener(CoRScene.MouseEvent.MOUSE_UP, this, this.mouseUpListener, true, true);
+    let editsc = this.m_editUIRenderer;
+    this.m_transCtr = CoEdit.createTransformController();
+    this.m_transCtr.initialize(editsc);
+    this.m_transCtr.addEventListener(UserEditEvent_1.UserEditEvent.EDIT_BEGIN, this, this.editBegin);
+    this.m_transCtr.addEventListener(UserEditEvent_1.UserEditEvent.EDIT_END, this, this.editEnd);
+    this.m_prevPos = CoMath.createVec3();
+    this.m_currPos = CoMath.createVec3();
+    this.m_keyInterac = CoUIInteraction.createKeyboardInteraction();
+    this.m_keyInterac.initialize(this.m_rsc);
+    let Key = CoRScene.Keyboard;
+    let type = this.m_keyInterac.createKeysEventType([Key.CTRL, Key.Y]);
+    this.m_keyInterac.addKeysDownListener(type, this, this.keyCtrlYDown);
+    type = this.m_keyInterac.createKeysEventType([Key.CTRL, Key.Z]);
+    this.m_keyInterac.addKeysDownListener(type, this, this.keyCtrlZDown);
+    this.m_recoder = CoEdit.createTransformRecorder();
+    this.initUI();
+  }
+
+  keyCtrlZDown(evt) {
+    this.m_recoder.undo();
+    let list = this.m_recoder.getCurrList();
+    this.selectEntities(list);
+  }
+
+  keyCtrlYDown(evt) {
+    this.m_recoder.redo();
+    let list = this.m_recoder.getCurrList();
+    this.selectEntities(list);
+  }
+
+  getRecoder() {
+    return this.m_recoder;
+  }
+
+  editBegin(evt) {
+    let st = this.m_rsc.getStage3D();
+    this.m_prevPos.setXYZ(st.mouseX, st.mouseY, 0);
+  }
+
+  editEnd(evt) {
+    let st = this.m_rsc.getStage3D();
+    this.m_currPos.setXYZ(st.mouseX, st.mouseY, 0);
+
+    if (CoMath.Vector3D.Distance(this.m_prevPos, this.m_currPos) > 0.5) {
+      let list = evt.currentTarget.getTargetEntities();
+      this.m_recoder.save(list);
+    }
+  }
+
+  initUI() {
+    this.m_uirsc = this.m_coUIScene.rscene;
+    this.m_entityQuery = new NVRectFrameQuery_1.NVRectFrameQuery();
+    this.m_entityQuery.initialize(this.m_rsc);
+    let rsc = this.m_uirsc;
+    this.m_rsc.addEventListener(CoRScene.MouseEvent.MOUSE_BG_DOWN, this, this.uiMouseDownListener);
+    rsc.addEventListener(CoRScene.MouseEvent.MOUSE_UP, this, this.uiMouseUpListener);
+    rsc.addEventListener(CoRScene.MouseEvent.MOUSE_MOVE, this, this.uiMouseMoveListener);
+
+    if (this.m_selectFrame == null) {
+      this.m_selectFrame = new NVUIRectLine_1.NVUIRectLine();
+      this.m_selectFrame.initialize(this.m_uirsc);
+      this.m_selectFrame.setZ(-0.5);
+      this.m_selectFrame.enable();
+    }
+
+    this.initTransUI();
+  }
+
+  initTransUI() {
+    this.m_btnGroup = CoUI.createSelectButtonGroup();
+    let uiScene = this.m_coUIScene;
+    let tta = uiScene.transparentTexAtlas;
+    let pw = 90;
+    let ph = 70;
+    let urls = ["框选", "移动", "旋转", "缩放"];
+    let keys = ["select", "move", "rotate", "scale"];
+    let infos = ["Select items using box selection.", "Move selected items(W).", "Rotate selected items(R).", "Scale(resize) selected items(E)."];
+    let fontColor = CoMaterial.createColor4().setRGB3Bytes(170, 170, 170);
+    ;
+    let bgColor = CoMaterial.createColor4(1, 1, 1, 0);
+
+    for (let i = 0; i < urls.length; ++i) {
+      let img = tta.createCharsCanvasFixSize(pw, ph, urls[i], 30, fontColor, bgColor);
+      tta.addImageToAtlas(urls[i], img);
+    }
+
+    let px = 5;
+    let py = (5 + ph) * 4;
+    ph = 5 + ph;
+
+    for (let i = 0; i < urls.length; ++i) {
+      let btn = this.crateBtn(urls, pw, ph, px, py - ph * i, i, keys[i], infos[i]);
+
+      if (i > 0) {
+        this.m_transBtns.push(btn);
+        this.m_btnGroup.addButton(btn);
+      }
+    }
+
+    this.m_btnGroup.setSelectedFunction(btn => {
+      let label;
+      label = btn.getLable();
+      label.getColorAt(0).setRGB3Bytes(71, 114, 179);
+      label.setClipIndex(0);
+      this.selectTrans(btn.uuid);
+    }, btn => {
+      let label;
+      label = btn.getLable();
+      label.getColorAt(0).setRGB3Bytes(40, 40, 40);
+      label.setClipIndex(0);
+    });
+    this.m_btnGroup.select(keys[1]);
+  }
+
+  uiMouseDownListener(evt) {
+    this.m_selectFrame.begin(evt.mouseX, evt.mouseY); // console.log("NVTransUI::uiMouseDownListener(), evt: ", evt);
+    // console.log("ui down (x, y): ", evt.mouseX, evt.mouseY);
+  }
+
+  uiMouseUpListener(evt) {
+    // console.log("NVTransUI::uiMouseUpListener(), evt: ", evt);
+    // console.log("ui up (x, y): ", evt.mouseX, evt.mouseY);
+    if (this.m_selectFrame.isSelectEnabled()) {
+      let b = this.m_selectFrame.bounds;
+      let list = this.m_entityQuery.getEntities(b.min, b.max);
+      this.selectEntities(list);
+    }
+
+    this.m_selectFrame.end(evt.mouseX, evt.mouseY);
+  }
+
+  uiMouseMoveListener(evt) {
+    // console.log("NVTransUI::uiMouseMoveListener(), evt: ", evt);
+    // console.log("ui move (x, y): ", evt.mouseX, evt.mouseY);
+    this.m_selectFrame.move(evt.mouseX, evt.mouseY);
+  }
+
+  crateBtn(urls, pw, ph, px, py, labelIndex, idns, info) {
+    let colorClipLabel = CoUI.createClipColorLabel();
+    colorClipLabel.initializeWithoutTex(pw, ph, 4);
+    colorClipLabel.getColorAt(0).setRGB3Bytes(40, 40, 40);
+    colorClipLabel.getColorAt(1).setRGB3Bytes(50, 50, 50);
+    colorClipLabel.getColorAt(2).setRGB3Bytes(40, 40, 60);
+    let tta = this.m_coUIScene.transparentTexAtlas;
+    let iconLable = CoUI.createClipLabel();
+    iconLable.transparent = true;
+    iconLable.premultiplyAlpha = true;
+    iconLable.initialize(tta, [urls[labelIndex]]); // let tipInfo = new TipInfo().alignRight().setContent(info);
+    // let tipInfo = CoUI.createTipInfo().alignRight().setContent(info);
+
+    let btn = CoUI.createButton();
+    btn.uuid = idns;
+    btn.info = CoUI.createTipInfo().alignRight().setContent(info);
+    btn.addLabel(iconLable);
+    btn.initializeWithLable(colorClipLabel);
+    btn.setXY(px, py);
+    this.m_coUIScene.addEntity(btn, 1);
+    this.tip.addEntity(btn); // const ME = CoRScene.MouseEvent;
+    // btn.addEventListener(ME.MOUSE_UP, this, this.btnMouseUpListener);
+    // btn.addEventListener(ME.MOUSE_OUT, this.tip, this.tip.targetMouseOut);
+    // btn.addEventListener(ME.MOUSE_OVER, this.tip, this.tip.targetMouseOver);
+    // btn.addEventListener(ME.MOUSE_MOVE, this.tip, this.tip.targetMouseMove);
+
+    return btn;
+  }
+
+  selectTrans(uuid) {
+    switch (uuid) {
+      case "move":
+        this.m_transCtr.toTranslation();
+        break;
+
+      case "scale":
+        this.m_transCtr.toScale();
+        break;
+
+      case "rotate":
+        this.m_transCtr.toRotation();
+        break;
+
+      default:
+        break;
+    }
+
+    if (this.m_selectList == null) {
+      this.m_transCtr.disable();
+    }
+  }
+
+  keyDown(evt) {
+    console.log("NVTransUI::keyDown() ..., evt.keyCode: ", evt.keyCode);
+    let KEY = CoRScene.Keyboard;
+
+    switch (evt.keyCode) {
+      case KEY.W:
+        this.m_btnGroup.select(this.m_transBtns[0].uuid);
+        break;
+
+      case KEY.R:
+        this.m_btnGroup.select(this.m_transBtns[1].uuid);
+        break;
+
+      case KEY.E:
+        this.m_btnGroup.select(this.m_transBtns[2].uuid);
+        break;
+
+      default:
+        break;
+    }
+  }
+
+  addSelectListener(listener) {
+    if (listener != null) {
+      this.m_selectListeners.push(listener);
+    }
+  }
+
+  sendSelectList(list) {
+    let ls = this.m_selectListeners;
+    let len = ls.length;
+
+    for (let i = 0; i < len; ++i) {
+      ls[i](list);
+    }
+  }
+
+  selectEntities(list) {
+    this.m_selectList = list;
+
+    if (list != null && list.length > 0) {
+      let transCtr = this.m_transCtr;
+      let pos = CoMath.createVec3();
+      let pv = CoMath.createVec3();
+
+      for (let i = 0; i < list.length; ++i) {
+        pos.addBy(pv.copyFrom(list[i].getGlobalBounds().center));
+      }
+
+      pos.scaleBy(1.0 / list.length);
+
+      if (transCtr != null) {
+        transCtr.select(list, pos);
+        this.m_outline.select(list);
+      }
+
+      this.sendSelectList(list);
+    } else {
+      this.sendSelectList(null);
+    }
+  }
+
+  mouseUpListener(evt) {
+    // console.log("NVTransUI::mouseUpListener() ...");
+    if (this.m_transCtr != null) {
+      this.m_transCtr.decontrol();
+    }
+  }
+
+  mouseClickListener(evt) {
+    this.deselect();
+  }
+
+  deselect() {
+    this.m_selectList = null;
+
+    if (this.m_transCtr != null) {
+      this.m_transCtr.disable();
+    }
+
+    this.m_outline.deselect();
+    this.sendSelectList(null);
+  }
+
+  run() {
+    if (this.m_transCtr != null) {
+      this.m_transCtr.run();
+    }
+  }
+
+}
+
+exports.NVTransUI = NVTransUI;
+
+/***/ }),
+
 /***/ "5e13":
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -1963,121 +2346,6 @@ class UIEntityContainer extends UIEntityBase_1.UIEntityBase {
 }
 
 exports.UIEntityContainer = UIEntityContainer;
-
-/***/ }),
-
-/***/ "66bb":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-class UIRectLine {
-  constructor() {
-    this.m_entity = null;
-    this.m_pz = 0.0;
-    this.m_flag = false;
-    this.m_prePos = CoMath.createVec3();
-    this.m_currPos = CoMath.createVec3();
-    this.m_enabled = false;
-    this.bounds = CoMath.createAABB();
-  }
-
-  initialize(rscene) {
-    if (this.m_entity == null) {
-      this.m_rscene = rscene;
-      this.m_entity = CoEntity.createDisplayEntity();
-      CoMesh.line.dynColorEnabled = true;
-      let material = CoMaterial.createLineMaterial(CoMesh.line.dynColorEnabled);
-      CoMesh.line.setBufSortFormat(material.getBufSortFormat());
-      let mesh = CoMesh.line.createRectXOY(0, 0, 1, 1);
-      this.m_entity.setMaterial(material);
-      this.m_entity.setMesh(mesh);
-      rscene.addEntity(this.m_entity);
-      this.disable();
-    }
-  }
-
-  enable() {
-    this.m_enabled = true;
-  }
-
-  disable() {
-    this.m_enabled = false;
-    this.setVisible(false);
-  }
-
-  isEnabled() {
-    return this.m_enabled;
-  }
-
-  isSelectEnabled() {
-    return this.m_flag && this.m_enabled && CoMath.Vector3D.Distance(this.m_prePos, this.m_currPos) > 0.98;
-  }
-
-  setVisible(v) {
-    if (this.m_entity != null) {
-      this.m_entity.setVisible(v);
-    }
-  }
-
-  isVisible() {
-    if (this.m_entity != null) {
-      return this.m_entity.getVisible();
-    }
-
-    return false;
-  }
-
-  setZ(pz) {
-    this.m_pz = pz;
-  }
-
-  begin(px, py) {
-    this.m_flag = true;
-
-    if (this.m_enabled) {
-      this.m_prePos.setXYZ(px, py, this.m_pz); // this.m_currPos.copyFrom( this.m_prePos );
-
-      this.move(px, py);
-    }
-  }
-
-  end(px, py) {
-    if (this.m_enabled) {
-      this.setVisible(false);
-    }
-
-    this.m_flag = false;
-  }
-
-  move(px, py) {
-    const v = this.m_prePos;
-
-    if (this.m_enabled && this.m_flag && CoMath.Vector3D.DistanceXYZ(v.x, v.y, 0, px, py, 0) > 1.0) {
-      if (this.m_entity != null) {
-        this.m_currPos.setXYZ(px, py, 0);
-        this.setVisible(true);
-        let b = this.bounds;
-        b.reset();
-        b.addPosition(this.m_prePos);
-        b.addXYZ(px, py, 0);
-        b.updateFast();
-        let et = this.m_entity;
-        et.setScaleXYZ(b.getWidth(), b.getHeight(), 1.0);
-        et.setPosition(b.min);
-        et.update();
-      }
-    }
-  }
-
-}
-
-exports.UIRectLine = UIRectLine;
 
 /***/ }),
 
@@ -2292,497 +2560,6 @@ exports.ClipLabelBase = ClipLabelBase;
 
 /***/ }),
 
-/***/ "6b2b":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-const UserEditEvent_1 = __webpack_require__("268d");
-
-const UIRectLine_1 = __webpack_require__("66bb");
-
-const RectFrameQuery_1 = __webpack_require__("0396");
-/**
- * TransUI
- */
-
-
-class TransUI {
-  constructor() {
-    this.m_rsc = null;
-    this.m_editUIRenderer = null;
-    this.m_uirsc = null;
-    this.m_coUIScene = null;
-    this.m_outline = null;
-    this.tip = null;
-    this.m_transCtr = null;
-    this.m_selectFrame = null;
-    this.m_transBtns = [];
-    this.m_entityQuery = null;
-    this.m_selectList = null;
-    this.m_selectListeners = [];
-  }
-
-  setOutline(outline) {
-    this.m_outline = outline;
-  }
-
-  initialize(rsc, editUIRenderer, coUIScene) {
-    if (this.m_coUIScene == null) {
-      this.m_rsc = rsc;
-      this.m_editUIRenderer = editUIRenderer;
-      this.m_coUIScene = coUIScene;
-      this.init();
-    }
-  }
-
-  init() {
-    this.m_rsc.addEventListener(CoRScene.KeyboardEvent.KEY_DOWN, this, this.keyDown);
-    this.m_rsc.addEventListener(CoRScene.MouseEvent.MOUSE_BG_CLICK, this, this.mouseClickListener);
-    this.m_rsc.addEventListener(CoRScene.MouseEvent.MOUSE_UP, this, this.mouseUpListener, true, true);
-    let editsc = this.m_editUIRenderer;
-    this.m_transCtr = CoEdit.createTransformController();
-    this.m_transCtr.initialize(editsc);
-    this.m_transCtr.addEventListener(UserEditEvent_1.UserEditEvent.EDIT_BEGIN, this, this.editBegin);
-    this.m_transCtr.addEventListener(UserEditEvent_1.UserEditEvent.EDIT_END, this, this.editEnd);
-    this.m_prevPos = CoMath.createVec3();
-    this.m_currPos = CoMath.createVec3();
-    this.m_keyInterac = CoUIInteraction.createKeyboardInteraction();
-    this.m_keyInterac.initialize(this.m_rsc);
-    let Key = CoRScene.Keyboard;
-    let type = this.m_keyInterac.createKeysEventType([Key.CTRL, Key.Y]);
-    this.m_keyInterac.addKeysDownListener(type, this, this.keyCtrlYDown);
-    type = this.m_keyInterac.createKeysEventType([Key.CTRL, Key.Z]);
-    this.m_keyInterac.addKeysDownListener(type, this, this.keyCtrlZDown);
-    this.m_recoder = CoEdit.createTransformRecorder();
-    this.initUI();
-  }
-
-  keyCtrlZDown(evt) {
-    this.m_recoder.undo();
-    let list = this.m_recoder.getCurrList();
-    this.selectEntities(list);
-  }
-
-  keyCtrlYDown(evt) {
-    this.m_recoder.redo();
-    let list = this.m_recoder.getCurrList();
-    this.selectEntities(list);
-  }
-
-  getRecoder() {
-    return this.m_recoder;
-  }
-
-  editBegin(evt) {
-    let st = this.m_rsc.getStage3D();
-    this.m_prevPos.setXYZ(st.mouseX, st.mouseY, 0);
-  }
-
-  editEnd(evt) {
-    let st = this.m_rsc.getStage3D();
-    this.m_currPos.setXYZ(st.mouseX, st.mouseY, 0);
-
-    if (CoMath.Vector3D.Distance(this.m_prevPos, this.m_currPos) > 0.5) {
-      let list = evt.currentTarget.getTargetEntities();
-      this.m_recoder.save(list);
-    }
-  }
-
-  initUI() {
-    this.m_uirsc = this.m_coUIScene.rscene;
-    this.m_entityQuery = new RectFrameQuery_1.RectFrameQuery();
-    this.m_entityQuery.initialize(this.m_rsc);
-    let rsc = this.m_uirsc;
-    this.m_rsc.addEventListener(CoRScene.MouseEvent.MOUSE_BG_DOWN, this, this.uiMouseDownListener);
-    rsc.addEventListener(CoRScene.MouseEvent.MOUSE_UP, this, this.uiMouseUpListener);
-    rsc.addEventListener(CoRScene.MouseEvent.MOUSE_MOVE, this, this.uiMouseMoveListener);
-
-    if (this.m_selectFrame == null) {
-      this.m_selectFrame = new UIRectLine_1.UIRectLine();
-      this.m_selectFrame.initialize(this.m_uirsc);
-      this.m_selectFrame.setZ(-0.5);
-      this.m_selectFrame.enable();
-    }
-
-    this.initTransUI();
-  }
-
-  initTransUI() {
-    this.m_btnGroup = CoUI.createSelectButtonGroup();
-    let uiScene = this.m_coUIScene;
-    let tta = uiScene.transparentTexAtlas;
-    let pw = 90;
-    let ph = 70;
-    let urls = ["框选", "移动", "旋转", "缩放"];
-    let keys = ["select", "move", "rotate", "scale"];
-    let infos = ["Select items using box selection.", "Move selected items(W).", "Rotate selected items(R).", "Scale(resize) selected items(E)."];
-    let fontColor = CoMaterial.createColor4().setRGB3Bytes(170, 170, 170);
-    ;
-    let bgColor = CoMaterial.createColor4(1, 1, 1, 0);
-
-    for (let i = 0; i < urls.length; ++i) {
-      let img = tta.createCharsCanvasFixSize(pw, ph, urls[i], 30, fontColor, bgColor);
-      tta.addImageToAtlas(urls[i], img);
-    }
-
-    let px = 5;
-    let py = (5 + ph) * 4;
-    ph = 5 + ph;
-
-    for (let i = 0; i < urls.length; ++i) {
-      let btn = this.crateBtn(urls, pw, ph, px, py - ph * i, i, keys[i], infos[i]);
-
-      if (i > 0) {
-        this.m_transBtns.push(btn);
-        this.m_btnGroup.addButton(btn);
-      }
-    }
-
-    this.m_btnGroup.setSelectedFunction(btn => {
-      let label;
-      label = btn.getLable();
-      label.getColorAt(0).setRGB3Bytes(71, 114, 179);
-      label.setClipIndex(0);
-      this.selectTrans(btn.uuid);
-    }, btn => {
-      let label;
-      label = btn.getLable();
-      label.getColorAt(0).setRGB3Bytes(40, 40, 40);
-      label.setClipIndex(0);
-    });
-    this.m_btnGroup.select(keys[1]);
-  }
-
-  uiMouseDownListener(evt) {
-    this.m_selectFrame.begin(evt.mouseX, evt.mouseY); // console.log("TransUI::uiMouseDownListener(), evt: ", evt);
-    // console.log("ui down (x, y): ", evt.mouseX, evt.mouseY);
-  }
-
-  uiMouseUpListener(evt) {
-    // console.log("TransUI::uiMouseUpListener(), evt: ", evt);
-    // console.log("ui up (x, y): ", evt.mouseX, evt.mouseY);
-    if (this.m_selectFrame.isSelectEnabled()) {
-      let b = this.m_selectFrame.bounds;
-      let list = this.m_entityQuery.getEntities(b.min, b.max);
-      this.selectEntities(list);
-    }
-
-    this.m_selectFrame.end(evt.mouseX, evt.mouseY);
-  }
-
-  uiMouseMoveListener(evt) {
-    // console.log("TransUI::uiMouseMoveListener(), evt: ", evt);
-    // console.log("ui move (x, y): ", evt.mouseX, evt.mouseY);
-    this.m_selectFrame.move(evt.mouseX, evt.mouseY);
-  }
-
-  crateBtn(urls, pw, ph, px, py, labelIndex, idns, info) {
-    let colorClipLabel = CoUI.createClipColorLabel();
-    colorClipLabel.initializeWithoutTex(pw, ph, 4);
-    colorClipLabel.getColorAt(0).setRGB3Bytes(40, 40, 40);
-    colorClipLabel.getColorAt(1).setRGB3Bytes(50, 50, 50);
-    colorClipLabel.getColorAt(2).setRGB3Bytes(40, 40, 60);
-    let tta = this.m_coUIScene.transparentTexAtlas;
-    let iconLable = CoUI.createClipLabel();
-    iconLable.transparent = true;
-    iconLable.premultiplyAlpha = true;
-    iconLable.initialize(tta, [urls[labelIndex]]); // let tipInfo = new TipInfo().alignRight().setContent(info);
-    // let tipInfo = CoUI.createTipInfo().alignRight().setContent(info);
-
-    let btn = CoUI.createButton();
-    btn.uuid = idns;
-    btn.info = CoUI.createTipInfo().alignRight().setContent(info);
-    btn.addLabel(iconLable);
-    btn.initializeWithLable(colorClipLabel);
-    btn.setXY(px, py);
-    this.m_coUIScene.addEntity(btn, 1);
-    this.tip.addEntity(btn); // const ME = CoRScene.MouseEvent;
-    // btn.addEventListener(ME.MOUSE_UP, this, this.btnMouseUpListener);
-    // btn.addEventListener(ME.MOUSE_OUT, this.tip, this.tip.targetMouseOut);
-    // btn.addEventListener(ME.MOUSE_OVER, this.tip, this.tip.targetMouseOver);
-    // btn.addEventListener(ME.MOUSE_MOVE, this.tip, this.tip.targetMouseMove);
-
-    return btn;
-  }
-
-  selectTrans(uuid) {
-    switch (uuid) {
-      case "move":
-        this.m_transCtr.toTranslation();
-        break;
-
-      case "scale":
-        this.m_transCtr.toScale();
-        break;
-
-      case "rotate":
-        this.m_transCtr.toRotation();
-        break;
-
-      default:
-        break;
-    }
-
-    if (this.m_selectList == null) {
-      this.m_transCtr.disable();
-    }
-  }
-
-  keyDown(evt) {
-    console.log("TransUI::keyDown() ..., evt.keyCode: ", evt.keyCode);
-    let KEY = CoRScene.Keyboard;
-
-    switch (evt.keyCode) {
-      case KEY.W:
-        this.m_btnGroup.select(this.m_transBtns[0].uuid);
-        break;
-
-      case KEY.R:
-        this.m_btnGroup.select(this.m_transBtns[1].uuid);
-        break;
-
-      case KEY.E:
-        this.m_btnGroup.select(this.m_transBtns[2].uuid);
-        break;
-
-      default:
-        break;
-    }
-  }
-
-  addSelectListener(listener) {
-    if (listener != null) {
-      this.m_selectListeners.push(listener);
-    }
-  }
-
-  sendSelectList(list) {
-    let ls = this.m_selectListeners;
-    let len = ls.length;
-
-    for (let i = 0; i < len; ++i) {
-      ls[i](list);
-    }
-  }
-
-  selectEntities(list) {
-    this.m_selectList = list;
-
-    if (list != null && list.length > 0) {
-      let transCtr = this.m_transCtr;
-      let pos = CoMath.createVec3();
-      let pv = CoMath.createVec3();
-
-      for (let i = 0; i < list.length; ++i) {
-        pos.addBy(pv.copyFrom(list[i].getGlobalBounds().center));
-      }
-
-      pos.scaleBy(1.0 / list.length);
-
-      if (transCtr != null) {
-        transCtr.select(list, pos);
-        this.m_outline.select(list);
-      }
-
-      this.sendSelectList(list);
-    } else {
-      this.sendSelectList(null);
-    }
-  }
-
-  mouseUpListener(evt) {
-    // console.log("TransUI::mouseUpListener() ...");
-    if (this.m_transCtr != null) {
-      this.m_transCtr.decontrol();
-    }
-  }
-
-  mouseClickListener(evt) {
-    this.deselect();
-  }
-
-  deselect() {
-    this.m_selectList = null;
-
-    if (this.m_transCtr != null) {
-      this.m_transCtr.disable();
-    }
-
-    this.m_outline.deselect();
-    this.sendSelectList(null);
-  }
-
-  run() {
-    if (this.m_transCtr != null) {
-      this.m_transCtr.run();
-    }
-  }
-
-}
-
-exports.TransUI = TransUI;
-
-/***/ }),
-
-/***/ "6c5f":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-/**
- * NavigationUI
- */
-
-class NavigationUI {
-  constructor() {
-    this.m_rsc = null;
-    this.m_editUIRenderer = null;
-    this.m_uirsc = null;
-    this.m_coUIScene = null;
-    this.tip = null;
-    this.m_navBtns = []; // private m_promptPanel: IPromptPanel = null;// = new PromptPanel();
-
-    this.m_bgLabel = null;
-  }
-
-  initialize(rsc, editUIRenderer, coUIScene) {
-    if (this.m_coUIScene == null) {
-      this.m_rsc = rsc;
-      this.m_editUIRenderer = editUIRenderer;
-      this.m_coUIScene = coUIScene;
-      this.init();
-    }
-  }
-
-  init() {
-    let editsc = this.m_editUIRenderer;
-    this.initUI();
-  }
-
-  initUI() {
-    this.m_uirsc = this.m_coUIScene.rscene;
-    this.initNavigationUI();
-  }
-
-  resize(evt) {
-    let st = this.m_coUIScene.getStage();
-    this.m_bgLabel.setScaleX(st.stageWidth / this.m_bgLabelW);
-    this.m_bgLabel.setY(st.stageHeight - this.m_bgLabelH);
-    this.m_bgLabel.update();
-  }
-
-  initNavigationUI() {
-    let uiScene = this.m_coUIScene;
-    let tta = uiScene.transparentTexAtlas;
-    let px = 0;
-    let py = 0;
-    let pw = 90;
-    let ph = 40;
-    let st = this.m_coUIScene.getStage();
-    this.m_bgLabelW = st.stageWidth;
-    this.m_bgLabelH = ph;
-    let bgLabel = CoUI.createColorLabel();
-    bgLabel.initialize(this.m_bgLabelW, this.m_bgLabelH);
-    bgLabel.setY(st.stageHeight - ph);
-    bgLabel.setColor(bgLabel.getColor().setRGB3Bytes(40, 40, 40));
-    uiScene.addEntity(bgLabel);
-    this.m_bgLabel = bgLabel;
-    let EB = CoRScene.EventBase;
-    uiScene.getStage().addEventListener(EB.RESIZE, this, this.resize);
-    let keys = ["file", "edit", "model", "normal", "texture", "material", "light", "animation", "particle", "rendering", "physics", "help"];
-    let urls = ["文件", "编辑", "模型", "法线", "纹理", "材质", "灯光", "动画", "粒子", "渲染", "物理", "帮助"];
-    urls = urls.slice(0, 2);
-    let infos = ["File system operations.", "Editing operations.", "Geometry model operations.", "Normal data operations.", "Texture data operations.", "Material system operations.", "Light system operations.", "Animation system operations.", "Paiticle system operations.", "Rendering system operations.", "Physics system operations.", "Help infomation."];
-    let layouter = uiScene.layout.createLeftTopLayouter();
-    let fontColor = CoMaterial.createColor4().setRGB3Bytes(170, 170, 170);
-    let bgColor = CoMaterial.createColor4(1, 1, 1, 0);
-
-    for (let i = 0; i < urls.length; ++i) {
-      let img = tta.createCharsCanvasFixSize(pw, ph, urls[i], 30, fontColor, bgColor);
-      tta.addImageToAtlas(urls[i], img);
-    }
-
-    px = 0;
-    py = st.stageHeight - ph;
-
-    for (let i = 0; i < urls.length; ++i) {
-      let btn = this.crateBtn(urls, pw, ph, px + pw * i, py, i, keys[i], infos[i]);
-      this.tip.addEntity(btn);
-      this.m_navBtns.push(btn);
-      layouter.addUIEntity(btn);
-    }
-
-    this.m_coUIScene.prompt.setPromptListener(() => {
-      console.log("prompt panel confirm...");
-    }, () => {
-      console.log("prompt panel cancel...");
-    });
-  }
-
-  crateBtn(urls, pw, ph, px, py, labelIndex, idns, info) {
-    let colorClipLabel = CoUI.createClipColorLabel();
-    colorClipLabel.initializeWithoutTex(pw, ph, 4);
-    colorClipLabel.getColorAt(0).setRGB3Bytes(40, 40, 40);
-    colorClipLabel.getColorAt(1).setRGB3Bytes(50, 50, 50);
-    colorClipLabel.getColorAt(2).setRGB3Bytes(40, 40, 60);
-    let tta = this.m_coUIScene.transparentTexAtlas;
-    let iconLable = CoUI.createClipLabel();
-    iconLable.transparent = true;
-    iconLable.premultiplyAlpha = true;
-    iconLable.initialize(tta, [urls[labelIndex]]);
-    let btn = CoUI.createButton();
-    btn.uuid = idns;
-    btn.info = CoUI.createTipInfo().alignBottom().setContent(info);
-    btn.addLabel(iconLable);
-    btn.initializeWithLable(colorClipLabel);
-    btn.setXY(px, py);
-    this.m_coUIScene.addEntity(btn, 1);
-    btn.addEventListener(CoRScene.MouseEvent.MOUSE_UP, this, this.btnMouseUpListener);
-    return btn;
-  }
-
-  btnMouseUpListener(evt) {
-    // console.log("btnMouseUpListener(), evt.currentTarget: ", evt.currentTarget);
-    let uuid = evt.uuid;
-    console.log("btnMouseUpListener(), uuid: ", uuid);
-
-    switch (uuid) {
-      case "file":
-      case "edit":
-      case "model":
-      case "normal":
-      case "texture":
-      case "material":
-      case "light":
-      case "animation":
-      case "particle":
-      case "help":
-        this.m_coUIScene.prompt.showPrompt("It can't be used now!");
-        break;
-
-      default:
-        break;
-    }
-  }
-
-  run() {}
-
-}
-
-exports.NavigationUI = NavigationUI;
-
-/***/ }),
-
 /***/ "7435":
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -2808,12 +2585,12 @@ class NormalViewerScene {
     return this.m_uiscene;
   }
 
-  initialize(uiscene, vcoapp, transUI) {
+  initialize(uiscene, coapp, transUI) {
     if (this.m_uiscene == null) {
       this.m_uiscene = uiscene;
-      this.m_vcoapp = vcoapp;
+      this.m_coapp = coapp;
       this.m_transUI = transUI;
-      this.entityScene = new NormalEntityScene_1.NormalEntityScene(uiscene, vcoapp);
+      this.entityScene = new NormalEntityScene_1.NormalEntityScene(uiscene, coapp);
       this.m_entityManager = this.entityScene.entityManager;
       this.initUI();
       this.entityScene.transUI = transUI;
@@ -2968,6 +2745,188 @@ class ModuleLoader extends PackedLoader_1.PackedLoader {
 }
 
 exports.ModuleLoader = ModuleLoader;
+
+/***/ }),
+
+/***/ "7c62":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const CoSpaceAppData_1 = __webpack_require__("3347");
+
+const CoModuleLoader_1 = __webpack_require__("2a2b");
+
+class CoDataModule {
+  constructor() {
+    this.m_sysIniting = true;
+    this.m_initInsFlag = true;
+    this.m_initCalls = [];
+  }
+  /**
+   * 初始化
+   * @param sysInitCallback the default value is null
+   * @param urlChecker the default value is null
+   * @param deferredInit the default value is false
+   */
+
+
+  initialize(sysInitCallback = null, deferredInit = false) {
+    this.m_sysInitCallback = sysInitCallback; // this.m_urlChecker = urlChecker;
+
+    this.m_deferredInit = deferredInit;
+    let modules = [{
+      url: "static/cospace/core/coapp/CoSpaceApp.umd.js",
+      name: CoSpaceAppData_1.CoModuleNS.coSpaceApp,
+      type: CoSpaceAppData_1.CoModuleFileType.JS
+    }, {
+      url: "static/cospace/core/code/ThreadCore.umd.js",
+      name: CoSpaceAppData_1.CoModuleNS.threadCore,
+      type: CoSpaceAppData_1.CoModuleFileType.JS
+    }, {
+      url: "static/cospace/modules/ctm/ModuleCTMGeomParser.umd.js",
+      name: CoSpaceAppData_1.CoModuleNS.ctmParser,
+      type: CoSpaceAppData_1.CoModuleFileType.JS
+    }, {
+      url: "static/cospace/modules/obj/ModuleOBJGeomParser.umd.min.js",
+      name: CoSpaceAppData_1.CoModuleNS.objParser,
+      type: CoSpaceAppData_1.CoModuleFileType.JS
+    }, {
+      url: "static/cospace/modules/png/ModulePNGParser.umd.js",
+      name: CoSpaceAppData_1.CoModuleNS.pngParser,
+      type: CoSpaceAppData_1.CoModuleFileType.JS
+    }, {
+      url: "static/cospace/modules/fbxFast/ModuleFBXGeomFastParser.umd.js",
+      name: CoSpaceAppData_1.CoModuleNS.fbxFastParser,
+      type: CoSpaceAppData_1.CoModuleFileType.JS
+    }];
+    this.m_modules = modules; // 初始化数据协同中心
+
+    let dependencyGraphObj = {
+      nodes: [{
+        uniqueName: "dracoGeomParser",
+        path: "static/cospace/modules/draco/ModuleDracoGeomParser.umd.js"
+      }, {
+        uniqueName: "dracoWasmWrapper",
+        path: "static/cospace/modules/dracoLib/w2.js"
+      }, {
+        uniqueName: "ctmGeomParser",
+        path: "static/cospace/modules/ctm/ModuleCTMGeomParser.umd.js"
+      }],
+      maps: [{
+        uniqueName: "dracoGeomParser",
+        includes: [1]
+      } // 这里[1]表示 dracoGeomParser 依赖数组中的第一个元素也就是 dracoWasmWrapper 这个代码模块
+      ]
+    };
+    this.m_dependencyGraphObj = dependencyGraphObj;
+    let loader = new CoModuleLoader_1.CoModuleLoader(1);
+    let urlChecker = loader.getUrlChecker();
+
+    if (urlChecker != null) {
+      for (let i = 0; i < modules.length; ++i) {
+        modules[i].url = urlChecker(modules[i].url);
+      }
+
+      let nodes = dependencyGraphObj.nodes;
+
+      for (let i = 0; i < nodes.length; ++i) {
+        nodes[i].path = urlChecker(nodes[i].path);
+      }
+    }
+
+    if (!deferredInit) {
+      this.loadSys();
+    }
+  }
+
+  loadSys() {
+    if (this.m_sysIniting) {
+      new CoModuleLoader_1.CoModuleLoader(1, () => {
+        this.initCoSpaceSys();
+      }).load(this.m_modules[0].url);
+      this.m_sysIniting = false;
+    }
+  }
+  /**
+   * 注意: 不建议过多使用这个函数,因为回调函数不安全如果是lambda表达式则由性能问题。
+   * 立即获得CPU侧的数据单元实例, 但是数据单元中的数据可能是空的, 因为数据获取的操作实际是异步的。
+   * 需要通过 isCpuPhase() 或者 isGpuPhase() 等函数来判定具体数据情况
+   * @param url 数据资源url
+   * @param dataFormat 数据资源类型
+   * @param callback 数据资源接收回调函数, 其值建议为lambda函数表达式
+   * @param immediate 是否立即返回数据, 默认是false
+   * @returns 数据单元实例，用户只能访问不能更改这个实例内部的数据状态，如果必要则可以申请复制一份
+   */
+
+
+  getCPUDataByUrlAndCallback(url, dataFormat, callback, immediate) {
+    if (this.coappIns != null) {
+      let unit = this.coappIns.getCPUDataByUrlAndCallback(url, dataFormat, callback, immediate);
+
+      if (this.m_deferredInit) {
+        if (this.m_initInsFlag) {
+          this.m_initInsFlag = false;
+          let modules = this.m_modules;
+          this.coappIns.initialize(3, modules[1].url, true);
+        }
+      }
+
+      return unit;
+    }
+
+    return null;
+  }
+
+  deferredInit(callback) {
+    if (this.coappIns == null) {
+      this.m_initCalls.push(callback);
+      this.loadSys();
+    } else if (callback != null) {
+      callback();
+    }
+  }
+
+  initCoSpaceSys() {
+    if (this.coappIns == null && typeof CoSpaceApp !== "undefined") {
+      let coappIns = CoSpaceApp.createInstance();
+      let modules = this.m_modules;
+      let jsonStr = JSON.stringify(this.m_dependencyGraphObj);
+      coappIns.setThreadDependencyGraphJsonString(jsonStr);
+      coappIns.setTaskModuleParams(modules);
+
+      if (!this.m_deferredInit) {
+        coappIns.initialize(3, modules[1].url, true);
+      }
+
+      let t = this;
+      t.coappIns = coappIns;
+
+      for (let i = 0; i < this.m_initCalls.length; ++i) {
+        if (this.m_initCalls[i] != null) {
+          this.m_initCalls[i]();
+        }
+      }
+
+      this.m_initCalls = [];
+    }
+
+    if (this.m_sysInitCallback != null) {
+      this.m_sysInitCallback();
+    }
+
+    this.m_sysInitCallback = null;
+  }
+
+}
+
+exports.CoDataModule = CoDataModule;
+exports.default = CoDataModule;
 
 /***/ }),
 
@@ -3297,6 +3256,66 @@ var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_
 
 /***/ }),
 
+/***/ "89c1":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const CoModuleLoader_1 = __webpack_require__("2a2b");
+
+class CoPostOutline {
+  constructor(rscene) {
+    this.m_rscene = rscene;
+    let url = "static/cospace/renderEffect/occPostOutline/OccPostOutlineModule.umd.js";
+    new CoModuleLoader_1.CoModuleLoader(1, () => {
+      this.m_postOutline = OccPostOutlineModule.create();
+      this.initOutline();
+      this.m_rscene.appendRenderNode(this);
+    }).load(url);
+  }
+
+  initOutline() {
+    this.m_postOutline.initialize(this.m_rscene, 0, [0]);
+    this.m_postOutline.setFBOSizeScaleRatio(0.5);
+    this.m_postOutline.setRGB3f(0.0, 1.0, 0.0);
+    this.m_postOutline.setOutlineDensity(2.0);
+    this.m_postOutline.setOcclusionDensity(0.2);
+  }
+
+  select(targets) {
+    if (this.m_postOutline != null) {
+      this.m_postOutline.setTargetList(targets);
+    }
+  }
+
+  deselect() {
+    if (this.m_postOutline != null) {
+      this.m_postOutline.setTargetList(null);
+    }
+
+    console.log("post outline deselect() ...");
+  }
+
+  render() {
+    if (this.m_postOutline != null) {
+      // console.log("post outline getTargetList(): ",this.m_postOutline.getTargetList());
+      this.m_postOutline.drawBegin();
+      this.m_postOutline.draw();
+      this.m_postOutline.drawEnd();
+    }
+  }
+
+}
+
+exports.CoPostOutline = CoPostOutline;
+
+/***/ }),
+
 /***/ "9737":
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -3314,7 +3333,7 @@ const CoSpaceAppData_1 = __webpack_require__("3347");
 const NormalEntityLayout_1 = __webpack_require__("4cf3");
 
 class NormalEntityGroup {
-  constructor(vcoapp) {
+  constructor(coapp) {
     this.m_uid = NormalEntityGroup.s_uid++;
     this.m_loadTotal = 0;
     this.m_loadedTotal = 0;
@@ -3322,7 +3341,7 @@ class NormalEntityGroup {
     this.m_transforms = [];
     this.m_transes = [];
     this.m_layoutor = null;
-    this.m_vcoapp = vcoapp;
+    this.m_coapp = coapp;
   }
 
   getUid() {
@@ -3336,7 +3355,7 @@ class NormalEntityGroup {
       // this.m_transforms = [];
       // this.m_transes = [];
       let purls = urls.slice(0);
-      this.m_vcoapp.deferredInit(() => {
+      this.m_coapp.deferredInit(() => {
         console.log("XXXXXXXXXXXXXXXXXXX deferredInit() call...");
 
         for (let i = 0; i < purls.length; ++i) {
@@ -3388,8 +3407,8 @@ class NormalEntityGroup {
   }
 
   loadGeomModel(url, format) {
-    // let ins = this.m_vcoapp.coappIns;
-    let ins = this.m_vcoapp;
+    // let ins = this.m_coapp.coappIns;
+    let ins = this.m_coapp;
 
     if (ins != null) {
       this.uiscene.prompt.getPromptPanel().applyConfirmButton();
@@ -3541,6 +3560,74 @@ class NormalEntityGroup {
 
 NormalEntityGroup.s_uid = 0;
 exports.NormalEntityGroup = NormalEntityGroup;
+
+/***/ }),
+
+/***/ "a176":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+ // import {DemoThread as Demo} from "./cospace/modules/thread/example/DemoThread";
+// import {DemoThread as Demo} from "./cospace/demo/DemoThread";
+// import {DemoThreadLoadJS as Demo} from "./cospace/demo/DemoThreadLoadJS";
+// import { DemoCTMLoadAndParser as Demo } from "./cospace/demo/DemoCTMLoadAndParser";
+// import { DemoFBXFastParser as Demo } from "./cospace/demo/DemoFBXFastParser";
+// import { DemoOBJParser as Demo } from "./cospace/demo/DemoOBJParser";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+}); // import { DemoCTMLoad as Demo } from "./cospace/demo/DemoCTMLoad";
+// import { DemoCTMParser as Demo } from "./cospace/demo/DemoCTMParser";
+// import { DemoDracoParser as Demo } from "./cospace/demo/DemoDracoParser";
+// import { DemoShowCTMAndDraco as Demo } from "./cospace/demo/DemoShowCTMAndDraco";
+// import { DemoCTMToDraco as Demo } from "./cospace/demo/DemoCTMToDraco";
+// import { DemoDracoEncode as Demo } from "./cospace/demo/DemoDracoEncode";
+// import { DemoDracoParser2 as Demo } from "./cospace/demo/DemoDracoParser2";
+// import { DemoFBXParser as Demo } from "./cospace/demo/DemoFBXParser";
+// import { DemoGLBParser as Demo } from "./cospace/demo/DemoGLBParser";
+// import { DemoPNGParser as Demo } from "./cospace/demo/DemoPNGParser";
+// import { DemoMixParser as Demo } from "./cospace/demo/DemoMixParser";
+// import { DemoCospace as Demo } from "./cospace/demo/DemoCospace";
+// import { DemoCospaceDeferredInit as Demo } from "./cospace/demo/DemoCospaceDeferredInit";
+// import { DemoDependenceGraph as Demo } from "./cospace/demo/DemoDependenceGraph";
+// import { DemoCTMViewer as Demo } from "./cospace/demo/DemoCTMViewer";
+// import { DemoNormalViewer as Demo } from "./cospace/demo/DemoNormalViewer";
+// import { RenderingVerifier as Demo } from "./cospace/demo/RenderingVerifier";
+// import { DemoCoApp as Demo } from "./cospace/demo/DemoCoApp";
+// import { DemoCoAppDeferredInit as Demo } from "./cospace/demo/DemoCoAppDeferredInit";
+// import { DemoCoRenderer as Demo } from "./cospace/demo/DemoCoRenderer";
+// import { DemoCoRendererScene as Demo } from "./cospace/demo/DemoCoRendererScene";
+// import { DemoCoRendererSubScene as Demo } from "./cospace/demo/DemoCoRendererSubScene";
+// import { DemoCoSimpleRendereScene as Demo } from "./cospace/demo/DemoCoSimpleRendereScene";
+// import { DemoCoViewer as Demo } from "./cospace/demo/DemoCoViewer";
+
+const DemoVox3DEditor_1 = __webpack_require__("e9fd"); // import { DemoOutline as Demo } from "./cospace/demo/DemoOutline";
+// import { DemoPostOutline as Demo } from "./cospace/demo/DemoPostOutline";
+// import { DemoCoParticle as Demo } from "./cospace/demo/DemoCoParticle";
+// import { DemoCoParticleFlow as Demo } from "./cospace/demo/DemoCoParticleFlow";
+// import { DemoCoParticleModule as Demo } from "./cospace/demo/DemoCoParticleModule";
+// import { DemoCoEdit as Demo } from "./cospace/demo/DemoCoEdit";
+// import { DemoInputText as Demo } from "./cospace/demo/DemoInputText";
+// import { DemoCORS as Demo } from "./cospace/demo/DemoCORS";
+
+
+let demoIns = new DemoVox3DEditor_1.DemoVox3DEditor();
+let ins = demoIns;
+
+function main() {
+  console.log("------ demo --- init ------");
+  ins.initialize();
+
+  function mainLoop(now) {
+    ins.run();
+    window.requestAnimationFrame(mainLoop);
+  }
+
+  window.requestAnimationFrame(mainLoop);
+  console.log("------ demo --- running ------");
+}
+
+main();
 
 /***/ }),
 
@@ -5655,180 +5742,6 @@ exports.NormalLineMaterial = NormalLineMaterial;
 
 /***/ }),
 
-/***/ "d5ec":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-const CoSpaceAppData_1 = __webpack_require__("3347");
-
-const ModuleLoader_1 = __webpack_require__("75f5");
-
-class ViewerCoSApp {
-  constructor() {
-    this.m_urlChecker = null;
-    this.m_initInsFlag = true;
-    this.m_initCalls = [];
-    this.m_flag = true;
-  }
-
-  initialize(callback, urlChecker = null, deferredInit = false) {
-    this.m_deferredInit = deferredInit;
-    this.m_urlChecker = urlChecker;
-    let modules = [{
-      url: "static/cospace/core/coapp/CoSpaceApp.umd.js",
-      name: CoSpaceAppData_1.CoModuleNS.coSpaceApp,
-      type: CoSpaceAppData_1.CoModuleFileType.JS
-    }, {
-      url: "static/cospace/core/code/ThreadCore.umd.js",
-      name: CoSpaceAppData_1.CoModuleNS.threadCore,
-      type: CoSpaceAppData_1.CoModuleFileType.JS
-    }, {
-      url: "static/cospace/modules/ctm/ModuleCTMGeomParser.umd.js",
-      name: CoSpaceAppData_1.CoModuleNS.ctmParser,
-      type: CoSpaceAppData_1.CoModuleFileType.JS
-    }, {
-      url: "static/cospace/modules/obj/ModuleOBJGeomParser.umd.min.js",
-      name: CoSpaceAppData_1.CoModuleNS.objParser,
-      type: CoSpaceAppData_1.CoModuleFileType.JS
-    }, {
-      url: "static/cospace/modules/png/ModulePNGParser.umd.js",
-      name: CoSpaceAppData_1.CoModuleNS.pngParser,
-      type: CoSpaceAppData_1.CoModuleFileType.JS
-    }, {
-      url: "static/cospace/modules/fbxFast/ModuleFBXGeomFastParser.umd.js",
-      name: CoSpaceAppData_1.CoModuleNS.fbxFastParser,
-      type: CoSpaceAppData_1.CoModuleFileType.JS
-    }];
-    this.m_modules = modules; // 初始化数据协同中心
-
-    let dependencyGraphObj = {
-      nodes: [{
-        uniqueName: "dracoGeomParser",
-        path: "static/cospace/modules/draco/ModuleDracoGeomParser.umd.js"
-      }, {
-        uniqueName: "dracoWasmWrapper",
-        path: "static/cospace/modules/dracoLib/w2.js"
-      }, {
-        uniqueName: "ctmGeomParser",
-        path: "static/cospace/modules/ctm/ModuleCTMGeomParser.umd.js"
-      }],
-      maps: [{
-        uniqueName: "dracoGeomParser",
-        includes: [1]
-      } // 这里[1]表示 dracoGeomParser 依赖数组中的第一个元素也就是 dracoWasmWrapper 这个代码模块
-      ]
-    };
-    this.m_dependencyGraphObj = dependencyGraphObj;
-
-    if (urlChecker != null) {
-      for (let i = 0; i < modules.length; ++i) {
-        modules[i].url = urlChecker(modules[i].url);
-      }
-
-      let nodes = dependencyGraphObj.nodes;
-
-      for (let i = 0; i < nodes.length; ++i) {
-        nodes[i].path = urlChecker(nodes[i].path);
-      }
-    }
-
-    if (!deferredInit) {
-      new ModuleLoader_1.ModuleLoader(1, null, urlChecker).setCallback(() => {
-        this.initCoSpaceApp();
-
-        if (callback != null) {
-          callback();
-        }
-      }).load(this.m_modules[0].url);
-    }
-  }
-  /**
-   * 注意: 不建议过多使用这个函数,因为回调函数不安全如果是lambda表达式则由性能问题。
-   * 立即获得CPU侧的数据单元实例, 但是数据单元中的数据可能是空的, 因为数据获取的操作实际是异步的。
-   * 需要通过 isCpuPhase() 或者 isGpuPhase() 等函数来判定具体数据情况
-   * @param url 数据资源url
-   * @param dataFormat 数据资源类型
-   * @param callback 数据资源接收回调函数, 其值建议为lambda函数表达式
-   * @param immediate 是否立即返回数据, 默认是false
-   * @returns 数据单元实例，用户只能访问不能更改这个实例内部的数据状态，如果必要则可以申请复制一份
-   */
-
-
-  getCPUDataByUrlAndCallback(url, dataFormat, callback, immediate) {
-    if (this.coappIns != null) {
-      let unit = this.coappIns.getCPUDataByUrlAndCallback(url, dataFormat, callback, immediate);
-
-      if (this.m_deferredInit) {
-        if (this.m_initInsFlag) {
-          this.m_initInsFlag = false;
-          let modules = this.m_modules;
-          this.coappIns.initialize(3, modules[1].url, true);
-        }
-      }
-
-      return unit;
-    }
-
-    return null;
-  }
-
-  deferredInit(callback) {
-    if (this.coappIns == null) {
-      this.m_initCalls.push(callback);
-
-      if (this.m_flag) {
-        new ModuleLoader_1.ModuleLoader(1, null, this.m_urlChecker).setCallback(() => {
-          this.initCoSpaceApp();
-
-          if (callback != null) {
-            callback();
-          }
-        }).load(this.m_modules[0].url);
-        this.m_flag = false;
-      }
-    } else if (callback != null) {
-      callback();
-    }
-  }
-
-  initCoSpaceApp() {
-    if (this.coappIns == null && typeof CoSpaceApp !== "undefined") {
-      let coappIns = CoSpaceApp.createInstance();
-      let modules = this.m_modules;
-      let jsonStr = JSON.stringify(this.m_dependencyGraphObj);
-      coappIns.setThreadDependencyGraphJsonString(jsonStr);
-      coappIns.setTaskModuleParams(modules);
-
-      if (!this.m_deferredInit) {
-        coappIns.initialize(3, modules[1].url, true);
-      }
-
-      let t = this;
-      t.coappIns = coappIns;
-
-      for (let i = 0; i < this.m_initCalls.length; ++i) {
-        if (this.m_initCalls[i] != null) {
-          this.m_initCalls[i]();
-        }
-      }
-
-      this.m_initCalls = [];
-    }
-  }
-
-}
-
-exports.ViewerCoSApp = ViewerCoSApp;
-exports.default = ViewerCoSApp;
-
-/***/ }),
-
 /***/ "d755":
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -5963,9 +5876,12 @@ Object.defineProperty(exports, "__esModule", {
 
 const NormalViewerScene_1 = __webpack_require__("7435");
 
+const CoDataModule_1 = __webpack_require__("7c62");
+
 class NormalViewer {
   constructor() {
     this.m_uiscene = null;
+    this.m_codata = new CoDataModule_1.CoDataModule();
     this.normalScene = null;
   }
 
@@ -5973,11 +5889,12 @@ class NormalViewer {
     return this.m_uiscene;
   }
 
-  initialize(uiscene, vcoapp, transUI) {
+  initialize(uiscene, transUI) {
     if (this.m_uiscene == null) {
+      this.m_codata.initialize(null, true);
       this.m_uiscene = uiscene;
       this.normalScene = new NormalViewerScene_1.NormalViewerScene();
-      this.normalScene.initialize(uiscene, vcoapp, transUI);
+      this.normalScene.initialize(uiscene, this.m_codata, transUI);
     }
   }
 
@@ -6012,7 +5929,7 @@ exports.NormalViewer = NormalViewer;
 
 /***/ }),
 
-/***/ "dd5f":
+/***/ "e9fd":
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -6022,53 +5939,217 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
-const ModuleLoader_1 = __webpack_require__("75f5");
+const CoPostOutline_1 = __webpack_require__("89c1");
 
-class PostOutline {
-  constructor(rscene, urlChecker = null) {
-    this.m_rscene = rscene;
-    let url = "static/cospace/renderEffect/occPostOutline/OccPostOutlineModule.umd.js";
-    new ModuleLoader_1.ModuleLoader(1, null, urlChecker).setCallback(() => {
-      this.m_postOutline = OccPostOutlineModule.create();
-      this.initOutline();
-      this.m_rscene.appendRenderNode(this);
-    }).load(url);
+const NVTransUI_1 = __webpack_require__("5dcb");
+
+const NVNavigationUI_1 = __webpack_require__("3120");
+
+const NormalViewer_1 = __webpack_require__("d8b4");
+
+const PromptSystem_1 = __webpack_require__("3f7d");
+
+const CoModuleLoader_1 = __webpack_require__("2a2b");
+
+class SceneAccessor {
+  constructor() {}
+
+  renderBegin(rendererScene) {
+    let p = rendererScene.getRenderProxy();
+    p.clearDepth(1.0);
   }
 
-  initOutline() {
-    this.m_postOutline.initialize(this.m_rscene, 0, [0]);
-    this.m_postOutline.setFBOSizeScaleRatio(0.5);
-    this.m_postOutline.setRGB3f(0.0, 1.0, 0.0);
-    this.m_postOutline.setOutlineDensity(2.0);
-    this.m_postOutline.setOcclusionDensity(0.2);
+  renderEnd(rendererScene) {}
+
+}
+/**
+ * cospace renderer
+ */
+
+
+class DemoVox3DEditor {
+  constructor() {
+    this.m_rsc = null;
+    this.m_editUIRenderer = null;
+    this.m_uirsc = null;
+    this.m_coUIScene = null;
+    this.m_interact = null;
+    this.m_transUI = new NVTransUI_1.NVTransUI();
+    this.m_nvaUI = new NVNavigationUI_1.NVNavigationUI();
+    this.m_scale = 20.0;
+    this.m_tip = null;
+    this.m_viewer = null;
+    this.m_graph = null;
   }
 
-  select(targets) {
-    if (this.m_postOutline != null) {
-      this.m_postOutline.setTargetList(targets);
+  initialize() {
+    document.oncontextmenu = function (e) {
+      e.preventDefault();
+    };
+
+    console.log("DemoVox3DEditor::initialize() ..."); // //<a href="D:\Series\Breaking Bad">Click to open a folder</a>
+    // //D:\resource\
+    // let a = document.createElement('a');
+    // a.href = "D:\\resource\\";
+    // a.text = "ddfdfdfdf"
+    // document.body.appendChild(a);
+    // (a as any).style = 'display: none';
+    // a.click();
+    // // a.remove();
+    // return;
+
+    this.initEngineModule();
+  }
+
+  initEngineModule() {
+    let url = "static/cospace/engine/uiInteract/CoUIInteraction.umd.js";
+    let uiInteractML = new CoModuleLoader_1.CoModuleLoader(2, () => {
+      this.initInteract();
+    });
+    let url0 = "static/cospace/engine/renderer/CoRenderer.umd.js";
+    let url1 = "static/cospace/engine/rscene/CoRScene.umd.js";
+    let url2 = "static/cospace/math/CoMath.umd.js";
+    let url3 = "static/cospace/ageom/CoAGeom.umd.js";
+    let url4 = "static/cospace/coedit/CoEdit.umd.js";
+    let url5 = "static/cospace/comesh/CoMesh.umd.js";
+    let url6 = "static/cospace/coentity/CoEntity.umd.js";
+    let url7 = "static/cospace/particle/CoParticle.umd.js";
+    let url8 = "static/cospace/coMaterial/CoMaterial.umd.js";
+    let url9 = "static/cospace/cotexture/CoTexture.umd.js";
+    let url10 = "static/cospace/coui/CoUI.umd.js";
+    let url11 = "static/cospace/cotext/CoText.umd.js";
+    new CoModuleLoader_1.CoModuleLoader(2, () => {
+      if (this.isEngineEnabled()) {
+        console.log("engine modules loaded ...");
+        this.initRenderer();
+        this.initScene();
+        new CoModuleLoader_1.CoModuleLoader(3, () => {
+          console.log("math module loaded ...");
+          new CoModuleLoader_1.CoModuleLoader(7, () => {
+            console.log("ageom module loaded ...");
+            this.initEditUI();
+          }).load(url3).load(url4).load(url6).load(url7).load(url9).load(url10).load(url11);
+        }).load(url2).load(url5).load(url8);
+      }
+    }).addLoader(uiInteractML).load(url0).load(url1);
+    uiInteractML.load(url);
+  }
+
+  initEditUI() {
+    this.m_coUIScene = CoUI.createUIScene();
+    this.m_coUIScene.initialize(this.m_rsc, 512, 5);
+    this.m_uirsc = this.m_coUIScene.rscene;
+    this.m_graph.addScene(this.m_uirsc);
+    let promptSys = new PromptSystem_1.PromptSystem();
+    promptSys.initialize(this.m_coUIScene);
+    this.m_coUIScene.prompt = promptSys; // let tip = new RectTextTip();
+
+    let tip = CoUI.createRectTextTip();
+    tip.initialize(this.m_coUIScene, 2);
+    this.m_tip = tip;
+    this.m_transUI.tip = this.m_tip;
+    this.m_transUI.setOutline(this.m_outline);
+    this.m_transUI.initialize(this.m_rsc, this.m_editUIRenderer, this.m_coUIScene);
+    this.m_nvaUI.tip = this.m_tip;
+    this.m_nvaUI.initialize(this.m_rsc, this.m_editUIRenderer, this.m_coUIScene);
+    let minV = CoMath.createVec3(-100, 0, -100);
+    let maxV = minV.clone().scaleBy(-1);
+    let scale = 10.0;
+    let grid = CoEdit.createFloorLineGrid();
+    grid.initialize(this.m_rsc, 0, minV.scaleBy(scale), maxV.scaleBy(scale), 30);
+    let viewer = new NormalViewer_1.NormalViewer();
+    viewer.initialize(this.m_coUIScene, this.m_transUI);
+    viewer.open();
+    this.m_viewer = viewer;
+    let entitySC = viewer.normalScene.entityScene;
+    entitySC.initialize(this.m_rsc);
+  }
+
+  initScene() {}
+
+  isEngineEnabled() {
+    return typeof CoRenderer !== "undefined" && typeof CoRScene !== "undefined";
+  }
+
+  initInteract() {
+    let r = this.m_rsc;
+
+    if (r != null && this.m_interact == null && typeof CoUIInteraction !== "undefined") {
+      this.m_interact = CoUIInteraction.createMouseInteraction();
+      this.m_interact.initialize(this.m_rsc, 2, true);
+      this.m_interact.setSyncLookAtEnabled(true);
     }
   }
 
-  deselect() {
-    if (this.m_postOutline != null) {
-      this.m_postOutline.setTargetList(null);
-    }
+  initRenderer() {
+    if (this.m_rsc == null) {
+      let RendererDevice = CoRScene.RendererDevice;
+      RendererDevice.SHADERCODE_TRACE_ENABLED = false;
+      RendererDevice.VERT_SHADER_PRECISION_GLOBAL_HIGHP_ENABLED = true;
+      RendererDevice.SetWebBodyColor("#606060");
+      let rparam = CoRScene.createRendererSceneParam();
+      rparam.setAttriAntialias(!RendererDevice.IsMobileWeb());
+      rparam.setCamPosition(1000.0, 1000.0, 1000.0);
+      rparam.setCamProject(45, 20.0, 9000.0);
+      let rscene = CoRScene.createRendererScene(rparam, 3);
+      rscene.setClearRGBColor3f(0.23, 0.23, 0.23); // console.log("60/255: ", 60/255);
+      // rscene.setClearUint24Color((60 << 16) + (60 << 8) + 60);
 
-    console.log("post outline deselect() ...");
+      rscene.addEventListener(CoRScene.MouseEvent.MOUSE_DOWN, this, this.mouseDownListener); // rscene.addEventListener(CoRScene.KeyboardEvent.KEY_DOWN, this, this.keyDown);
+      // rscene.addEventListener(CoRScene.MouseEvent.MOUSE_BG_CLICK, this, this.mouseClickListener);
+      // rscene.addEventListener(CoRScene.MouseEvent.MOUSE_RIGHT_UP, this, this.mouseUpListener, true, true);
+
+      this.m_rsc = rscene;
+      let subScene = this.m_rsc.createSubScene(rparam, 3, false);
+      subScene.enableMouseEvent(true);
+      subScene.setAccessor(new SceneAccessor());
+      this.m_editUIRenderer = subScene;
+      this.m_graph = CoRScene.createRendererSceneGraph();
+      this.m_graph.addScene(this.m_rsc);
+      this.m_graph.addScene(this.m_editUIRenderer);
+      this.m_outline = new CoPostOutline_1.CoPostOutline(rscene);
+    }
   }
 
-  render() {
-    if (this.m_postOutline != null) {
-      // console.log("post outline getTargetList(): ",this.m_postOutline.getTargetList());
-      this.m_postOutline.drawBegin();
-      this.m_postOutline.draw();
-      this.m_postOutline.drawEnd();
+  mouseUpListener(evt) {
+    console.log("mouse up action...");
+  }
+
+  mouseDownListener(evt) {
+    console.log("DemoVox3DEditor::mouseDownListener() ...");
+  }
+
+  keyDown(evt) {
+    console.log("DemoVox3DEditor::keyDown() ..., evt.keyCode: ", evt.keyCode);
+    let KEY = CoRScene.Keyboard;
+
+    switch (evt.keyCode) {
+      case KEY.S:
+        break;
+
+      default:
+        break;
+    }
+  }
+
+  run() {
+    if (this.m_graph != null) {
+      if (this.m_interact != null) {
+        this.m_interact.run();
+      }
+
+      if (this.m_transUI != null) {
+        this.m_transUI.run();
+      }
+
+      this.m_graph.run();
     }
   }
 
 }
 
-exports.PostOutline = PostOutline;
+exports.DemoVox3DEditor = DemoVox3DEditor;
+exports.default = DemoVox3DEditor;
 
 /***/ }),
 
@@ -6363,7 +6444,7 @@ exports.Button = Button;
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _setPublicPath__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__("1eb2");
-/* harmony import */ var _entry__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__("43fc");
+/* harmony import */ var _entry__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__("a176");
 /* harmony import */ var _entry__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(_entry__WEBPACK_IMPORTED_MODULE_1__);
 /* harmony reexport (unknown) */ for(var __WEBPACK_IMPORT_KEY__ in _entry__WEBPACK_IMPORTED_MODULE_1__) if(["default"].indexOf(__WEBPACK_IMPORT_KEY__) < 0) (function(key) { __webpack_require__.d(__webpack_exports__, key, function() { return _entry__WEBPACK_IMPORTED_MODULE_1__[key]; }) }(__WEBPACK_IMPORT_KEY__));
 
