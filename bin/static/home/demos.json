@@ -103,6 +103,10 @@
         {
             "name": "ancientApple",
             "info": "ancient apple"
+        },
+        {
+            "name": "normalViewer",
+            "info": "a 3d editor"
         }
     ]
 }
