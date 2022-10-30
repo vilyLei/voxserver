@@ -1273,8 +1273,9 @@ class NormalEntityNode {
   }
 
   applyNormalLineScale(s) {
-    this.m_normalScale = s * this.m_normalScale0;
-    if (this.m_normalMaterial != null) this.m_normalMaterial.setLength(this.m_normalScale);
+    s *= this.m_normalScale0;
+    this.m_normalScale = s;
+    if (this.m_normalMaterial != null) this.m_normalMaterial.setLength(s);
   }
 
   flipNormal(boo) {
@@ -1298,7 +1299,7 @@ class NormalEntityNode {
 
   createNormalLine(size = 5) {
     if (this.m_normalLine == null) {
-      console.log("XXXXXX create normal line");
+      // console.log("XXXXXX create normal line");
       let m = this.m_model;
       let builder = NormalEntityNode.s_entityBuilder;
       this.m_normalLine = builder.createNormalLineEntity(this.entity, m.vertices, m.normals, size);
@@ -2645,6 +2646,11 @@ class NormalViewerScene {
         mana.applyFeatureColor(uuid);
         break;
 
+      case "normalScaleBtnSelect":
+        console.log("XXXX normalScaleBtnSelect");
+        mana.normalScaleBtnSelect();
+        break;
+
       case "normalLineColor":
         console.log("appaly normal color");
         break;
@@ -3837,6 +3843,23 @@ class NormalEntityManager {
     }
   }
 
+  normalScaleBtnSelect() {
+    let ls = this.m_selectEntities;
+
+    if (ls != null) {
+      let map = this.m_map;
+      let cpl = this.ctrPanel;
+
+      for (let i = 0; i < ls.length; ++i) {
+        const node = map.get(ls[i].getUid());
+
+        if (node != null) {
+          node.select();
+        }
+      }
+    }
+  }
+
   applyFeatureColor(uuid) {
     console.log("applyFeatureColor: ", uuid);
     let ls = this.m_selectEntities;
@@ -3898,9 +3921,6 @@ class NormalEntityManager {
     let ls = this.m_selectEntities;
 
     if (ls != null && ls.length > 0) {
-      // f = 0.1 + f * 3.0;
-      f = f / this.m_scaleBase;
-      f = 0.1 + f * 1.0;
       let ls = this.m_selectEntities;
 
       if (ls != null) {
@@ -4084,6 +4104,7 @@ class NormalCtrlPanel {
     this.m_dragMinX = 0;
     this.m_dragMaxX = 0;
     this.m_progressLen = 0;
+    this.m_proBaseLen = 100;
   }
 
   getScene() {
@@ -4359,15 +4380,29 @@ class NormalCtrlPanel {
   createProgressBtn(px, py, length) {
     let sc = this.getScene();
     let color = CoMaterial.createColor4(0.1, 0.1, 0.1); // let bgBar = new ColorLabel();
+    // let bgBar = CoUI.createColorLabel();
+    // bgBar.depthTest = true;
+    // bgBar.initialize(length, 10);
+    // bgBar.setZ(-0.05);
+    // bgBar.setColor(color);
+    // bgBar.setXY(px, py);
+    // this.m_panel.addEntity(bgBar);
 
-    let bgBar = CoUI.createColorLabel();
-    bgBar.depthTest = true;
-    bgBar.initialize(length, 10);
-    bgBar.setZ(-0.05);
-    bgBar.setColor(color);
-    bgBar.setXY(px, py);
-    this.m_panel.addEntity(bgBar);
+    let barBgLabel = CoUI.createClipColorLabel();
+    barBgLabel.initializeWithoutTex(length, 10, 4);
+    barBgLabel.getColorAt(0).setRGB3Bytes(70, 70, 70);
+    barBgLabel.getColorAt(1).setRGB3f(0.3, 0.3, 0.3);
+    barBgLabel.getColorAt(2).setRGB3Bytes(70, 70, 70);
+    barBgLabel.getColorAt(3).setRGB3Bytes(70, 70, 70);
+    let dragBgBar = CoUI.createButton();
+    dragBgBar.initializeWithLable(barBgLabel);
+    dragBgBar.setZ(-0.05);
+    dragBgBar.setXY(px, py);
+    this.m_panel.addEntity(dragBgBar);
+    this.m_dragBgBar = dragBgBar;
+    dragBgBar.addEventListener(CoRScene.MouseEvent.MOUSE_DOWN, this, this.progressBgMouseDown);
     this.m_progressLen = length - 16;
+    this.m_proBaseLen = this.m_progressLen;
     this.m_dragMinX = px;
     this.m_dragMaxX = px + this.m_progressLen; // let barLabel = new ClipColorLabel();
 
@@ -4391,6 +4426,7 @@ class NormalCtrlPanel {
   progressMouseDown(evt) {
     this.m_dragging = true;
     let sc = this.getScene();
+    this.sendSelectionEvt("normalScaleBtnSelect", true);
     sc.addEventListener(CoRScene.MouseEvent.MOUSE_MOVE, this, this.progressMouseMove);
   }
 
@@ -4398,6 +4434,27 @@ class NormalCtrlPanel {
     this.m_dragging = false;
     let sc = this.getScene();
     sc.removeEventListener(CoRScene.MouseEvent.MOUSE_MOVE, this, this.progressMouseMove);
+  }
+
+  progressBgMouseDown(evt) {
+    let px = evt.mouseX;
+    let py = evt.mouseY;
+    let pv = this.m_v0;
+    pv.setXYZ(px, py, 0); // console.log("px,py: ", px,py);
+
+    this.m_panel.globalToLocal(pv); // console.log("pv.x, pv.y: ", pv.x, pv.y);
+
+    px = pv.x;
+
+    if (px < this.m_dragMinX) {
+      px = this.m_dragMinX;
+    } else if (px > this.m_dragMaxX) {
+      px = this.m_dragMaxX;
+    }
+
+    this.m_dragBar.setX(px);
+    this.m_dragBar.update();
+    this.m_proBaseLen = px - this.m_dragMinX;
   }
 
   progressMouseMove(evt) {
@@ -4417,8 +4474,11 @@ class NormalCtrlPanel {
     }
 
     this.m_dragBar.setX(px);
-    this.m_dragBar.update();
-    let f = (px - this.m_dragMinX) / this.m_progressLen; // console.log("f: ",f, (0.1 + f * 2.0));
+    this.m_dragBar.update(); // console.log("this.m_proBaseLen: ",this.m_proBaseLen, this.m_progressLen);
+    // let f = (px - this.m_dragMinX) / this.m_progressLen;
+
+    let f = (px - this.m_dragMinX) / this.m_proBaseLen; // console.log("f: ", f, px - this.m_dragMinX);
+    // console.log("f: ",f, (0.1 + f * 2.0));
     // f = 0.1 + f * 3.0;
 
     this.m_normalScale = f;
@@ -6223,6 +6283,7 @@ class DemoVox3DEditor {
   run() {
     if (this.m_graph != null) {
       if (this.m_interact != null) {
+        this.m_interact.setLookAtPosition(null);
         this.m_interact.run();
       }
 
