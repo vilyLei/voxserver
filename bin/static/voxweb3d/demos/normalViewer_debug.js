@@ -732,7 +732,7 @@ class NVNavigationUI {
     let keys = ["file", "edit", "model", "normal", "texture", "material", "light", "animation", "particle", "rendering", "physics", "help"];
     let urls = ["文件", "编辑", "模型", "法线", "纹理", "材质", "灯光", "动画", "粒子", "渲染", "物理", "帮助"];
     let infos = ["File system operations.", "Editing operations.", "Geometry model operations.", "Normal data operations.", "Texture data operations.", "Material system operations.", "Light system operations.", "Animation system operations.", "Paiticle system operations.", "Rendering system operations.", "Physics system operations.", "Help infomation."];
-    keys = urls.slice(0, 2);
+    keys = keys.slice(0, 2);
     urls = urls.slice(0, 2);
     infos = infos.slice(0, 2);
     keys.push("help");
@@ -789,7 +789,7 @@ class NVNavigationUI {
   btnMouseUpListener(evt) {
     // console.log("btnMouseUpListener(), evt.currentTarget: ", evt.currentTarget);
     let uuid = evt.uuid;
-    console.log("btnMouseUpListener(), uuid: ", uuid);
+    console.log("XXX CO btnMouseUpListener(), uuid: ", uuid);
 
     switch (uuid) {
       case "file":
@@ -801,6 +801,7 @@ class NVNavigationUI {
       case "light":
       case "animation":
       case "particle":
+        console.log("dfdfdffd");
         this.m_coUIScene.prompt.showPrompt("It can't be used now!");
         break;
 
@@ -1199,11 +1200,24 @@ class NormalEntityNode {
     this.m_uid = -1;
     this.groupUid = -1;
     this.entity = null;
-    this.normalLine = null;
+    this.m_normalLine = null;
+  }
+
+  setLineVisible(v) {
+    if (v) {
+      this.createNormalLine();
+    }
+
+    if (this.m_normalLine != null) this.m_normalLine.setVisible(v);
+  }
+
+  getLineVisible() {
+    return this.m_normalLine != null && this.m_normalLine.getVisible();
   }
 
   setVisible(v) {
-    this.normalLine.setVisible(false);
+    this.setLineVisible(v); // this.m_normalLine.setVisible(false);
+
     this.entity.setVisible(v);
   }
 
@@ -1260,13 +1274,13 @@ class NormalEntityNode {
 
   applyNormalLineScale(s) {
     this.m_normalScale = s * this.m_normalScale0;
-    this.m_normalMaterial.setLength(this.m_normalScale);
+    if (this.m_normalMaterial != null) this.m_normalMaterial.setLength(this.m_normalScale);
   }
 
   flipNormal(boo) {
     this.m_normalFlip = boo;
     let s = boo ? -1.0 : 1.0;
-    this.m_normalMaterial.setScale(s);
+    if (this.m_normalMaterial != null) this.m_normalMaterial.setScale(s);
     this.m_entityMaterial.setNormalScale(s);
   }
 
@@ -1275,7 +1289,7 @@ class NormalEntityNode {
   }
 
   setNormalLineColor(c) {
-    this.m_normalMaterial.setColor(c);
+    if (this.m_normalMaterial != null) this.m_normalMaterial.setColor(c);
   }
 
   readyCreateNormalLine(model) {
@@ -1283,14 +1297,17 @@ class NormalEntityNode {
   }
 
   createNormalLine(size = 5) {
-    let m = this.m_model;
-    let builder = NormalEntityNode.s_entityBuilder;
-    this.normalLine = builder.createNormalLineEntity(this.entity, m.vertices, m.normals, size);
-    this.m_normalMaterial = builder.getNormalLineMaterial();
-    this.m_normalScale = builder.getNormalLineScale();
+    if (this.m_normalLine == null) {
+      console.log("XXXXXX create normal line");
+      let m = this.m_model;
+      let builder = NormalEntityNode.s_entityBuilder;
+      this.m_normalLine = builder.createNormalLineEntity(this.entity, m.vertices, m.normals, size);
+      this.m_normalMaterial = builder.getNormalLineMaterial();
+      this.m_normalScale = builder.getNormalLineScale();
 
-    if (this.normalLine.getMesh() != null) {
-      this.rsc.addEntity(this.normalLine);
+      if (this.m_normalLine.getMesh() != null) {
+        this.rsc.addEntity(this.m_normalLine);
+      }
     }
   }
 
@@ -1343,11 +1360,11 @@ class NormalEntityNode {
 
     if (this.entity != null) {
       this.rsc.removeEntity(this.entity);
-      this.rsc.removeEntity(this.normalLine);
+      this.rsc.removeEntity(this.m_normalLine);
       this.entity.destroy();
-      this.normalLine.destroy();
+      this.m_normalLine.destroy();
       this.entity = null;
-      this.normalLine = null;
+      this.m_normalLine = null;
     }
   }
 
@@ -2633,6 +2650,7 @@ class NormalViewerScene {
         break;
 
       case "normalTest":
+        this.m_uiscene.prompt.showPrompt("It can't be used now!");
         console.log("appaly normal data feature test");
         break;
 
@@ -3060,8 +3078,8 @@ class NormalExampleGroup {
     node.setEntityModel(model, nivs); // node.entity.setRotationXYZ(45, 0.0, -45);
 
     node.setPosition(pv);
-    node.update();
-    node.createNormalLine(5);
+    node.update(); // node.createNormalLine(5);
+
     this.m_nodeEntities.push(node.entity);
     this.m_nodes.push(node);
     return node;
@@ -3435,6 +3453,7 @@ class NormalEntityGroup {
 
       if (format == CoSpaceAppData_1.CoDataFormat.FBX) {
         unit.data.modelReceiver = (models, transforms, index, total) => {
+          console.log("XXX: ", index, ",", total);
           this.createEntityFromModels(models, transforms);
         };
       }
@@ -3485,12 +3504,10 @@ class NormalEntityGroup {
     // 	nodes[i].createNormalLine();
     // }
     //*/
-
-    let nodes = this.m_nodes;
-
-    for (let i = 0; i < nodes.length; ++i) {
-      nodes[i].createNormalLine();
-    }
+    // let nodes = this.m_nodes;
+    // for (let i = 0; i < nodes.length; ++i) {
+    // 	nodes[i].createNormalLine();
+    // }
 
     this.m_loadedTotal++;
 
@@ -3685,7 +3702,7 @@ class NormalEntityManager {
         const node = map.get(ls[i].getUid());
 
         if (node != null) {
-          if (node.normalLine.getVisible()) {
+          if (node.getLineVisible()) {
             lineVisible = true;
           }
 
@@ -3718,7 +3735,7 @@ class NormalEntityManager {
         const node = map.get(ls[i].getUid());
 
         if (node != null) {
-          node.normalLine.setVisible(v);
+          node.setLineVisible(v);
         }
       }
     }
@@ -3836,6 +3853,11 @@ class NormalEntityManager {
 
         case "modelColor":
           this.setModelColor(true);
+          break;
+
+        case "normalTest":
+          // this.setModelColor(true);
+          console.log("test");
           break;
 
         default:
