@@ -96,6 +96,69 @@ return /******/ (function(modules) { // webpackBootstrap
 /************************************************************************/
 /******/ ({
 
+/***/ "1389":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+/**
+ * 光标移入的信息提示系统
+ */
+
+class TipsSystem {
+  constructor() {
+    this.m_tipEntity = null;
+  }
+
+  initialize(uiscene, rpi = 3) {
+    if (this.m_tipEntity == null) {
+      this.m_uiscene = uiscene;
+      let tip = CoUI.createRectTextTip();
+      tip.initialize(uiscene, rpi);
+      this.m_tipEntity = tip;
+    }
+  }
+  /**
+   * get tip entity
+   * @param type the default value is 0
+   * @returns IRectTextTip instance
+   */
+
+
+  getTipEntity(type) {
+    return this.m_tipEntity;
+  }
+  /**
+   * @param entity IMouseEvtUIEntity instance
+   * @param type the default value is 0
+   */
+
+
+  addTipsTarget(entity, type) {
+    this.m_tipEntity.addEntity(entity);
+  }
+  /**
+   * @param entity IMouseEvtUIEntity instance
+   * @param type the default value is 0
+   */
+
+
+  removeTipsTarget(entity, type) {
+    this.m_tipEntity.removeEntity(entity);
+  }
+
+  destroy() {}
+
+}
+
+exports.TipsSystem = TipsSystem;
+
+/***/ }),
+
 /***/ "1dd7":
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -675,12 +738,12 @@ Object.defineProperty(exports, "__esModule", {
  */
 
 class NVNavigationUI {
+  // tip: IRectTextTip = null;
   constructor() {
     this.m_rsc = null;
     this.m_editUIRenderer = null;
     this.m_uirsc = null;
     this.m_coUIScene = null;
-    this.tip = null;
     this.m_navBtns = [];
     this.m_bgLabel = null;
   }
@@ -752,7 +815,7 @@ class NVNavigationUI {
 
     for (let i = 0; i < urls.length; ++i) {
       let btn = this.crateBtn(urls, pw, ph, px + pw * i, py, i, keys[i], infos[i]);
-      this.tip.addEntity(btn);
+      this.m_coUIScene.tips.addTipsTarget(btn);
       this.m_navBtns.push(btn);
       layouter.addUIEntity(btn);
     }
@@ -1949,13 +2012,13 @@ const NVRectFrameQuery_1 = __webpack_require__("259d");
 
 
 class NVTransUI {
+  // tip: IRectTextTip = null;
   constructor() {
     this.m_rsc = null;
     this.m_editUIRenderer = null;
     this.m_uirsc = null;
     this.m_coUIScene = null;
     this.m_outline = null;
-    this.tip = null;
     this.m_transCtr = null;
     this.m_selectFrame = null;
     this.m_transBtns = [];
@@ -2138,7 +2201,8 @@ class NVTransUI {
     btn.initializeWithLable(colorClipLabel);
     btn.setXY(px, py);
     this.m_coUIScene.addEntity(btn, 1);
-    this.tip.addEntity(btn); // const ME = CoRScene.MouseEvent;
+    this.m_coUIScene.tips.addTipsTarget(btn); // this.tip.addEntity( btn );
+    // const ME = CoRScene.MouseEvent;
     // btn.addEventListener(ME.MOUSE_UP, this, this.btnMouseUpListener);
     // btn.addEventListener(ME.MOUSE_OUT, this.tip, this.tip.targetMouseOut);
     // btn.addEventListener(ME.MOUSE_OVER, this.tip, this.tip.targetMouseOver);
@@ -6031,7 +6095,9 @@ const NormalViewer_1 = __webpack_require__("d8b4");
 
 const PromptSystem_1 = __webpack_require__("3f7d");
 
-const CoModuleLoader_1 = __webpack_require__("2a2b"); //*
+const CoModuleLoader_1 = __webpack_require__("2a2b");
+
+const TipsSystem_1 = __webpack_require__("1389"); //*
 
 
 class LoadingUI {
@@ -6129,9 +6195,7 @@ class DemoVox3DEditor {
     this.m_interact = null;
     this.m_transUI = new NVTransUI_1.NVTransUI();
     this.m_nvaUI = new NVNavigationUI_1.NVNavigationUI();
-    this.m_scale = 20.0;
     this.m_loadingUI = new LoadingUI();
-    this.m_tip = null;
     this.m_viewer = null;
     this.m_graph = null;
   }
@@ -6190,15 +6254,12 @@ class DemoVox3DEditor {
     this.m_graph.addScene(this.m_uirsc);
     let promptSys = new PromptSystem_1.PromptSystem();
     promptSys.initialize(this.m_coUIScene);
-    this.m_coUIScene.prompt = promptSys; // let tip = new RectTextTip();
-
-    let tip = CoUI.createRectTextTip();
-    tip.initialize(this.m_coUIScene, 2);
-    this.m_tip = tip;
-    this.m_transUI.tip = this.m_tip;
+    this.m_coUIScene.prompt = promptSys;
+    let tipsSys = new TipsSystem_1.TipsSystem();
+    tipsSys.initialize(this.m_coUIScene);
+    this.m_coUIScene.tips = tipsSys;
     this.m_transUI.setOutline(this.m_outline);
     this.m_transUI.initialize(this.m_rsc, this.m_editUIRenderer, this.m_coUIScene);
-    this.m_nvaUI.tip = this.m_tip;
     this.m_nvaUI.initialize(this.m_rsc, this.m_editUIRenderer, this.m_coUIScene);
     let minV = CoMath.createVec3(-100, 0, -100);
     let maxV = minV.clone().scaleBy(-1);
