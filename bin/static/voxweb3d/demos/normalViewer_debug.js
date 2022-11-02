@@ -114,7 +114,7 @@ class TipsSystem {
     this.m_tipEntity = null;
   }
 
-  initialize(uiscene, rpi = 3) {
+  initialize(uiscene, rpi = 2) {
     if (this.m_tipEntity == null) {
       this.m_uiscene = uiscene;
       let tip = CoUI.createRectTextTip();
