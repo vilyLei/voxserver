@@ -1279,8 +1279,7 @@ class NormalEntityNode {
   }
 
   setVisible(v) {
-    this.setLineVisible(v); // this.m_normalLine.setVisible(false);
-
+    this.setLineVisible(v);
     this.entity.setVisible(v);
   }
 
@@ -1327,7 +1326,8 @@ class NormalEntityNode {
     this.readyCreateNormalLine(model);
     this.entity = normalEntity;
     this.m_uid = this.entity.getUid();
-    this.applyEvt(this.entity);
+    this.entity.mouseEnabled = false; // this.applyEvt(this.entity);
+
     return this.entity;
   }
 
@@ -1375,7 +1375,12 @@ class NormalEntityNode {
     }
   }
 
+  applyEvent() {
+    this.applyEvt(this.entity);
+  }
+
   applyEvt(entity) {
+    entity.mouseEnabled = true;
     let ME = CoRScene.MouseEvent;
     entity.addEventListener(ME.MOUSE_OVER, this, this.mouseOverTargetListener);
     entity.addEventListener(ME.MOUSE_OUT, this, this.mouseOutTargetListener);
@@ -3148,7 +3153,8 @@ class NormalExampleGroup {
     node.setEntityModel(model, nivs); // node.entity.setRotationXYZ(45, 0.0, -45);
 
     node.setPosition(pv);
-    node.update(); // node.createNormalLine(5);
+    node.update();
+    node.applyEvent(); // node.createNormalLine(5);
 
     this.m_nodeEntities.push(node.entity);
     this.m_nodes.push(node);
@@ -3440,12 +3446,8 @@ class NormalEntityGroup {
 
   loadModels(urls, typeNS = "") {
     if (urls != null && urls.length > 0) {
-      // this.m_transforms = [];
-      // this.m_transes = [];
       let purls = urls.slice(0);
       this.m_coapp.deferredInit(() => {
-        console.log("XXXXXXXXXXXXXXXXXXX deferredInit() call...");
-
         for (let i = 0; i < purls.length; ++i) {
           this.loadModel(purls[i], typeNS);
         }
@@ -3501,18 +3503,7 @@ class NormalEntityGroup {
     if (ins != null) {
       this.uiscene.prompt.getPromptPanel().applyConfirmButton();
       this.uiscene.prompt.showPrompt("Model loading!");
-      this.m_loadTotal++; // let unit = ins.getCPUDataByUrlAndCallback(
-      // 	url,
-      // 	format,
-      // 	(unit: CoGeomDataUnit, status: number): void => {
-      // 		if(format != CoDataFormat.FBX) {
-      // 			this.createEntityFromModels(unit.data.models, unit.data.transforms);
-      // 		}
-      // 		this.createEntityFromUnit(unit, status);
-      // 	},
-      // 	true
-      // );
-
+      this.m_loadTotal++;
       let unit = ins.getCPUDataByUrlAndCallback(url, format, (unit, status) => {
         if (format != CoSpaceAppData_1.CoDataFormat.FBX) {
           this.createEntityFromModels(unit.data.models, unit.data.transforms);
@@ -3584,6 +3575,10 @@ class NormalEntityGroup {
     if (this.m_loadedTotal >= this.m_loadTotal) {
       this.uiscene.prompt.getPromptPanel().applyConfirmButton();
       this.uiscene.prompt.showPrompt("Model loaded finish!");
+
+      for (let i = 0; i < this.m_nodes.length; ++i) {
+        this.m_nodes[i].applyEvent();
+      }
     }
   }
 
