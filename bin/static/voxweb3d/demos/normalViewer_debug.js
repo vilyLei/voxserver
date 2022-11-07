@@ -159,6 +159,168 @@ exports.TipsSystem = TipsSystem;
 
 /***/ }),
 
+/***/ "1c1e":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const TextPackedLoader_1 = __webpack_require__("2756");
+
+class UIConfig {
+  constructor() {
+    this.m_jsonRawData = "";
+    this.m_jsonObj = null;
+    this.m_globalColor = null;
+    this.m_globalText = null;
+  }
+
+  initialize(configUrl, callback) {
+    // load the cofig text file
+    this.m_callback = callback;
+    let jsonLoader = new TextPackedLoader_1.TextPackedLoader(1, () => {
+      // console.log("jsonLoader loaded: ", jsonLoader.getDataByUrl(configUrl));
+      this.m_jsonRawData = jsonLoader.getDataByUrl(configUrl);
+      this.m_jsonObj = JSON.parse(this.m_jsonRawData); // console.log("this.m_jsonObj: ", this.m_jsonObj);
+
+      if (this.m_callback != null) {
+        this.m_callback();
+        this.m_callback = null;
+      }
+    }).load(configUrl);
+  }
+
+  createColorByData(bytesArray3) {
+    let c = CoRScene.createColor4();
+    c.fromBytesArray3(bytesArray3);
+    return c;
+  }
+
+  applyButtonGlobalColor(btn, colorName) {
+    if (btn != null && colorName != "") {
+      let gColor = this.m_globalColor.button;
+
+      if (gColor != null) {
+        let c = gColor[colorName];
+
+        if (c != undefined) {
+          let label = btn.getLable();
+          this.applyButtonColor(label.getColors(), c);
+          label.setClipIndex(0);
+        }
+      }
+    }
+  }
+
+  applyButtonColor(btnColors, uiBtnColor) {
+    // let ls = uiBtnColor.out;
+    // btnColors[0].setRGB3Bytes(ls[0], ls[1], ls[2]);
+    // ls = uiBtnColor.over;
+    // btnColors[1].setRGB3Bytes(ls[0], ls[1], ls[2]);
+    // ls = uiBtnColor.down;
+    // btnColors[2].setRGB3Bytes(ls[0], ls[1], ls[2]);
+    // if(btnColors.length > 3) {
+    // 	ls = uiBtnColor.up;
+    // 	btnColors[3].setRGB3Bytes(ls[0], ls[1], ls[2]);
+    // }
+    const len = btnColors.length;
+    btnColors[0].fromBytesArray3(uiBtnColor.out);
+    btnColors[1].fromBytesArray3(uiBtnColor.over);
+
+    if (len > 2) {
+      btnColors[2].fromBytesArray3(uiBtnColor.down != undefined ? uiBtnColor.down : uiBtnColor.out);
+    }
+
+    if (len > 3) {
+      btnColors[3].fromBytesArray3(uiBtnColor.up != undefined ? uiBtnColor.up : uiBtnColor.out);
+    }
+  }
+
+  getUIGlobalText() {
+    if (this.m_globalText != null) return this.m_globalText;
+    let obj = this.m_jsonObj;
+
+    if (obj != null) {
+      let uiModule = obj["text"];
+
+      if (uiModule !== undefined) {
+        this.m_globalText = uiModule;
+        return this.m_globalText;
+      }
+    }
+
+    return null;
+  }
+
+  getUIGlobalColor() {
+    if (this.m_globalColor != null) return this.m_globalColor;
+    let obj = this.m_jsonObj;
+
+    if (obj != null) {
+      let uiModule = obj["color"];
+
+      if (uiModule !== undefined) {
+        this.m_globalColor = uiModule;
+        return this.m_globalColor;
+      }
+    }
+
+    return null;
+  }
+
+  getUIModuleByName(moduleName) {
+    if (moduleName != "") {
+      let obj = this.m_jsonObj;
+
+      if (obj != null) {
+        let uiModule = obj["uiModule"];
+        console.log("XXXX uiModule: ", uiModule);
+
+        if (uiModule !== undefined) {
+          let module = uiModule[moduleName];
+
+          if (module !== undefined) {
+            return module;
+          }
+        }
+      }
+    }
+
+    return null;
+  }
+
+  getUIPanelCfgByName(panelName) {
+    if (panelName != "") {
+      let obj = this.m_jsonObj;
+
+      if (obj != null) {
+        let uiModule = obj["uiModule"];
+
+        if (uiModule !== undefined) {
+          let module = uiModule[panelName];
+
+          if (module !== undefined) {
+            return module;
+          }
+        }
+      }
+    }
+
+    return null;
+  }
+
+  destroy() {}
+
+}
+
+exports.UIConfig = UIConfig;
+
+/***/ }),
+
 /***/ "1dd7":
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -187,7 +349,8 @@ class TextLabel extends UIEntityBase_1.UIEntityBase {
 
   initialize(text, uiScene, fontSize = 24) {
     if (text != "" && this.isIniting()) {
-      if (fontSize < 12) fontSize = 12;
+      if (fontSize < 8) fontSize = 8;
+      this.m_fontSize = fontSize;
       this.init(); // this.transparent = true;
       // this.premultiplyAlpha = true;
 
@@ -205,7 +368,7 @@ class TextLabel extends UIEntityBase_1.UIEntityBase {
       this.m_tex.minFilter = CoRScene.TextureConst.LINEAR;
       this.m_tex.magFilter = CoRScene.TextureConst.NEAREST;
       let material = this.createMaterial(this.m_tex);
-      material.setColor(this.m_fontColor);
+      this.m_material = material;
       CoMesh.plane.setBufSortFormat(material.getBufSortFormat());
       let mesh = CoMesh.plane.createXOY(0, 0, 1.0, 1.0);
       this.m_pw = img.width;
@@ -614,6 +777,64 @@ exports.UserEditEvent = UserEditEvent;
 
 /***/ }),
 
+/***/ "2756":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const PackedLoader_1 = __webpack_require__("2564");
+
+class TextPackedLoader extends PackedLoader_1.PackedLoader {
+  constructor() {
+    super(...arguments);
+    this.m_dataMap = new Map();
+  } // /**
+  //  * @param times 记录总共需要的加载完成操作的响应次数。这个次数可能是由load直接产生，也可能是由于别的地方驱动。
+  //  * @param callback 完成所有响应的之后的回调
+  //  * @param urlChecker url 转换与检查
+  //  */
+  // constructor(times: number, callback: (m?: PackedLoader) => void = null, urlChecker: (url: string) => string = null) {
+  // 	super(times, callback, urlChecker);
+  // }
+
+
+  loadData(url) {
+    let req = new XMLHttpRequest();
+    req.open("GET", url, true);
+
+    req.onerror = function (err) {
+      console.error("load error: ", err);
+    }; // req.onprogress = e => { };
+
+
+    req.onload = evt => {
+      // this.loadedData(req.response, url);
+      this.m_dataMap.set(url, req.response);
+      this.loadedUrl(url);
+    };
+
+    req.send(null);
+  }
+
+  getDataByUrl(url) {
+    return this.m_dataMap.get(url);
+  }
+
+  clearAllData() {
+    this.m_dataMap.clear();
+  }
+
+}
+
+exports.TextPackedLoader = TextPackedLoader;
+
+/***/ }),
+
 /***/ "2870":
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -631,8 +852,8 @@ const ClipColorLabel_1 = __webpack_require__("bb62");
 const Button_1 = __webpack_require__("eb56");
 
 class ButtonBuilder {
-  static crateCurrTextBtn(pw, ph, idns, texAtlas, textParam, colors) {
-    if (textParam.text !== null && textParam.text != "" && colors != null) {
+  static createCurrTextBtn(pw, ph, idns, texAtlas, textParam, colors = null) {
+    if (textParam.text !== null && textParam.text != "") {
       let colorClipLabel = new ClipColorLabel_1.ClipColorLabel();
       colorClipLabel.initializeWithoutTex(pw, ph, 4);
       colorClipLabel.setColors(colors);
@@ -656,7 +877,66 @@ class ButtonBuilder {
     let tp = textParam;
     let img = texAtlas.createCharsCanvasFixSize(width, height, tp.text, tp.fontSize, CoMaterial.createColor4(), CoMaterial.createColor4(1.0, 1.0, 1.0, 0.0));
     texAtlas.addImageToAtlas(tp.text, img);
-    return ButtonBuilder.crateCurrTextBtn(width, height, idns, texAtlas, textParam, colors);
+    return ButtonBuilder.createCurrTextBtn(width, height, idns, texAtlas, textParam, colors);
+  }
+
+  static createPanelBtnWithCfg(couiScene, px, py, btnIndex, uiConfig) {
+    let tta = couiScene.transparentTexAtlas;
+    let cfg = couiScene.uiConfig;
+    let btnSize = uiConfig.btnSize;
+    let pw = btnSize[0];
+    let ph = btnSize[1];
+    let names = uiConfig.btnNames;
+    let keys = uiConfig.btnKeys;
+    let tips = uiConfig.btnTips;
+    let fontFormat = uiConfig.btnTextFontFormat;
+    tta.setFontName(fontFormat.font);
+    let fontColor = CoMaterial.createColor4();
+    fontColor.fromBytesArray3(cfg.getUIGlobalColor().text);
+    let bgColor = CoMaterial.createColor4(1, 1, 1, 0);
+    let img = tta.createCharsCanvasFixSize(pw, ph, names[btnIndex], fontFormat.fontSize, fontColor, bgColor);
+    tta.addImageToAtlas(names[btnIndex], img);
+    let label = CoUI.createClipColorLabel();
+    label.initializeWithoutTex(pw, ph, 4);
+    let iconLable = CoUI.createClipLabel();
+    iconLable.transparent = true;
+    iconLable.premultiplyAlpha = true;
+    iconLable.initialize(tta, [names[btnIndex]]);
+    let btn = CoUI.createButton();
+    btn.uuid = keys[btnIndex];
+    btn.addLabel(iconLable);
+    btn.initializeWithLable(label);
+    let tipsAlign = "right";
+    let btnStyle = uiConfig.buttonStyle;
+
+    if (btnStyle != undefined) {
+      if (btnStyle.globalColor != undefined) {
+        tipsAlign = btnStyle.tipsAlign;
+        cfg.applyButtonGlobalColor(btn, btnStyle.globalColor);
+      }
+    }
+
+    if (tips.length > btnIndex) {
+      couiScene.tips.addTipsTarget(btn);
+      let tipInfo = CoUI.createTipInfo().setContent(tips[btnIndex]);
+
+      switch (tipsAlign) {
+        case "top":
+          btn.info = tipInfo.alignTop();
+          break;
+
+        case "bottom":
+          btn.info = tipInfo.alignBottom();
+          break;
+
+        default:
+          btn.info = tipInfo.alignRight();
+          break;
+      }
+    }
+
+    btn.setXY(px, py);
+    return btn;
   }
 
 }
@@ -675,8 +955,7 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
-const ModuleLoader_1 = __webpack_require__("75f5"); //CoModuleLoader
-
+const ModuleLoader_1 = __webpack_require__("75f5");
 
 class CoModuleLoader extends ModuleLoader_1.ModuleLoader {
   /**
@@ -733,12 +1012,14 @@ exports.CoModuleLoader = CoModuleLoader;
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
+
+const ButtonBuilder_1 = __webpack_require__("2870");
 /**
  * NVNavigationUI
  */
 
+
 class NVNavigationUI {
-  // tip: IRectTextTip = null;
   constructor() {
     this.m_rsc = null;
     this.m_editUIRenderer = null;
@@ -758,7 +1039,6 @@ class NVNavigationUI {
   }
 
   init() {
-    let editsc = this.m_editUIRenderer;
     this.initUI();
   }
 
@@ -776,46 +1056,37 @@ class NVNavigationUI {
 
   initNavigationUI() {
     let uiScene = this.m_coUIScene;
-    let tta = uiScene.transparentTexAtlas;
+    let uimodule = uiScene.uiConfig.getUIPanelCfgByName("navigation");
+    console.log("NVNavigationUI::initNavigationUI(), uimodule: ", uimodule);
     let px = 0;
     let py = 0;
-    let pw = 90;
-    let ph = 40;
+    let pw = uimodule.btnTextAreaSize[0];
+    let ph = uimodule.btnTextAreaSize[1];
     let st = this.m_coUIScene.getStage();
     this.m_bgLabelW = st.stageWidth;
     this.m_bgLabelH = ph;
     let bgLabel = CoUI.createColorLabel();
     bgLabel.initialize(this.m_bgLabelW, this.m_bgLabelH);
     bgLabel.setY(st.stageHeight - ph);
-    bgLabel.setColor(bgLabel.getColor().setRGB3Bytes(40, 40, 40));
+    bgLabel.setColor(bgLabel.getColor().fromBytesArray3(uimodule.bgColor));
     uiScene.addEntity(bgLabel);
     this.m_bgLabel = bgLabel;
     let EB = CoRScene.EventBase;
     uiScene.getStage().addEventListener(EB.RESIZE, this, this.resize);
     let keys = ["file", "edit", "model", "normal", "texture", "material", "light", "animation", "particle", "rendering", "physics", "help"];
-    let urls = ["文件", "编辑", "模型", "法线", "纹理", "材质", "灯光", "动画", "粒子", "渲染", "物理", "帮助"];
-    let infos = ["File system operations.", "Editing operations.", "Geometry model operations.", "Normal data operations.", "Texture data operations.", "Material system operations.", "Light system operations.", "Animation system operations.", "Paiticle system operations.", "Rendering system operations.", "Physics system operations.", "Help infomation."];
-    keys = keys.slice(0, 2);
-    urls = urls.slice(0, 2);
-    infos = infos.slice(0, 2);
-    keys.push("help");
-    urls.push("帮助");
-    infos.push("Help infomation");
+    let btnNames = ["文件", "编辑", "模型", "法线", "纹理", "材质", "灯光", "动画", "粒子", "渲染", "物理", "帮助"];
+    let tips = ["File system operations.", "Editing operations.", "Geometry model operations.", "Normal data operations.", "Texture data operations.", "Material system operations.", "Light system operations.", "Animation system operations.", "Paiticle system operations.", "Rendering system operations.", "Physics system operations.", "Help infomation."];
+    btnNames = uimodule.btnNames;
+    keys = uimodule.btnKeys;
+    tips = uimodule.btnTips;
     let layouter = uiScene.layout.createLeftTopLayouter();
-    let fontColor = CoMaterial.createColor4().setRGB3Bytes(170, 170, 170);
-    let bgColor = CoMaterial.createColor4(1, 1, 1, 0);
-
-    for (let i = 0; i < urls.length; ++i) {
-      let img = tta.createCharsCanvasFixSize(pw, ph, urls[i], 30, fontColor, bgColor);
-      tta.addImageToAtlas(urls[i], img);
-    }
-
     px = 0;
     py = st.stageHeight - ph;
 
-    for (let i = 0; i < urls.length; ++i) {
-      let btn = this.crateBtn(urls, pw, ph, px + pw * i, py, i, keys[i], infos[i]);
-      this.m_coUIScene.tips.addTipsTarget(btn);
+    for (let i = 0; i < btnNames.length; ++i) {
+      const btn = ButtonBuilder_1.ButtonBuilder.createPanelBtnWithCfg(uiScene, px + pw * i, py, i, uimodule);
+      btn.addEventListener(CoRScene.MouseEvent.MOUSE_UP, this, this.btnMouseUpListener);
+      this.m_coUIScene.addEntity(btn, 1);
       this.m_navBtns.push(btn);
       layouter.addUIEntity(btn);
     }
@@ -827,32 +1098,9 @@ class NVNavigationUI {
     });
   }
 
-  crateBtn(urls, pw, ph, px, py, labelIndex, idns, info) {
-    let colorClipLabel = CoUI.createClipColorLabel();
-    colorClipLabel.initializeWithoutTex(pw, ph, 4);
-    colorClipLabel.getColorAt(0).setRGB3Bytes(40, 40, 40);
-    colorClipLabel.getColorAt(1).setRGB3Bytes(50, 50, 50);
-    colorClipLabel.getColorAt(2).setRGB3Bytes(40, 40, 60);
-    let tta = this.m_coUIScene.transparentTexAtlas;
-    let iconLable = CoUI.createClipLabel();
-    iconLable.transparent = true;
-    iconLable.premultiplyAlpha = true;
-    iconLable.initialize(tta, [urls[labelIndex]]);
-    let btn = CoUI.createButton();
-    btn.uuid = idns;
-    btn.info = CoUI.createTipInfo().alignBottom().setContent(info);
-    btn.addLabel(iconLable);
-    btn.initializeWithLable(colorClipLabel);
-    btn.setXY(px, py);
-    this.m_coUIScene.addEntity(btn, 1);
-    btn.addEventListener(CoRScene.MouseEvent.MOUSE_UP, this, this.btnMouseUpListener);
-    return btn;
-  }
-
   btnMouseUpListener(evt) {
     // console.log("btnMouseUpListener(), evt.currentTarget: ", evt.currentTarget);
     let uuid = evt.uuid;
-    console.log("XXX CO btnMouseUpListener(), uuid: ", uuid);
 
     switch (uuid) {
       case "file":
@@ -864,7 +1112,6 @@ class NVNavigationUI {
       case "light":
       case "animation":
       case "particle":
-        console.log("dfdfdffd");
         this.m_coUIScene.prompt.showPrompt("It can't be used now!");
         break;
 
@@ -1198,12 +1445,20 @@ class PromptSystem {
   initialize(uiscene, rpi = 3) {
     if (this.m_promptPanel == null) {
       this.m_uiscene = uiscene;
-      let pl = new PromptPanel_1.PromptPanel();
-      pl.initialize(this.m_uiscene, rpi, 300, 200, 120, 50);
+      let cfg = uiscene.uiConfig;
+      let uimodule = cfg.getUIPanelCfgByName("promptPanel");
+      let plSize = uimodule.panelSize;
+      let btnSize = uimodule.btnSize;
+      let names = uimodule.btnNames;
+      let pl = new PromptPanel_1.PromptPanel(); // pl.initialize(this.m_uiscene, rpi, 300, 200, 120, 50);
+
+      pl.initialize(this.m_uiscene, rpi, plSize[0], plSize[1], btnSize[0], btnSize[1], names[0], names[1]);
       pl.setZ(3.0);
-      pl.setBGColor(CoMaterial.createColor4(0.2, 0.2, 0.2));
-      this.m_promptPanel = pl; // pl.open();
-      // pl.close();
+      let color = CoMaterial.createColor4();
+      color.fromBytesArray3(uimodule.bgColor); // pl.setBGColor(CoMaterial.createColor4(0.2, 0.2, 0.2));
+
+      pl.setBGColor(color);
+      this.m_promptPanel = pl;
     }
   }
 
@@ -1874,7 +2129,7 @@ class NormalEntityMaterial {
   }
 
   getRGBA4f(color) {
-    color.fromArray(this.m_data);
+    color.fromArray4(this.m_data);
   }
 
   setLength(length) {
@@ -2011,13 +2266,14 @@ const UserEditEvent_1 = __webpack_require__("268d");
 const NVUIRectLine_1 = __webpack_require__("4709");
 
 const NVRectFrameQuery_1 = __webpack_require__("259d");
+
+const ButtonBuilder_1 = __webpack_require__("2870");
 /**
  * NVTransUI
  */
 
 
 class NVTransUI {
-  // tip: IRectTextTip = null;
   constructor() {
     this.m_rsc = null;
     this.m_editUIRenderer = null;
@@ -2043,6 +2299,10 @@ class NVTransUI {
       this.m_coUIScene = coUIScene;
       this.init();
     }
+  }
+
+  getCoUIScene() {
+    return this.m_coUIScene;
   }
 
   init() {
@@ -2118,29 +2378,22 @@ class NVTransUI {
   }
 
   initTransUI() {
-    this.m_btnGroup = CoUI.createSelectButtonGroup();
     let uiScene = this.m_coUIScene;
-    let tta = uiScene.transparentTexAtlas;
-    let pw = 90;
-    let ph = 70;
-    let urls = ["框选", "移动", "旋转", "缩放"];
-    let keys = ["select", "move", "rotate", "scale"];
-    let infos = ["Select items using box selection.", "Move selected items(W).", "Rotate selected items(R).", "Scale(resize) selected items(E)."];
-    let fontColor = CoMaterial.createColor4().setRGB3Bytes(170, 170, 170);
-    ;
-    let bgColor = CoMaterial.createColor4(1, 1, 1, 0);
-
-    for (let i = 0; i < urls.length; ++i) {
-      let img = tta.createCharsCanvasFixSize(pw, ph, urls[i], 30, fontColor, bgColor);
-      tta.addImageToAtlas(urls[i], img);
-    }
-
+    let cfg = uiScene.uiConfig;
+    let uiCfg = cfg.getUIPanelCfgByName("transformCtrl");
+    this.m_btnGroup = CoUI.createSelectButtonGroup();
+    let pw = uiCfg.btnTextAreaSize[0];
+    let ph = uiCfg.btnTextAreaSize[1];
+    let btnNames = uiCfg.btnNames;
+    let keys = uiCfg.btnKeys;
     let px = 5;
-    let py = (5 + ph) * 4;
-    ph = 5 + ph;
+    pw = uiCfg.btnSize[0];
+    ph = uiCfg.btnSize[1];
+    let py = ph * 4;
 
-    for (let i = 0; i < urls.length; ++i) {
-      let btn = this.crateBtn(urls, pw, ph, px, py - ph * i, i, keys[i], infos[i]);
+    for (let i = 0; i < btnNames.length; ++i) {
+      const btn = ButtonBuilder_1.ButtonBuilder.createPanelBtnWithCfg(uiScene, px, py - ph * i, i, uiCfg);
+      this.m_coUIScene.addEntity(btn, 1);
 
       if (i > 0) {
         this.m_transBtns.push(btn);
@@ -2149,16 +2402,10 @@ class NVTransUI {
     }
 
     this.m_btnGroup.setSelectedFunction(btn => {
-      let label;
-      label = btn.getLable();
-      label.getColorAt(0).setRGB3Bytes(71, 114, 179);
-      label.setClipIndex(0);
+      cfg.applyButtonGlobalColor(btn, "selected");
       this.selectTrans(btn.uuid);
     }, btn => {
-      let label;
-      label = btn.getLable();
-      label.getColorAt(0).setRGB3Bytes(40, 40, 40);
-      label.setClipIndex(0);
+      cfg.applyButtonGlobalColor(btn, "common");
     });
     this.m_btnGroup.select(keys[1]);
   }
@@ -2184,36 +2431,6 @@ class NVTransUI {
     // console.log("NVTransUI::uiMouseMoveListener(), evt: ", evt);
     // console.log("ui move (x, y): ", evt.mouseX, evt.mouseY);
     this.m_selectFrame.move(evt.mouseX, evt.mouseY);
-  }
-
-  crateBtn(urls, pw, ph, px, py, labelIndex, idns, info) {
-    let colorClipLabel = CoUI.createClipColorLabel();
-    colorClipLabel.initializeWithoutTex(pw, ph, 4);
-    colorClipLabel.getColorAt(0).setRGB3Bytes(40, 40, 40);
-    colorClipLabel.getColorAt(1).setRGB3Bytes(50, 50, 50);
-    colorClipLabel.getColorAt(2).setRGB3Bytes(40, 40, 60);
-    let tta = this.m_coUIScene.transparentTexAtlas;
-    let iconLable = CoUI.createClipLabel();
-    iconLable.transparent = true;
-    iconLable.premultiplyAlpha = true;
-    iconLable.initialize(tta, [urls[labelIndex]]); // let tipInfo = new TipInfo().alignRight().setContent(info);
-    // let tipInfo = CoUI.createTipInfo().alignRight().setContent(info);
-
-    let btn = CoUI.createButton();
-    btn.uuid = idns;
-    btn.info = CoUI.createTipInfo().alignRight().setContent(info);
-    btn.addLabel(iconLable);
-    btn.initializeWithLable(colorClipLabel);
-    btn.setXY(px, py);
-    this.m_coUIScene.addEntity(btn, 1);
-    this.m_coUIScene.tips.addTipsTarget(btn); // this.tip.addEntity( btn );
-    // const ME = CoRScene.MouseEvent;
-    // btn.addEventListener(ME.MOUSE_UP, this, this.btnMouseUpListener);
-    // btn.addEventListener(ME.MOUSE_OUT, this.tip, this.tip.targetMouseOut);
-    // btn.addEventListener(ME.MOUSE_OVER, this.tip, this.tip.targetMouseOver);
-    // btn.addEventListener(ME.MOUSE_MOVE, this.tip, this.tip.targetMouseMove);
-
-    return btn;
   }
 
   selectTrans(uuid) {
@@ -2363,6 +2580,18 @@ class UIEntityContainer extends UIEntityBase_1.UIEntityBase {
   addedEntity(entity) {}
 
   removedEntity(entity) {}
+
+  update() {
+    for (let i = 0; i < this.m_uientities.length; ++i) {
+      this.m_uientities[i].update();
+    }
+
+    if (this.m_rcontainer != null) {
+      this.m_rcontainer.update();
+    }
+
+    super.update();
+  }
 
   addEntity(entity) {
     if (entity != null) {
@@ -2685,9 +2914,16 @@ class NormalViewerScene {
   }
 
   initUI() {
-    let panel = new NormalCtrlPanel_1.NormalCtrlPanel();
-    panel.initialize(this.m_uiscene, 0, 310, 390, 50);
-    panel.setBGColor(CoMaterial.createColor4(0.2, 0.2, 0.2));
+    let cfg = this.m_uiscene.uiConfig;
+    let uimodule = cfg.getUIPanelCfgByName("normalCtrlPanel");
+    let plSize = uimodule.panelSize;
+    let btnSize = uimodule.btnSize; // let names = uimodule.names;
+
+    let panel = new NormalCtrlPanel_1.NormalCtrlPanel(); // panel.initialize(this.m_uiscene, 0, 310, 390, 90, 50);
+
+    panel.initialize(this.m_uiscene, 0, plSize[0], plSize[1], btnSize[0], btnSize[1]); // panel.setBGColor(CoMaterial.createColor4(0.2, 0.2, 0.2));
+
+    panel.setBGColor(cfg.createColorByData(uimodule.bgColor));
     panel.addEventListener(CoRScene.SelectionEvent.SELECT, this, this.selectDisplay);
     panel.addEventListener(CoRScene.ProgressDataEvent.PROGRESS, this, this.normalScale);
     this.m_ctrPanel = panel;
@@ -2792,6 +3028,7 @@ class ModuleLoader extends PackedLoader_1.PackedLoader {
   /**
    * @param times 记录总共需要的加载完成操作的响应次数。这个次数可能是由load直接产生，也可能是由于别的地方驱动。
    * @param callback 完成所有响应的之后的回调
+   * @param urlChecker url 转换与检查
    */
   constructor(times, callback = null, urlChecker = null) {
     super(times, callback, urlChecker);
@@ -3107,30 +3344,37 @@ class NormalExampleGroup {
       normals: nvs,
       indices: ivs
     };
+    let cfg = this.m_transUI.getCoUIScene().uiConfig;
+    let uiCfg = cfg.getUIPanelCfgByName("exampleGroup");
+    let items = uiCfg.items;
     let textHeight = this.m_textHeight;
     let h5Text = CoText.createH5Text(this.m_rscene, "text_cv_01", 22, 512, 512);
     let mana = this.entityManager;
     let pv = CoRScene.createVec3();
     let node = this.createEntityWithModel(correct_model, pv.setXYZ(-70.0, 0.0, 70.0));
     mana.addNode(node);
-    pv.y += textHeight;
-    this.createStaticText(pv, "法线正确", h5Text);
-    node = this.createEntityWithModel(normalHasNot_model, pv.setXYZ(-200.0, 0.0, 200.0));
+    pv.y += textHeight; // this.createStaticText(pv, "法线正确", h5Text);
+
+    this.createStaticText(pv, items[0].text, h5Text);
+    node = this.createEntityWithModel(normalHasNot_model, pv.setXYZ(-220.0, 0.0, 220.0));
     mana.addNode(node);
-    pv.y += textHeight;
-    this.createStaticText(pv, "没有法线数据", h5Text);
+    pv.y += textHeight; // this.createStaticText(pv, "没有法线数据", h5Text);
+
+    this.createStaticText(pv, items[1].text, h5Text);
     node = this.createEntityWithModel(inclinedNormal_model, pv.setXYZ(70.0, 0.0, -70.0));
     node.showDifference();
     node.showModelColor(true);
     mana.addNode(node);
-    pv.y += textHeight;
-    this.createStaticText(pv, "法线错误倾斜", h5Text);
-    node = this.createEntityWithModel(wrapErr_model, pv.setXYZ(200.0, 0.0, -200.0), sm.indices);
+    pv.y += textHeight; // this.createStaticText(pv, "法线错误倾斜", h5Text);
+
+    this.createStaticText(pv, items[2].text, h5Text);
+    node = this.createEntityWithModel(wrapErr_model, pv.setXYZ(220.0, 0.0, -220.0), sm.indices);
     node.showDifference();
     node.showModelColor(true);
     mana.addNode(node);
-    pv.y += textHeight;
-    this.createStaticText(pv, "顶点绕序错误", h5Text);
+    pv.y += textHeight; // this.createStaticText(pv, "顶点绕序错误", h5Text);
+
+    this.createStaticText(pv, items[3].text, h5Text);
     this.m_transUI.getRecoder().save(this.m_nodeEntities); // node.entity.setRenderState(CoRScene.RendererState.FRONT_CULLFACE_NORMAL_STATE);
   }
 
@@ -3574,7 +3818,7 @@ class NormalEntityGroup {
 
     if (this.m_loadedTotal >= this.m_loadTotal) {
       this.uiscene.prompt.getPromptPanel().applyConfirmButton();
-      this.uiscene.prompt.showPrompt("Model loaded finish!");
+      this.uiscene.prompt.showPrompt("Model loading finish!");
 
       for (let i = 0; i < this.m_nodes.length; ++i) {
         this.m_nodes[i].applyEvent();
@@ -4151,6 +4395,8 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
+const ButtonBuilder_1 = __webpack_require__("2870");
+
 class NormalCtrlPanel {
   constructor() {
     this.m_btnW = 90;
@@ -4176,12 +4422,13 @@ class NormalCtrlPanel {
     this.m_panel.setBGColor(c);
   }
 
-  initialize(scene, rpi, panelW, panelH, btnH) {
+  initialize(scene, rpi, panelW, panelH, btnW, btnH) {
     if (this.m_scene == null) {
       this.m_scene = scene;
       this.m_rpi = rpi;
       this.m_panelW = panelW;
       this.m_panelH = panelH;
+      this.m_btnW = btnW;
       this.m_btnH = btnH;
       this.m_v0 = CoRScene.createVec3();
       if (this.m_panel == null) this.m_panel = CoUI.createUIPanel();
@@ -4221,6 +4468,8 @@ class NormalCtrlPanel {
       this.addLayoutEvt();
       this.layout();
     }
+
+    this.update();
   }
 
   isOpen() {
@@ -4253,64 +4502,95 @@ class NormalCtrlPanel {
     this.m_progressDispatcher = CoRScene.createEventBaseDispatcher(); // this.m_flagEvt = CoRScene.createSelectionEvent();
 
     this.m_progressEvt = CoRScene.createProgressDataEvent();
+    let builder = ButtonBuilder_1.ButtonBuilder;
     let sc = this.m_scene;
+    let tta = sc.transparentTexAtlas;
+    let fc4 = CoMaterial.createColor4;
+    let cfg = this.m_scene.uiConfig;
+    let gColor = cfg.getUIGlobalColor();
+    let uiCfg = cfg.getUIPanelCfgByName("normalCtrlPanel");
+    let btf = uiCfg.btnTextFontFormat;
+    let ltf = uiCfg.textFontFormat;
+    let items = uiCfg.items;
     let startX = 10;
     let startY = this.m_panelH - 10 - this.m_btnH;
     let disX = 5;
     let disY = 5;
     let px = startX;
     let py = 0;
-    this.m_btnW = 90; // let localBtn = this.createBtn("Local", startX, startY, "local");
+    let ME = CoRScene.MouseEvent; // let textParam: ITextParam = {
+    // 	text: "Local",
+    // 	textColor: CoMaterial.createColor4(),
+    // 	fontSize: 30,
+    // 	font: ""
+    // };
+    // let colors: IColor4[] = [
+    // 	fc4().setRGB3Bytes(80, 80, 80),
+    // 	fc4().setRGB3Bytes(110, 110, 110),
+    // 	fc4().setRGB3Bytes(90, 90, 90),
+    // 	fc4().setRGB3Bytes(80, 80, 80)
+    // ];
+    // let localBtn = CoUI.createTextButton(
+    // 	this.m_btnW, this.m_btnH, "local",
+    // 	tta, textParam, colors
+    // );
+    // localBtn.setXY(startX, startY);
 
-    let tta = sc.transparentTexAtlas;
-    let ME = CoRScene.MouseEvent;
-    let textParam = {
-      text: "Local",
-      textColor: CoMaterial.createColor4(),
-      fontSize: 30,
-      font: ""
-    };
-    let fc4 = CoMaterial.createColor4;
-    let colors = [fc4().setRGB3Bytes(80, 80, 80), fc4().setRGB3Bytes(110, 110, 110), fc4().setRGB3Bytes(90, 90, 90), fc4().setRGB3Bytes(110, 110, 110)];
-    let localBtn = CoUI.createTextButton(this.m_btnW, this.m_btnH, "local", tta, textParam, colors);
-    localBtn.setXY(startX, startY);
-    px = px + this.m_btnW + disX;
-    this.m_btnW = 90;
-    textParam.text = "Global"; // let globalBtn = this.createBtn("Global", px, startY, "global");
+    let localBtn = builder.createPanelBtnWithCfg(sc, startX, startY, 0, uiCfg);
+    px = px + this.m_btnW; // this.m_btnW = 90;
+    // textParam.text = "Global";
+    // // let globalBtn = this.createBtn("Global", px, startY, "global");
+    // let globalBtn = CoUI.createTextButton(
+    // 	this.m_btnW, this.m_btnH, "global",
+    // 	tta, textParam, colors
+    // );
+    // globalBtn.setXY(px, startY);
 
-    let globalBtn = CoUI.createTextButton(this.m_btnW, this.m_btnH, "global", tta, textParam, colors);
-    globalBtn.setXY(px, startY);
-    px = px + this.m_btnW + disX;
-    this.m_btnW = 100;
-    textParam.text = "Color"; // let differenceBtn = this.createBtn("Difference", px, startY, "difference");
+    let globalBtn = builder.createPanelBtnWithCfg(sc, px, startY, 1, uiCfg);
+    px = px + this.m_btnW; // this.m_btnW = 100;		
+    // textParam.text = "Color";
+    // // let differenceBtn = this.createBtn("Difference", px, startY, "difference");
+    // let modelColorBtn = CoUI.createTextButton(
+    // 	this.m_btnW, this.m_btnH, "modelColor",
+    // 	tta, textParam, colors
+    // );
+    // modelColorBtn.setXY(px, startY);
 
-    let modelColorBtn = CoUI.createTextButton(this.m_btnW, this.m_btnH, "modelColor", tta, textParam, colors);
-    modelColorBtn.setXY(px, startY);
+    let modelColorBtn = builder.createPanelBtnWithCfg(sc, px, startY, 2, uiCfg);
     let pl = this.m_panel;
     pl.addEntity(localBtn);
     pl.addEntity(globalBtn);
     pl.addEntity(modelColorBtn);
-    let btnSize = 28;
-    py = startY - this.m_btnH - disY + 20;
-    let textLabel = this.createText("Normal line visible", startX + btnSize + disX, py);
+    let btnSize = 24;
+    py = startY - this.m_btnH - disY + 20; // let textLabel = this.createText("Normal line visible", startX + btnSize + disX, py, ltf);
+
+    let textLabel = this.createText(items[0].text, startX + btnSize + disX, py, ltf);
     px = startX;
     py = textLabel.getY();
-    this.m_normalVisiBtn = this.createFlagBtn(btnSize, px, py, "normal");
-    textLabel = this.createText("Model visible", startX + btnSize + disX, py - 10);
+    this.m_normalVisiBtn = this.createFlagBtn(btnSize, px, py, "normal"); // textLabel = this.createText("Model visible", startX + btnSize + disX, py - 10, ltf);
+
+    textLabel = this.createText(items[1].text, startX + btnSize + disX, py - 10, ltf);
     py = textLabel.getY();
-    this.m_modelVisiBtn = this.createFlagBtn(btnSize, px, py, "model");
-    textLabel = this.createText("Normal difference", startX + btnSize + disX, py - 10);
+    this.m_modelVisiBtn = this.createFlagBtn(btnSize, px, py, "model"); // textLabel = this.createText("Normal difference", startX + btnSize + disX, py - 10, ltf);
+
+    textLabel = this.createText(items[2].text, startX + btnSize + disX, py - 10, ltf);
     py = textLabel.getY();
-    this.m_diffBtn = this.createFlagBtn(btnSize, px, py, "difference");
-    textLabel = this.createText("Normal flip", startX + btnSize + disX, py - 10);
+    this.m_diffBtn = this.createFlagBtn(btnSize, px, py, "difference"); // textLabel = this.createText("Normal flip", startX + btnSize + disX, py - 10, ltf);
+
+    textLabel = this.createText(items[3].text, startX + btnSize + disX, py - 10, ltf);
     py = textLabel.getY();
-    this.m_normalFlipBtn = this.createFlagBtn(btnSize, px, py, "normalFlip");
-    textLabel = this.createText("Normal line length:", startX, py - 15);
+    this.m_normalFlipBtn = this.createFlagBtn(btnSize, px, py, "normalFlip"); // textLabel = this.createText("Normal line length:", startX, py - 15, ltf);
+
+    textLabel = this.createText(items[4].text, startX, py - 15, ltf);
     px = startX;
     py = textLabel.getY();
     this.m_dragBar = this.createProgressBtn(px + 5, py - 25, 200);
-    py = this.m_dragBar.getY();
-    textLabel = this.createText("Normal line color:", startX, py - 10);
+    this.m_dragBar.setX(112);
+    this.m_dragBar.update();
+    this.m_proBaseLen = 97;
+    py = this.m_dragBar.getY(); // textLabel = this.createText("Normal line color:", startX, py - 10, ltf);
+
+    textLabel = this.createText(items[5].text, startX, py - 10, ltf);
     px = startX;
     py = textLabel.getY();
     let colors1 = [fc4().setRGB3Bytes(210, 0, 210), fc4().setRGB3Bytes(240, 0, 240), fc4().setRGB3Bytes(220, 0, 220), fc4().setRGB3Bytes(240, 0, 240)];
@@ -4318,15 +4598,18 @@ class NormalCtrlPanel {
     normalLineColorBtn.setXY(startX + textLabel.getWidth() + disX, py);
     pl.addEntity(normalLineColorBtn);
     px = startX;
-    py = textLabel.getY() - disY;
-    this.m_btnW = 90;
-    textParam.text = "Test"; // let differenceBtn = this.createBtn("Difference", px, startY, "difference");
+    py = textLabel.getY() - disY; // this.m_btnW = 90;		
+    // textParam.text = "Test";
+    // // let differenceBtn = this.createBtn("Difference", px, startY, "difference");
+    // let normalTestBtn = CoUI.createTextButton(
+    // 	this.m_btnW, this.m_btnH, "normalTest",
+    // 	tta, textParam, colors
+    // );
+    // normalTestBtn.update();
+    // normalTestBtn.setXY(px, py - normalTestBtn.getHeight());
 
-    let normalTestBtn = CoUI.createTextButton(this.m_btnW, this.m_btnH, "normalTest", tta, textParam, colors);
-    normalTestBtn.update();
-    normalTestBtn.setXY(px, py - normalTestBtn.getHeight());
-    pl.addEntity(normalTestBtn); //let ME = CoRScene.MouseEvent;
-
+    let normalTestBtn = builder.createPanelBtnWithCfg(sc, px, py - localBtn.getHeight(), 3, uiCfg);
+    pl.addEntity(normalTestBtn);
     localBtn.addEventListener(ME.MOUSE_UP, this, this.normalDisplaySelect);
     globalBtn.addEventListener(ME.MOUSE_UP, this, this.normalDisplaySelect);
     modelColorBtn.addEventListener(ME.MOUSE_UP, this, this.normalDisplaySelect);
@@ -4337,15 +4620,9 @@ class NormalCtrlPanel {
     group.addButton(globalBtn);
     group.addButton(modelColorBtn);
     group.setSelectedFunction(btn => {
-      let label;
-      label = btn.getLable();
-      label.getColorAt(0).setRGB3Bytes(71, 114, 179);
-      label.setClipIndex(0);
+      cfg.applyButtonGlobalColor(btn, "selected");
     }, btn => {
-      let label;
-      label = btn.getLable();
-      label.getColorAt(0).setRGB3Bytes(80, 80, 80);
-      label.setClipIndex(0);
+      cfg.applyButtonGlobalColor(btn, "light");
     });
     this.m_btnGroup.select(globalBtn.uuid);
   }
@@ -4363,8 +4640,7 @@ class NormalCtrlPanel {
   }
 
   createFlagBtn(size, px, py, uuid = "model") {
-    let sc = this.getScene(); // let flagBtn = new FlagButton();
-
+    let sc = this.getScene();
     let flagBtn = CoUI.createFlagButton();
     flagBtn.uuid = uuid;
     flagBtn.initializeWithSize(sc.texAtlas, size, size);
@@ -4379,7 +4655,6 @@ class NormalCtrlPanel {
   }
 
   setNormalFlag(flag) {
-    console.log("setNormalFlag, flag: ", flag);
     this.m_normalVisiBtn.setFlag(flag);
   }
 
@@ -4422,14 +4697,15 @@ class NormalCtrlPanel {
     e.target = null;
   }
 
-  createText(text, px, py) {
+  createText(text, px, py, fontFormat) {
     let sc = this.getScene(); // let textLabel = new TextLabel();
 
     let textLabel = CoUI.createTextLabel();
     textLabel.depthTest = true;
     textLabel.transparent = true;
     textLabel.premultiplyAlpha = true;
-    textLabel.initialize(text, sc);
+    textLabel.initialize(text, sc, fontFormat.fontSize);
+    textLabel.setColor(CoMaterial.createColor4().fromBytesArray3(fontFormat.fontColor));
     textLabel.setXY(px, py - textLabel.getHeight());
     textLabel.update();
     this.m_panel.addEntity(textLabel);
@@ -4438,15 +4714,6 @@ class NormalCtrlPanel {
 
   createProgressBtn(px, py, length) {
     let sc = this.getScene();
-    let color = CoMaterial.createColor4(0.1, 0.1, 0.1); // let bgBar = new ColorLabel();
-    // let bgBar = CoUI.createColorLabel();
-    // bgBar.depthTest = true;
-    // bgBar.initialize(length, 10);
-    // bgBar.setZ(-0.05);
-    // bgBar.setColor(color);
-    // bgBar.setXY(px, py);
-    // this.m_panel.addEntity(bgBar);
-
     let barBgLabel = CoUI.createClipColorLabel();
     barBgLabel.initializeWithoutTex(length, 10, 4);
     barBgLabel.getColorAt(0).setRGB3Bytes(70, 70, 70);
@@ -4509,11 +4776,12 @@ class NormalCtrlPanel {
       px = this.m_dragMinX;
     } else if (px > this.m_dragMaxX) {
       px = this.m_dragMaxX;
-    }
+    } // px = Math.round(px);
+
 
     this.m_dragBar.setX(px);
     this.m_dragBar.update();
-    this.m_proBaseLen = px - this.m_dragMinX;
+    this.m_proBaseLen = px - this.m_dragMinX; // console.log("this.m_proBaseLen, px: ", this.m_proBaseLen, px);
   }
 
   progressMouseMove(evt) {
@@ -4587,8 +4855,8 @@ class NormalCtrlPanel {
       let width = this.getGlobalBounds().getWidth();
       let rect = sc.getRect(); // let bounds = this.getGlobalBounds();
 
-      let px = rect.width - width;
-      let py = rect.y + (rect.height - this.getHeight()) * 0.5;
+      let px = Math.round(rect.width - width);
+      let py = Math.round(rect.y + (rect.height - this.getHeight()) * 0.5);
       this.setXY(px, py);
       this.update();
     }
@@ -4836,8 +5104,8 @@ class UIPanel extends UIEntityContainer_1.UIEntityContainer {
     if (sc != null) {
       this.update();
       let rect = sc.getRect();
-      let px = rect.x + (rect.width - this.getWidth()) * 0.5;
-      let py = rect.y + (rect.height - this.getHeight()) * 0.5;
+      let px = Math.round(rect.x + (rect.width - this.getWidth()) * 0.5);
+      let py = Math.round(rect.y + (rect.height - this.getHeight()) * 0.5);
       this.setXY(px, py);
       this.update();
     }
@@ -5628,38 +5896,48 @@ class PromptPanel extends UIPanel_1.UIPanel {
   }
 
   buildItems() {
-    if (this.m_confirmBtn != null) {
-      return;
+    if (this.m_confirmBtn == null) {
+      let sc = this.getScene();
+      let tta = sc.transparentTexAtlas;
+      let fc4 = CoMaterial.createColor4;
+      let cfg = this.m_scene.uiConfig;
+      let gColor = cfg.getUIGlobalColor();
+      let uiCfg = cfg.getUIPanelCfgByName("promptPanel");
+      let keys = uiCfg.btnKeys;
+      let btf = uiCfg.btnTextFontFormat;
+      let ltf = uiCfg.textFontFormat;
+      let textLabel = new TextLabel_1.TextLabel();
+      textLabel.depthTest = true;
+      textLabel.transparent = true;
+      textLabel.premultiplyAlpha = true;
+      textLabel.initialize(this.m_prompt, sc, ltf.fontSize);
+      let color = fc4();
+      color.fromBytesArray3(ltf.fontColor);
+      textLabel.setColor(color);
+      this.m_promptLabel = textLabel; // console.log("textLabel.getHeight(): ", textLabel.getHeight());
+
+      let ME = CoRScene.MouseEvent;
+      let textParam = {
+        text: this.m_confirmNS,
+        textColor: fc4(),
+        fontSize: btf.fontSize,
+        font: ""
+      };
+      textParam.textColor.fromBytesArray3(btf.fontColor);
+      let colors = [fc4(), fc4(), fc4(), fc4() //.setRGB3Bytes(80, 80, 80)
+      ];
+      cfg.applyButtonColor(colors, gColor.button.light);
+      let builder = ButtonBuilder_1.ButtonBuilder;
+      let confirmBtn = builder.createTextButton(this.m_btnW, this.m_btnH, keys[0], tta, textParam, colors);
+      this.m_confirmBtn = confirmBtn;
+      textParam.text = this.m_cancelNS;
+      let cancelBtn = builder.createTextButton(this.m_btnW, this.m_btnH, keys[1], tta, textParam, colors); // cancelBtn.addEventListener(ME.MOUSE_UP, this, this.btnMouseUpListener);
+
+      this.m_cancelBtn = cancelBtn;
+      this.addEntity(cancelBtn);
+      this.addEntity(confirmBtn);
+      this.addEntity(textLabel);
     }
-
-    let sc = this.getScene();
-    let textLabel = new TextLabel_1.TextLabel();
-    textLabel.depthTest = true;
-    textLabel.transparent = true;
-    textLabel.premultiplyAlpha = true;
-    textLabel.initialize(this.m_prompt, sc);
-    this.m_promptLabel = textLabel; // console.log("textLabel.getHeight(): ", textLabel.getHeight());
-
-    let tta = sc.transparentTexAtlas;
-    let fc4 = CoMaterial.createColor4;
-    let ME = CoRScene.MouseEvent;
-    let textParam = {
-      text: this.m_confirmNS,
-      textColor: fc4(),
-      fontSize: 30,
-      font: ""
-    };
-    let colors = [fc4().setRGB3Bytes(80, 80, 80), fc4().setRGB3Bytes(110, 110, 110), fc4().setRGB3Bytes(90, 90, 90)];
-    let builder = ButtonBuilder_1.ButtonBuilder;
-    let confirmBtn = builder.createTextButton(this.m_btnW, this.m_btnH, "confirm", tta, textParam, colors);
-    this.m_confirmBtn = confirmBtn;
-    textParam.text = this.m_cancelNS;
-    let cancelBtn = builder.createTextButton(this.m_btnW, this.m_btnH, "cancel", tta, textParam, colors); // cancelBtn.addEventListener(ME.MOUSE_UP, this, this.btnMouseUpListener);
-
-    this.m_cancelBtn = cancelBtn;
-    this.addEntity(cancelBtn);
-    this.addEntity(confirmBtn);
-    this.addEntity(textLabel);
   }
 
   updateBgSize() {
@@ -5821,7 +6099,7 @@ class NormalLineMaterial {
   }
 
   getRGBA4f(color) {
-    color.fromArray(this.m_data);
+    color.fromArray4(this.m_data);
   }
 
   setScale(s) {
@@ -6092,7 +6370,9 @@ const PromptSystem_1 = __webpack_require__("3f7d");
 
 const CoModuleLoader_1 = __webpack_require__("2a2b");
 
-const TipsSystem_1 = __webpack_require__("1389"); //*
+const TipsSystem_1 = __webpack_require__("1389");
+
+const UIConfig_1 = __webpack_require__("1c1e"); //*
 
 
 class LoadingUI {
@@ -6227,7 +6507,7 @@ class DemoVox3DEditor {
       if (this.isEngineEnabled()) {
         console.log("engine modules loaded ...");
         this.initRenderer();
-        this.initScene();
+        this.init3DScene();
         this.m_loadingUI.showInfo("initializing editor system...");
         new CoModuleLoader_1.CoModuleLoader(3, () => {
           console.log("math module loaded ...");
@@ -6244,32 +6524,51 @@ class DemoVox3DEditor {
 
   initEditUI() {
     this.m_coUIScene = CoUI.createUIScene();
-    this.m_coUIScene.initialize(this.m_rsc, 512, 5);
-    this.m_uirsc = this.m_coUIScene.rscene;
+    let coui = this.m_coUIScene;
+    coui.initialize(this.m_rsc, 512, 5);
+    this.m_uirsc = coui.rscene;
     this.m_graph.addScene(this.m_uirsc);
+    let uiConfig = new UIConfig_1.UIConfig();
+    coui.uiConfig = uiConfig;
+    let cfgUrl = "static/apps/normalViewer/ui/zh-CN/uicfg.json";
+    let language = CoRScene.RendererDevice.GetLanguage();
+    console.log("XXX language: ", language);
+
+    if (language != "zh-CN") {
+      cfgUrl = "static/apps/normalViewer/ui/en-US/uicfg.json";
+    }
+
+    uiConfig.initialize(cfgUrl, () => {
+      console.log("xxxx initEditSceneSys... ...");
+      this.initEditSceneSys();
+    });
+  }
+
+  initEditSceneSys() {
+    let coui = this.m_coUIScene;
     let promptSys = new PromptSystem_1.PromptSystem();
-    promptSys.initialize(this.m_coUIScene);
-    this.m_coUIScene.prompt = promptSys;
+    promptSys.initialize(coui);
+    coui.prompt = promptSys;
     let tipsSys = new TipsSystem_1.TipsSystem();
-    tipsSys.initialize(this.m_coUIScene);
-    this.m_coUIScene.tips = tipsSys;
+    tipsSys.initialize(coui);
+    coui.tips = tipsSys;
     this.m_transUI.setOutline(this.m_outline);
-    this.m_transUI.initialize(this.m_rsc, this.m_editUIRenderer, this.m_coUIScene);
-    this.m_nvaUI.initialize(this.m_rsc, this.m_editUIRenderer, this.m_coUIScene);
+    this.m_transUI.initialize(this.m_rsc, this.m_editUIRenderer, coui);
+    this.m_nvaUI.initialize(this.m_rsc, this.m_editUIRenderer, coui);
     let minV = CoMath.createVec3(-100, 0, -100);
     let maxV = minV.clone().scaleBy(-1);
     let scale = 10.0;
     let grid = CoEdit.createFloorLineGrid();
     grid.initialize(this.m_rsc, 0, minV.scaleBy(scale), maxV.scaleBy(scale), 30);
     let viewer = new NormalViewer_1.NormalViewer();
-    viewer.initialize(this.m_coUIScene, this.m_transUI);
+    viewer.initialize(coui, this.m_transUI);
     viewer.open();
     this.m_viewer = viewer;
     let entitySC = viewer.normalScene.entityScene;
     entitySC.initialize(this.m_rsc);
   }
 
-  initScene() {}
+  init3DScene() {}
 
   isEngineEnabled() {
     return typeof CoRenderer !== "undefined" && typeof CoRScene !== "undefined";

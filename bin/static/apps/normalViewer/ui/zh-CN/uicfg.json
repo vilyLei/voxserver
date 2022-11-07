@@ -1,0 +1,405 @@
+{
+	"name": "normalViewer",
+	"color": {
+		"text": [
+			170,
+			170,
+			170
+		],
+		"dark": [
+			20,
+			20,
+			20
+		],
+		"background": [
+			40,
+			40,
+			40
+		],
+		"foreground": [
+			170,
+			170,
+			170
+		],
+		"button": {
+			"dark": {
+				"out": [
+					20,
+					20,
+					20
+				],
+				"over": [
+					30,
+					30,
+					30
+				],
+				"down": [
+					40,
+					40,
+					40
+				],
+				"up": [
+					20,
+					20,
+					20
+				]
+			},
+			"common": {
+				"out": [
+					40,
+					40,
+					40
+				],
+				"over": [
+					50,
+					50,
+					50
+				],
+				"down": [
+					60,
+					60,
+					60
+				],
+				"up": [
+					40,
+					40,
+					40
+				]
+			},
+			"selected": {
+				"out": [
+					71,
+					114,
+					179
+				],
+				"over": [
+					81,
+					124,
+					189
+				],
+				"down": [
+					71,
+					114,
+					189
+				],
+				"up": [
+					71,
+					114,
+					179
+				]
+			},
+			"light": {
+				"out": [
+					80,
+					80,
+					80
+				],
+				"over": [
+					110,
+					110,
+					110
+				],
+				"down": [
+					90,
+					90,
+					90
+				],
+				"up": [
+					80,
+					80,
+					80
+				]
+			}
+		}
+	},
+	"text": {
+		"fontFormat": {
+			"common": {
+				"fontName": "Verdana",
+				"fontSize": 20,
+				"bold": false,
+				"italic": false,
+				"fontColor": [
+					170,
+					170,
+					170
+				]
+			},
+			"button": {
+				"fontName": "Verdana",
+				"fontSize": 20,
+				"bold": false,
+				"italic": false,
+				"fontColor": [
+					170,
+					170,
+					170
+				]
+			},
+			"tips": {
+				"fontName": "Verdana",
+				"fontSize": 18,
+				"bold": false,
+				"italic": false,
+				"fontColor": [
+					170,
+					170,
+					170
+				]
+			}
+		}
+	},
+	"uiModule": {
+		"transformCtrl": {
+			"bgColor": [
+				40,
+				40,
+				40
+			],
+			"buttonStyle": {
+				"globalColor": "common",
+				"tipsAlign": "right"
+			},
+			"btnTextAreaSize": [
+				70,
+				50
+			],
+			"btnSize": [
+				70,
+				55
+			],
+			"btnTextFontFormat": {
+				"fontName": "Verdana",
+				"fontSize": 20,
+				"bold": false,
+				"italic": false,
+				"fontColor": [
+					170,
+					170,
+					170
+				]
+			},
+			"textFontFormat": {},
+			"btnNames": [
+				"框选",
+				"移动",
+				"旋转",
+				"缩放"
+			],
+			"btnKeys": [
+				"select",
+				"move",
+				"rotate",
+				"scale"
+			],
+			"btnTips": [
+				"按下鼠标左键拖动框选场景中的对象.",
+				"移动场景中的对象(W).",
+				"旋转场景中的对象(R).",
+				"缩放场景中的对象(E)."
+			]
+		},
+		"navigation": {
+			"bgColor": [
+				40,
+				40,
+				40
+			],
+			"buttonStyle": {
+				"globalColor": "common",
+				"tipsAlign": "bottom"
+			},
+			"btnTextAreaSize": [
+				60,
+				30
+			],
+			"btnSize": [
+				60,
+				30
+			],
+			"btnTextFontFormat": {
+				"fontName": "Verdana",
+				"fontSize": 20,
+				"bold": false,
+				"italic": false,
+				"fontColor": [
+					170,
+					170,
+					170
+				]
+			},
+			"textFontFormat": {},
+			"btnNames": [
+				"文件",
+				"编辑",
+				"帮助"
+			],
+			"btnKeys": [
+				"file",
+				"edit",
+				"help"
+			],
+			"btnTips": [
+				"文件系统相关操作.",
+				"编辑环境相关操作.",
+				"一些帮助信息."
+			]
+		},
+		"promptPanel": {
+			"bgColor": [
+				51,
+				51,
+				51
+			],
+			"buttonStyle": {
+				"globalColor": "light",
+				"tipsAlign": "bottom"
+			},
+			"panelSize": [
+				300,
+				150
+			],
+			"btnSize": [
+				90,
+				30
+			],
+			"btnTextFontFormat": {
+				"fontName": "Verdana",
+				"fontSize": 20,
+				"bold": false,
+				"italic": false,
+				"fontColor": [
+					220,
+					220,
+					220
+				]
+			},
+			"textFontFormat": {
+				"fontName": "Verdana",
+				"fontSize": 20,
+				"bold": false,
+				"italic": false,
+				"fontColor": [
+					170,
+					170,
+					170
+				]
+			},
+			"btnNames": [
+				"确认",
+				"取消"
+			],
+			"btnKeys": [
+				"confirm",
+				"cancel"
+			],
+			"btnTips": []
+		},
+		"normalCtrlPanel": {
+			"bgColor": [
+				51,
+				51,
+				51
+			],
+			"buttonStyle": {
+				"globalColor": "light",
+				"tipsAlign": "top"
+			},
+			"panelSize": [
+				230,
+				315
+			],
+			"btnSize": [
+				70,
+				30
+			],
+			"btnTextFontFormat": {
+				"fontName": "Verdana",
+				"fontSize": 20,
+				"bold": false,
+				"italic": false,
+				"fontColor": [
+					170,
+					170,
+					170
+				]
+			},
+			"textFontFormat": {
+				"fontName": "Verdana",
+				"fontSize": 20,
+				"bold": false,
+				"italic": false,
+				"fontColor": [
+					170,
+					170,
+					170
+				]
+			},
+			"btnNames": [
+				"局部",
+				"全局",
+				"颜色",
+				"检测"
+			],
+			"btnKeys": [
+				"local",
+				"global",
+				"modelColor",
+				"normalTest"
+			],
+			"btnTips": [
+				"显示物体坐标空间法线颜色.",
+				"显示世界坐标空间法线颜色.",
+				"显示灰色模型颜色.",
+				"分析检查模型法线问题."
+			],
+			"items": [
+				{
+					"name": "normalLineVisible",
+					"text": "法线线条可见性"
+				},
+				{
+					"name": "modelVisible",
+					"text": "模型可见性"
+				},
+				{
+					"name": "normalDifference",
+					"text": "法线问题可视化"
+				},
+				{
+					"name": "normalFlip",
+					"text": "法线翻转"
+				},
+				{
+					"name": "normalLineLength:",
+					"text": "法线线条长度:"
+				},
+				{
+					"name": "normalLineColor:",
+					"text": "法线线条颜色:"
+				}
+			]
+		},
+		"exampleGroup": {
+			
+			"items": [
+				{
+					"name": "normalCorrect",
+					"text": "法线正确"
+				},
+				{
+					"name": "noNormal",
+					"text": "没有法线数据"
+				},
+				{
+					"name": "normalDifference",
+					"text": "法线错误倾斜"
+				},
+				{
+					"name": "normalFlip",
+					"text": "顶点绕序错误"
+				}
+			]
+		}
+	}
+}
