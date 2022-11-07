@@ -171,6 +171,8 @@ Object.defineProperty(exports, "__esModule", {
 
 const TextPackedLoader_1 = __webpack_require__("2756");
 
+const CoModuleLoader_1 = __webpack_require__("2a2b");
+
 class UIConfig {
   constructor() {
     this.m_jsonRawData = "";
@@ -182,6 +184,8 @@ class UIConfig {
   initialize(configUrl, callback) {
     // load the cofig text file
     this.m_callback = callback;
+    let checker = new CoModuleLoader_1.CoModuleLoader(1).getUrlChecker();
+    configUrl = checker(configUrl);
     let jsonLoader = new TextPackedLoader_1.TextPackedLoader(1, () => {
       // console.log("jsonLoader loaded: ", jsonLoader.getDataByUrl(configUrl));
       this.m_jsonRawData = jsonLoader.getDataByUrl(configUrl);
@@ -978,17 +982,23 @@ class CoModuleLoader extends ModuleLoader_1.ModuleLoader {
         let j = url.indexOf(".", i); // hostUrl = "http://localhost:9000/test/";
 
         hostUrl = "http://www.artvily.com:9090/";
-        let fileName = url.slice(i, j).toLocaleLowerCase();
+        let fileName = url.slice(i, j);
+
+        if (url.indexOf(".umd.") > 0) {
+          fileName = fileName.toLocaleLowerCase();
+          url = hostUrl + url.slice(0, i) + fileName + ".js";
+        } else {
+          url = hostUrl + url;
+        }
 
         if (fileName == "") {
           console.error("err: ", url);
           console.error("i, j: ", i, j);
         }
 
-        let purl = hostUrl + url.slice(0, i) + fileName + ".js";
         console.log("urlChecker(), fileName:-" + fileName + "-");
-        console.log("urlChecker(), purl: ", purl);
-        return purl;
+        console.log("urlChecker(), new url: ", url);
+        return url;
       }
 
       return url;
