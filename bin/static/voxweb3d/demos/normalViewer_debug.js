@@ -96,69 +96,6 @@ return /******/ (function(modules) { // webpackBootstrap
 /************************************************************************/
 /******/ ({
 
-/***/ "1389":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-/**
- * 光标移入的信息提示系统
- */
-
-class TipsSystem {
-  constructor() {
-    this.m_tipEntity = null;
-  }
-
-  initialize(uiscene, rpi = 2) {
-    if (this.m_tipEntity == null) {
-      this.m_uiscene = uiscene;
-      let tip = CoUI.createRectTextTip();
-      tip.initialize(uiscene, rpi);
-      this.m_tipEntity = tip;
-    }
-  }
-  /**
-   * get tip entity
-   * @param type the default value is 0
-   * @returns IRectTextTip instance
-   */
-
-
-  getTipEntity(type) {
-    return this.m_tipEntity;
-  }
-  /**
-   * @param entity IMouseEvtUIEntity instance
-   * @param type the default value is 0
-   */
-
-
-  addTipsTarget(entity, type) {
-    this.m_tipEntity.addEntity(entity);
-  }
-  /**
-   * @param entity IMouseEvtUIEntity instance
-   * @param type the default value is 0
-   */
-
-
-  removeTipsTarget(entity, type) {
-    this.m_tipEntity.removeEntity(entity);
-  }
-
-  destroy() {}
-
-}
-
-exports.TipsSystem = TipsSystem;
-
-/***/ }),
-
 /***/ "1c1e":
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -322,135 +259,6 @@ class UIConfig {
 }
 
 exports.UIConfig = UIConfig;
-
-/***/ }),
-
-/***/ "1dd7":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-const UIEntityBase_1 = __webpack_require__("b0fb");
-
-class TextLabel extends UIEntityBase_1.UIEntityBase {
-  constructor() {
-    super();
-    this.m_pw = 10;
-    this.m_ph = 10;
-    this.m_sx = 1.0;
-    this.m_sy = 1.0; // private m_rpi = 0;
-
-    this.m_material = null;
-    this.m_tex = null;
-    this.m_fontSize = 24;
-    this.m_text = "";
-  }
-
-  initialize(text, uiScene, fontSize = 24) {
-    if (text != "" && this.isIniting()) {
-      if (fontSize < 8) fontSize = 8;
-      this.m_fontSize = fontSize;
-      this.init(); // this.transparent = true;
-      // this.premultiplyAlpha = true;
-
-      this.m_text = text;
-      this.m_uiScene = uiScene;
-      let entity = CoEntity.createDisplayEntity();
-      this.m_fontColor = CoMaterial.createColor4();
-      this.m_bgColor = CoMaterial.createColor4(1.0, 1.0, 1.0, 0.0);
-      let img = this.m_uiScene.texAtlas.createCharsImage(this.m_text, this.m_fontSize, this.m_fontColor, this.m_bgColor);
-      this.m_tex = uiScene.rscene.textureBlock.createImageTex2D(img.width, img.height);
-      this.m_tex.setDataFromImage(img);
-      this.m_tex.flipY = true;
-      this.m_tex.premultiplyAlpha = true; //this.premultiplyAlpha;
-
-      this.m_tex.minFilter = CoRScene.TextureConst.LINEAR;
-      this.m_tex.magFilter = CoRScene.TextureConst.NEAREST;
-      let material = this.createMaterial(this.m_tex);
-      this.m_material = material;
-      CoMesh.plane.setBufSortFormat(material.getBufSortFormat());
-      let mesh = CoMesh.plane.createXOY(0, 0, 1.0, 1.0);
-      this.m_pw = img.width;
-      this.m_ph = img.height;
-      entity.setMaterial(material);
-      entity.setMesh(mesh);
-      this.m_entities.push(entity);
-      this.applyRST(entity);
-      super.setScaleXY(this.m_sx * this.m_pw, this.m_sy * this.m_ph);
-      this.update();
-    }
-  }
-
-  setScaleXY(sx, sy) {
-    this.m_sx = sx;
-    this.m_sy = sy;
-    super.setScaleXY(sx * this.m_pw, sy * this.m_ph);
-  }
-
-  setScaleX(sx) {
-    this.m_sx = sx;
-    super.setScaleX(sx * this.m_pw);
-  }
-
-  setScaleY(sy) {
-    this.m_sy = sy;
-    super.setScaleX(sy * this.m_ph);
-  }
-
-  getScaleX() {
-    return this.m_sx;
-  }
-
-  getScaleY() {
-    return this.m_sy;
-  }
-
-  setText(text) {
-    if (this.m_tex != null && text != "" && this.m_text != text) {
-      this.m_text = text;
-      let img = this.m_uiScene.texAtlas.createCharsImage(text, this.m_fontSize, this.m_fontColor, this.m_bgColor);
-      this.m_tex.setDataFromImage(img, 0, 0, 0, true);
-      this.m_tex.updateDataToGpu();
-      this.m_pw = img.width;
-      this.m_ph = img.height;
-      super.setScaleXY(this.m_sx * this.m_pw, this.m_sy * this.m_ph);
-      this.update();
-    }
-  }
-
-  getText() {
-    return this.m_text;
-  }
-
-  setColor(c) {
-    this.m_fontColor.copyFrom(c);
-
-    if (this.m_material != null) {
-      this.m_material.setColor(c);
-    }
-
-    return this;
-  }
-
-  getColor() {
-    return this.m_fontColor;
-  }
-
-  destroy() {
-    super.destroy();
-    this.m_material = null;
-    this.m_uiScene = null;
-    this.m_tex = null;
-  }
-
-}
-
-exports.TextLabel = TextLabel;
 
 /***/ }),
 
@@ -1361,152 +1169,6 @@ exports.ClipLabel = ClipLabel;
 
 /***/ }),
 
-/***/ "3f49":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-const UIEntityBase_1 = __webpack_require__("b0fb");
-
-class ColorLabel extends UIEntityBase_1.UIEntityBase {
-  constructor() {
-    super();
-    this.m_color = null;
-    this.m_material = null;
-  }
-
-  createMesh(material) {
-    let ivs = new Uint16Array([0, 1, 2, 0, 2, 3]);
-    let vs = new Float32Array(this.createVS(0, 0, this.m_width, this.m_height));
-    let mesh = CoMesh.createRawMesh();
-    mesh.reset();
-    mesh.setBufSortFormat(material.getBufSortFormat());
-    mesh.setIVS(ivs);
-    mesh.addFloat32Data(vs, 3);
-    mesh.initialize();
-    return mesh;
-  }
-
-  initialize(width, height) {
-    if (this.isIniting()) {
-      this.init();
-      this.m_width = width;
-      this.m_height = height;
-      let material = CoMaterial.createDefaultMaterial();
-      material.initializeByCodeBuf(false);
-      this.m_color = CoMaterial.createColor4();
-      let mesh = this.createMesh(material);
-      let et = CoEntity.createDisplayEntity();
-      et.setMaterial(material);
-      et.setMesh(mesh);
-      this.applyRST(et);
-      this.m_entities.push(et);
-      this.m_material = material;
-    }
-  }
-
-  setColor(c) {
-    this.m_color.copyFrom(c);
-
-    if (this.m_material != null) {
-      this.m_material.setColor(c);
-    }
-
-    return c;
-  }
-
-  getColor() {
-    return this.m_color;
-  }
-
-  destroy() {
-    super.destroy();
-    this.m_material = null;
-  }
-
-}
-
-exports.ColorLabel = ColorLabel;
-
-/***/ }),
-
-/***/ "3f7d":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-const PromptPanel_1 = __webpack_require__("ccfe");
-
-class PromptSystem {
-  constructor() {
-    this.m_promptPanel = null;
-  }
-
-  initialize(uiscene, rpi = 3) {
-    if (this.m_promptPanel == null) {
-      this.m_uiscene = uiscene;
-      let cfg = uiscene.uiConfig;
-      let uimodule = cfg.getUIPanelCfgByName("promptPanel");
-      let plSize = uimodule.panelSize;
-      let btnSize = uimodule.btnSize;
-      let names = uimodule.btnNames;
-      let pl = new PromptPanel_1.PromptPanel(); // pl.initialize(this.m_uiscene, rpi, 300, 200, 120, 50);
-
-      pl.initialize(this.m_uiscene, rpi, plSize[0], plSize[1], btnSize[0], btnSize[1], names[0], names[1]);
-      pl.setZ(3.0);
-      let color = CoMaterial.createColor4();
-      color.fromBytesArray3(uimodule.bgColor); // pl.setBGColor(CoMaterial.createColor4(0.2, 0.2, 0.2));
-
-      pl.setBGColor(color);
-      this.m_promptPanel = pl;
-    }
-  }
-
-  setPromptListener(confirmFunc, cancelFunc, type = 0) {
-    if (this.m_promptPanel != null) {
-      this.m_promptPanel.setListener(confirmFunc, cancelFunc);
-    }
-  }
-
-  showPrompt(promptInfo, type = 0) {
-    if (this.m_promptPanel != null) {
-      this.m_promptPanel.setPrompt(promptInfo);
-      this.m_promptPanel.open();
-    }
-  }
-
-  setPromptTextColor(color, type = 0) {
-    if (this.m_promptPanel != null) {
-      this.m_promptPanel.setPromptTextColor(color);
-    }
-  }
-
-  setPromptBGColor(color, type = 0) {
-    if (this.m_promptPanel != null) {
-      this.m_promptPanel.setBGColor(color);
-    }
-  }
-
-  getPromptPanel(type = 0) {
-    return this.m_promptPanel;
-  }
-
-}
-
-exports.PromptSystem = PromptSystem;
-
-/***/ }),
-
 /***/ "43c4":
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -1523,6 +1185,7 @@ class NormalEntityNode {
   constructor() {
     this.m_normalFlip = false;
     this.m_showDifference = false;
+    this.m_color = null;
     this.m_normalScale = 1.0;
     this.m_normalScale0 = 1.0;
     this.m_uid = -1;
@@ -1550,6 +1213,10 @@ class NormalEntityNode {
 
   getUid() {
     return this.m_uid;
+  }
+
+  getEntityMaterial() {
+    return this.m_entityMaterial;
   }
 
   showLocalNormal() {
@@ -1584,6 +1251,7 @@ class NormalEntityNode {
       return this.entity;
     }
 
+    this.m_color = CoRScene.createColor4();
     let builder = NormalEntityNode.s_entityBuilder;
     let normalEntity = builder.createNormalEntity(model, nivs);
     this.m_entityMaterial = builder.getEntityMaterial();
@@ -1621,6 +1289,16 @@ class NormalEntityNode {
     if (this.m_normalMaterial != null) this.m_normalMaterial.setColor(c);
   }
 
+  getNormalLineColor() {
+    this.m_color.setRGB3f(1.0, 0.0, 1.0);
+
+    if (this.m_normalMaterial != null) {
+      this.m_normalMaterial.getColor(this.m_color);
+    }
+
+    return this.m_color;
+  }
+
   readyCreateNormalLine(model) {
     this.m_model = model;
   }
@@ -1649,8 +1327,18 @@ class NormalEntityNode {
     let ME = CoRScene.MouseEvent;
     entity.addEventListener(ME.MOUSE_OVER, this, this.mouseOverTargetListener);
     entity.addEventListener(ME.MOUSE_OUT, this, this.mouseOutTargetListener);
-    entity.addEventListener(ME.MOUSE_DOWN, this, this.mouseDownTargetListener); // entity.addEventListener(ME.MOUSE_UP, this, this.mouseUpTargetListener);
-    // 如果双击一个entity则全部选中这个group
+    entity.addEventListener(ME.MOUSE_DOWN, this, this.mouseDownTargetListener); // entity.addEventListener(ME.MOUSE_DOUBLE_CLICK, this, this.mouseDBClickTargetListener);
+    // entity.addEventListener(ME.MOUSE_CLICK, this, this.mouseClickTargetListener);
+    // entity.addEventListener(ME.MOUSE_UP, this, this.mouseUpTargetListener);
+    // 如果双击/(shift+单击)一个entity则全部选中这个group
+  }
+
+  mouseClickTargetListener(evt) {
+    console.log("mouseClickTargetListener()....");
+  }
+
+  mouseDBClickTargetListener(evt) {
+    console.log("mouseDBClickTargetListener()....");
   }
 
   mouseOverTargetListener(evt) {
@@ -1785,8 +1473,8 @@ class NVUIRectLine {
     this.m_flag = true;
 
     if (this.m_enabled) {
-      this.m_prePos.setXYZ(px, py, this.m_pz); // this.m_currPos.copyFrom( this.m_prePos );
-
+      this.m_prePos.setXYZ(px, py, this.m_pz);
+      this.m_currPos.copyFrom(this.m_prePos);
       this.move(px, py);
     }
   }
@@ -2159,14 +1847,26 @@ class NormalEntityMaterial {
     color.fromArray3(this.m_data);
   }
 
+  isApplyingLocalNormal() {
+    return this.m_data[7] < 0.5;
+  }
+
   applyLocalNormal() {
     // console.log("apply local normal..., dif: ", this.m_data[5]);
     this.m_data[7] = 0.0;
   }
 
+  isApplyingGlobalNormal() {
+    return this.m_data[7] > 0.5;
+  }
+
   applyGlobalNormal() {
     // console.log("apply global normal..., dif: ", this.m_data[5]);
     this.m_data[7] = 1.0;
+  }
+
+  isApplyingModelColor() {
+    return this.m_data[4] >= 1.0;
   }
 
   applyModelColor() {
@@ -2211,7 +1911,7 @@ class NormalEntityMaterial {
     		vec2 f2 = sign(dv);
     
     		vec3 nv = normalize(v_nv.xyz);
-    		vec3 color = pow(nv, gama);
+    		vec3 color = nv;//pow(nv, gama);
 
 			float nDotL0 = max(dot(v_vnv.xyz, direc0), 0.1);
 			float nDotL1 = max(dot(v_vnv.xyz, direc1), 0.1);
@@ -2232,8 +1932,8 @@ class NormalEntityMaterial {
 			float s = sign(f2.x * f2.y);
 			vec3 diffColor = vec3(1.0, s, s) * f + dstColor * (1.0 - f);
 			dstColor = param.y > 0.5 ? diffColor : dstColor;
-
-    		FragColor0 = vec4(dstColor, 1.0);
+			
+    		FragColor0 = vec4(pow(dstColor, gama), 1.0);
     		// FragColor0 = vec4(u_params[0].xyz, 1.0);
 					`);
         coder.addVertMainCode(`
@@ -2293,9 +1993,9 @@ class NVTransUI {
     this.m_outline = null;
     this.m_transCtr = null;
     this.m_selectFrame = null;
-    this.m_transBtns = [];
     this.m_entityQuery = null;
     this.m_selectList = null;
+    this.m_transBtns = [];
     this.m_selectListeners = [];
   }
 
@@ -2580,119 +2280,6 @@ class NVTransUI {
 }
 
 exports.NVTransUI = NVTransUI;
-
-/***/ }),
-
-/***/ "5e13":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-const UIEntityBase_1 = __webpack_require__("b0fb");
-
-class UIEntityContainer extends UIEntityBase_1.UIEntityBase {
-  constructor() {
-    super();
-    this.m_uientities = [];
-  }
-
-  init() {
-    if (this.isIniting()) {
-      super.init();
-      this.m_rcontainer = CoRScene.createDisplayEntityContainer();
-    }
-  }
-
-  addedEntity(entity) {}
-
-  removedEntity(entity) {}
-
-  update() {
-    for (let i = 0; i < this.m_uientities.length; ++i) {
-      this.m_uientities[i].update();
-    }
-
-    if (this.m_rcontainer != null) {
-      this.m_rcontainer.update();
-    }
-
-    super.update();
-  }
-
-  addEntity(entity) {
-    if (entity != null) {
-      let i = 0;
-
-      for (; i < this.m_uientities.length; ++i) {
-        if (this.m_uientities[i] == entity) break;
-      }
-
-      if (i >= this.m_uientities.length) {
-        this.m_uientities.push(entity);
-        entity.update();
-        let container = entity.getRContainer();
-
-        if (container != null) {
-          this.m_rcontainer.addChild(container);
-        }
-
-        let ls = entity.getREntities();
-
-        for (let k = 0; k < ls.length; ++k) {
-          this.m_rcontainer.addEntity(ls[k]);
-        }
-
-        this.addedEntity(entity);
-      }
-    }
-  }
-
-  removeEntity(entity) {
-    if (entity != null) {
-      let i = 0;
-
-      for (; i < this.m_uientities.length; ++i) {
-        if (this.m_uientities[i] == entity) {
-          this.m_uientities.splice(i, 1);
-          let container = entity.getRContainer();
-
-          if (container != null) {
-            this.m_rcontainer.removeChild(container);
-          }
-
-          let ls = entity.getREntities();
-
-          for (let k = 0; k < ls.length; ++k) {
-            this.m_rcontainer.removeEntity(ls[k]);
-          }
-
-          this.removedEntity(entity);
-          break;
-        }
-      }
-    }
-  }
-
-  globalToLocal(pv) {
-    this.m_rcontainer.globalToLocal(pv);
-  }
-
-  localToGlobal(pv) {
-    this.m_rcontainer.localToGlobal(pv);
-  }
-
-  getEneitysTotal() {
-    return this.m_uientities.length;
-  }
-
-}
-
-exports.UIEntityContainer = UIEntityContainer;
 
 /***/ }),
 
@@ -2988,7 +2575,8 @@ class NormalViewerScene {
         break;
 
       case "normalLineColor":
-        console.log("appaly normal color");
+        console.log("appaly normal color: ", evt.data);
+        mana.setNormalLineColor(evt.data);
         break;
 
       case "normalTest":
@@ -4006,13 +3594,18 @@ class NormalEntityManager {
       let flip = false;
       let cpl = this.ctrPanel;
       let scaleBase = cpl.getNormalScale();
+      let firstLNode = null;
+      let firstNode = null;
 
       for (let i = 0; i < ls.length; ++i) {
         const node = map.get(ls[i].getUid());
 
         if (node != null) {
+          if (firstNode == null) firstNode = node;
+
           if (node.getLineVisible()) {
             lineVisible = true;
+            if (firstLNode == null) firstLNode = node;
           }
 
           if (node.isShowDifference()) {
@@ -4025,12 +3618,29 @@ class NormalEntityManager {
 
           node.select();
         }
-      }
+      } //getEntityMaterial
+
 
       this.m_scaleBase = scaleBase < 0.1 ? 0.1 : scaleBase;
       cpl.setNormalFlag(lineVisible);
       cpl.setNormalFlipFlag(flip);
       cpl.setDifferenceFlag(dif);
+      if (firstLNode != null) cpl.setNormalLineColor(firstLNode.getNormalLineColor());
+
+      if (firstNode != null) {
+        let m = firstNode.getEntityMaterial();
+
+        if (m.isApplyingModelColor()) {
+          cpl.setDisplayMode("modelColor");
+        } else {
+          if (m.isApplyingLocalNormal()) {
+            cpl.setDisplayMode("local");
+          } else {
+            cpl.setDisplayMode("global");
+          }
+        } //cpl.setNormalLineColor( firstNode.getNormalLineColor() );
+
+      }
     }
   }
 
@@ -4038,15 +3648,20 @@ class NormalEntityManager {
     let ls = this.m_selectEntities;
 
     if (ls != null) {
+      let cpl = this.ctrPanel;
       let map = this.m_map;
+      let firstLNode = null;
 
       for (let i = 0; i < ls.length; ++i) {
         const node = map.get(ls[i].getUid());
 
         if (node != null) {
+          if (firstLNode == null) firstLNode = node;
           node.setLineVisible(v);
         }
       }
+
+      if (v) cpl.setNormalLineColor(firstLNode.getNormalLineColor());
     }
   }
 
@@ -4163,6 +3778,22 @@ class NormalEntityManager {
     }
   }
 
+  setNormalLineColor(c) {
+    let ls = this.m_selectEntities;
+
+    if (ls != null) {
+      let map = this.m_map;
+
+      for (let i = 0; i < ls.length; ++i) {
+        const node = map.get(ls[i].getUid());
+
+        if (node != null) {
+          node.setNormalLineColor(c);
+        }
+      }
+    }
+  }
+
   applyFeatureColor(uuid) {
     console.log("applyFeatureColor: ", uuid);
     let ls = this.m_selectEntities;
@@ -4268,120 +3899,6 @@ class NormalEntityManager {
 }
 
 exports.NormalEntityManager = NormalEntityManager;
-
-/***/ }),
-
-/***/ "ab08":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-class AxisAlignCalc {
-  constructor() {}
-
-  calcRange(size, factor = 0.7, centerPercent = 0.5) {
-    if (centerPercent < 0.0) centerPercent = 0.0;else if (centerPercent > 1.0) centerPercent = 1.0;
-    if (factor < 0.0) factor = 0.0;else if (factor > 1.0) factor = 1.0;
-    let content = size * (1.0 - factor);
-    let p = centerPercent * size;
-    let max = p + content * 0.5;
-    if (max > size) max = size;
-    let min = max - content;
-    return [min, max];
-  }
-
-  avgLayout(sizes, min, max, minGap = -1) {
-    if (sizes != null && sizes.length > 0) {
-      let len = sizes.length;
-
-      switch (len) {
-        case 1:
-          let px = 0.5 * (max - min) + min;
-          return [px - 0.5 * sizes[0]];
-          break;
-
-        default:
-          return this.calcAvgMulti(sizes, min, max, minGap);
-          break;
-      }
-    }
-
-    return null;
-  }
-
-  calcAvgLayout(itemSizes, bgSize, marginFactor = 0.7, centerPercent = 0.5) {
-    let range = this.calcRange(bgSize, marginFactor, centerPercent);
-    return this.avgLayout(itemSizes, range[0], range[1]);
-  }
-
-  calcAvgFixLayout(itemSizes, bgSize, minGap = 10.0, marginFactor = 0.7, centerPercent = 0.5) {
-    let range = this.calcRange(bgSize, marginFactor, centerPercent);
-    return this.avgLayout(itemSizes, range[0], range[1], minGap);
-  }
-
-  calcAvgMulti(sizes, min, max, minGap = -1) {
-    let dis = max - min;
-    let len = sizes.length;
-    let size = 0.0;
-
-    for (let i = 0; i < len; i++) {
-      size += sizes[i];
-
-      if (minGap > 0.0 && i > 0) {
-        size += minGap;
-      }
-    }
-
-    let list = new Array(len);
-    list[0] = min;
-    list[len - 1] = max - sizes[len - 1];
-
-    if (len > 2) {
-      if (size < dis) {
-        let dl = (dis - size) / (len - 1);
-        len--;
-
-        for (let i = 1; i < len; i++) {
-          list[i] = list[i - 1] + sizes[i - 1] + dl;
-        }
-      } else {
-        if (minGap <= 0.0) {
-          let p0 = list[0] + 0.5 * sizes[0];
-          dis = list[len - 1] + 0.5 * sizes[len - 1] - p0;
-          let dl = dis / (len - 1);
-          p0 += dl;
-          len--;
-
-          for (let i = 1; i < len; i++) {
-            list[i] = p0;
-            p0 += dl;
-          }
-        }
-      }
-    }
-
-    if (size >= dis) {
-      if (minGap > 0.0) {
-        let p0 = dis * 0.5 + min - (size + (len - 1) * minGap) * 0.5;
-
-        for (let i = 0; i < len; i++) {
-          list[i] = p0;
-          p0 += sizes[i] + minGap;
-        }
-      }
-    }
-
-    return list;
-  }
-
-}
-
-exports.AxisAlignCalc = AxisAlignCalc;
 
 /***/ }),
 
@@ -4499,8 +4016,7 @@ class NormalCtrlPanel {
 
   buildPanel(pw, ph) {
     this.m_selectDispatcher = CoRScene.createEventBaseDispatcher();
-    this.m_progressDispatcher = CoRScene.createEventBaseDispatcher(); // this.m_flagEvt = CoRScene.createSelectionEvent();
-
+    this.m_progressDispatcher = CoRScene.createEventBaseDispatcher();
     this.m_progressEvt = CoRScene.createProgressDataEvent();
     let builder = ButtonBuilder_1.ButtonBuilder;
     let sc = this.m_scene;
@@ -4518,44 +4034,11 @@ class NormalCtrlPanel {
     let disY = 5;
     let px = startX;
     let py = 0;
-    let ME = CoRScene.MouseEvent; // let textParam: ITextParam = {
-    // 	text: "Local",
-    // 	textColor: CoMaterial.createColor4(),
-    // 	fontSize: 30,
-    // 	font: ""
-    // };
-    // let colors: IColor4[] = [
-    // 	fc4().setRGB3Bytes(80, 80, 80),
-    // 	fc4().setRGB3Bytes(110, 110, 110),
-    // 	fc4().setRGB3Bytes(90, 90, 90),
-    // 	fc4().setRGB3Bytes(80, 80, 80)
-    // ];
-    // let localBtn = CoUI.createTextButton(
-    // 	this.m_btnW, this.m_btnH, "local",
-    // 	tta, textParam, colors
-    // );
-    // localBtn.setXY(startX, startY);
-
+    let ME = CoRScene.MouseEvent;
     let localBtn = builder.createPanelBtnWithCfg(sc, startX, startY, 0, uiCfg);
-    px = px + this.m_btnW; // this.m_btnW = 90;
-    // textParam.text = "Global";
-    // // let globalBtn = this.createBtn("Global", px, startY, "global");
-    // let globalBtn = CoUI.createTextButton(
-    // 	this.m_btnW, this.m_btnH, "global",
-    // 	tta, textParam, colors
-    // );
-    // globalBtn.setXY(px, startY);
-
+    px = px + this.m_btnW;
     let globalBtn = builder.createPanelBtnWithCfg(sc, px, startY, 1, uiCfg);
-    px = px + this.m_btnW; // this.m_btnW = 100;		
-    // textParam.text = "Color";
-    // // let differenceBtn = this.createBtn("Difference", px, startY, "difference");
-    // let modelColorBtn = CoUI.createTextButton(
-    // 	this.m_btnW, this.m_btnH, "modelColor",
-    // 	tta, textParam, colors
-    // );
-    // modelColorBtn.setXY(px, startY);
-
+    px = px + this.m_btnW;
     let modelColorBtn = builder.createPanelBtnWithCfg(sc, px, startY, 2, uiCfg);
     let pl = this.m_panel;
     pl.addEntity(localBtn);
@@ -4594,20 +4077,11 @@ class NormalCtrlPanel {
     px = startX;
     py = textLabel.getY();
     let colors1 = [fc4().setRGB3Bytes(210, 0, 210), fc4().setRGB3Bytes(240, 0, 240), fc4().setRGB3Bytes(220, 0, 220), fc4().setRGB3Bytes(240, 0, 240)];
-    let normalLineColorBtn = this.createColorBtn(22, 22, "normalLineColor", colors1);
-    normalLineColorBtn.setXY(startX + textLabel.getWidth() + disX, py);
+    let normalLineColorBtn = this.createColorBtn(16, 16, "normalLineColor", colors1);
+    normalLineColorBtn.setXY(startX + textLabel.getWidth() + disX, py + 3);
     pl.addEntity(normalLineColorBtn);
     px = startX;
-    py = textLabel.getY() - disY; // this.m_btnW = 90;		
-    // textParam.text = "Test";
-    // // let differenceBtn = this.createBtn("Difference", px, startY, "difference");
-    // let normalTestBtn = CoUI.createTextButton(
-    // 	this.m_btnW, this.m_btnH, "normalTest",
-    // 	tta, textParam, colors
-    // );
-    // normalTestBtn.update();
-    // normalTestBtn.setXY(px, py - normalTestBtn.getHeight());
-
+    py = textLabel.getY() - disY;
     let normalTestBtn = builder.createPanelBtnWithCfg(sc, px, py - localBtn.getHeight(), 3, uiCfg);
     pl.addEntity(normalTestBtn);
     localBtn.addEventListener(ME.MOUSE_UP, this, this.normalDisplaySelect);
@@ -4628,11 +4102,51 @@ class NormalCtrlPanel {
   }
 
   normalDisplaySelect(evt) {
-    this.sendSelectionEvt(evt.uuid, true);
+    // this.sendSelectionEvt(evt.uuid, true);
+    this.setDisplayMode(evt.uuid, true);
+  }
+
+  setDisplayMode(uuid, sendEvt = false) {
+    console.log("setDisplayMode, uuid: ", uuid);
+
+    if (sendEvt) {
+      this.sendSelectionEvt(uuid, sendEvt);
+    } else {
+      this.m_btnGroup.select(uuid);
+    }
+  }
+
+  setNormalLineColor(color, sendEvt = false) {
+    let c0 = color.clone().scaleBy(0.9);
+    let c1 = color.clone().scaleBy(1.1);
+    this.m_colorSelectLabel.setColors([c0, c1, c0, c0]);
+    this.m_colorSelectLabel.setClipIndex(0);
+
+    if (sendEvt) {
+      this.sendSelectionEvt(this.m_normalLineColorBtn.uuid, true, color.clone());
+    }
   }
 
   normalLineColorSelect(evt) {
-    console.log("color select...");
+    console.log("color select...evt: ", evt);
+    let uuid = evt.uuid;
+    let target = evt.target;
+    let bounds = target.getGlobalBounds();
+    let panel = this.m_scene.panel.getPanel("colorPickPanel");
+
+    if (panel != null) {
+      if (panel.isOpen()) {
+        panel.close();
+      } else {
+        panel.open();
+        panel.setXY(bounds.max.x - panel.getWidth(), bounds.max.y);
+        panel.setZ(this.getZ() + 0.3);
+        panel.update();
+        panel.setSelectColorCallback(color => {
+          this.setNormalLineColor(color, true);
+        });
+      }
+    }
   }
 
   selectVisibleFunc(evt) {
@@ -4685,7 +4199,7 @@ class NormalCtrlPanel {
     e.target = null;
   }
 
-  sendSelectionEvt(uuid, flag) {
+  sendSelectionEvt(uuid, flag, data = null) {
     let e = CoRScene.createSelectionEvent(); // let e = this.m_flagEvt;
 
     e.uuid = uuid;
@@ -4693,6 +4207,7 @@ class NormalCtrlPanel {
     e.type = CoRScene.SelectionEvent.SELECT;
     e.flag = flag;
     e.phase = 1;
+    e.data = data;
     this.m_selectDispatcher.dispatchEvt(e);
     e.target = null;
   }
@@ -4816,9 +4331,11 @@ class NormalCtrlPanel {
     let colorClipLabel = CoUI.createClipColorLabel();
     colorClipLabel.initializeWithoutTex(pw, ph, 4);
     colorClipLabel.setColors(colors);
+    this.m_colorSelectLabel = colorClipLabel;
     let btn = CoUI.createButton();
     btn.uuid = idns;
     btn.initializeWithLable(colorClipLabel);
+    this.m_normalLineColorBtn = btn;
     return btn;
   }
 
@@ -4866,6 +4383,10 @@ class NormalCtrlPanel {
     this.m_panel.setZ(pz);
   }
 
+  getZ() {
+    return this.m_panel.getZ();
+  }
+
   setXY(px, py) {
     this.m_panel.setXY(px, py);
   }
@@ -4889,231 +4410,6 @@ class NormalCtrlPanel {
 }
 
 exports.NormalCtrlPanel = NormalCtrlPanel;
-
-/***/ }),
-
-/***/ "af66":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-const UIEntityContainer_1 = __webpack_require__("5e13");
-
-const ColorLabel_1 = __webpack_require__("3f49");
-
-class UIPanel extends UIEntityContainer_1.UIEntityContainer {
-  constructor() {
-    super();
-    this.m_panelW = 100;
-    this.m_panelH = 150;
-    this.m_isOpen = false;
-    this.autoLayout = true;
-    this.m_openListener = null;
-    this.m_closeListener = null;
-    this.m_panelBuilding = true;
-  }
-
-  setSize(pw, ph) {
-    this.m_panelW = pw;
-    this.m_panelH = ph;
-  }
-
-  setBGColor(c) {
-    if (this.m_bgColor == null) this.m_bgColor = CoMaterial.createColor4();
-    this.m_bgColor.copyFrom(c);
-
-    if (this.m_bgLabel != null) {
-      this.m_bgLabel.setColor(c);
-    }
-
-    return this;
-  } // initialize(scene: ICoUIScene, rpi: number, panelW: number, panelH: number): void {
-  // 	if (this.isIniting()) {
-  // 		this.init();
-  // 		this.m_scene = scene;
-  // 		this.m_rpi = rpi;
-  // 		this.m_panelW = panelW;
-  // 		this.m_panelH = panelH;
-  // 		this.m_bgColor = CoMaterial.createColor4();
-  // 	}
-  // }
-
-
-  init() {
-    if (this.isIniting()) {
-      if (this.m_bgColor == null) this.m_bgColor = CoMaterial.createColor4();
-      super.init();
-    }
-  }
-
-  setUIscene(scene, rpi = -1) {
-    if (this.m_scene == null && scene != null) {
-      this.m_scene = scene;
-      if (rpi >= 0) this.m_rpi = rpi;
-      this.init();
-    }
-  }
-
-  openThis() {}
-
-  closeThis() {}
-
-  setOpenAndLoseListener(openListener, closeListener) {
-    this.m_openListener = openListener;
-    this.m_closeListener = closeListener;
-  }
-
-  open(uiscene = null, rpi = -1) {
-    if (!this.m_isOpen) {
-      if (this.isIniting()) {
-        this.init();
-      }
-
-      if (uiscene != null) this.m_scene = uiscene;
-      if (rpi >= 0) this.m_rpi = rpi;
-      this.m_scene.addEntity(this, this.m_rpi);
-      this.m_isOpen = true;
-      this.setVisible(true);
-      this.openThis();
-
-      if (this.autoLayout) {
-        this.addLayoutEvt();
-        this.layout();
-      }
-
-      if (this.m_openListener != null) {
-        this.m_openListener();
-      }
-    }
-  }
-
-  isOpen() {
-    return this.m_isOpen;
-  }
-
-  close() {
-    if (this.m_isOpen) {
-      this.m_scene.removeEntity(this);
-      this.m_isOpen = false;
-      this.setVisible(false);
-      this.removeLayoutEvt();
-      this.closeThis();
-
-      if (this.m_closeListener != null) {
-        this.m_closeListener();
-      }
-    }
-  }
-
-  destroy() {
-    super.destroy();
-    this.m_panelBuilding = true;
-
-    if (this.m_bgLabel != null) {
-      this.m_bgLabel.destroy();
-      this.m_bgLabel = null;
-    }
-
-    this.m_openListener = null;
-    this.m_closeListener = null;
-  }
-
-  buildPanel(pw, ph) {}
-
-  updateScene() {
-    let sc = this.getScene();
-
-    if (sc != null && this.m_panelBuilding && this.m_bgLabel == null) {
-      this.m_panelBuilding = false;
-      let pw = this.m_panelW;
-      let ph = this.m_panelH;
-      let bgLabel = this.createBG(pw, ph);
-      this.buildPanel(pw, ph);
-      this.addEntity(bgLabel);
-      this.setVisible(this.m_isOpen);
-
-      if (this.m_isOpen) {
-        this.addLayoutEvt();
-        this.layout();
-      }
-    }
-  }
-
-  addLayoutEvt() {
-    if (this.autoLayout) {
-      let sc = this.getScene();
-
-      if (sc != null) {
-        let EB = CoRScene.EventBase;
-        sc.addEventListener(EB.RESIZE, this, this.resize);
-      }
-    }
-  }
-
-  removeLayoutEvt() {
-    if (this.autoLayout) {
-      let sc = this.getScene();
-
-      if (sc != null) {
-        let EB = CoRScene.EventBase;
-        sc.removeEventListener(EB.RESIZE, this, this.resize);
-      }
-    }
-  }
-
-  createBG(pw, ph) {
-    let bgLabel = new ColorLabel_1.ColorLabel();
-    bgLabel.depthTest = true;
-    bgLabel.initialize(pw, ph);
-    bgLabel.setZ(-0.1);
-    bgLabel.setColor(this.m_bgColor);
-    this.m_bgLabel = bgLabel;
-    this.initializeEvent(bgLabel.getREntities()[0]);
-    return bgLabel;
-  }
-
-  initializeEvent(entity, uuid = "uiPlane") {
-    const me = CoRScene.MouseEvent;
-    let dpc = CoRScene.createMouseEvt3DDispatcher();
-    dpc.currentTarget = this;
-    dpc.uuid = uuid;
-    dpc.addEventListener(me.MOUSE_OVER, this, this.mouseOverListener);
-    dpc.addEventListener(me.MOUSE_OUT, this, this.mouseOutListener);
-    entity.setEvtDispatcher(dpc);
-    entity.mouseEnabled = true;
-  }
-
-  mouseOverListener(evt) {// console.log("mouseOverListener() ...");
-  }
-
-  mouseOutListener(evt) {// console.log("mouseOutListener() ...");
-  }
-
-  resize(evt) {
-    this.layout();
-  }
-
-  layout() {
-    let sc = this.getScene();
-
-    if (sc != null) {
-      this.update();
-      let rect = sc.getRect();
-      let px = Math.round(rect.x + (rect.width - this.getWidth()) * 0.5);
-      let py = Math.round(rect.y + (rect.height - this.getHeight()) * 0.5);
-      this.setXY(px, py);
-      this.update();
-    }
-  }
-
-}
-
-exports.UIPanel = UIPanel;
 
 /***/ }),
 
@@ -5765,312 +5061,6 @@ exports.ClipColorLabel = ClipColorLabel;
 
 /***/ }),
 
-/***/ "ccfe":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-const TextLabel_1 = __webpack_require__("1dd7");
-
-const UIPanel_1 = __webpack_require__("af66");
-
-const ButtonBuilder_1 = __webpack_require__("2870");
-
-const AxisAlignCalc_1 = __webpack_require__("ab08");
-
-class PromptPanel extends UIPanel_1.UIPanel {
-  constructor() {
-    super();
-    this.m_promptLabel = null;
-    this.m_prompt = "Hi,Prompt Panel.";
-    this.m_btnW = 90;
-    this.m_btnH = 50;
-    this.m_confirmFunc = null;
-    this.m_cancelFunc = null;
-    this.m_cancelBtnVis = true;
-    this.marginWidth = 70;
-    /**
-     * x轴留白比例
-     */
-
-    this.marginXFactor = 0.5;
-    /**
-     * y轴留白比例
-     */
-
-    this.marginYFactor = 0.6;
-    this.m_alignCalc = new AxisAlignCalc_1.AxisAlignCalc();
-  }
-
-  initialize(scene, rpi, panelW, panelH, btnW, btnH, confirmNS = "Confirm", cancelNS = "Cancel") {
-    if (this.isIniting()) {
-      this.init();
-      this.m_scene = scene;
-      this.m_rpi = rpi;
-      this.m_panelW = panelW;
-      this.m_panelH = panelH;
-      this.m_btnW = btnW;
-      this.m_btnH = btnH;
-      this.m_confirmNS = confirmNS;
-      this.m_cancelNS = cancelNS;
-      this.m_bgColor = CoMaterial.createColor4();
-    }
-  }
-
-  applyConfirmButton() {
-    this.m_cancelBtnVis = false;
-    let btn = this.m_cancelBtn;
-
-    if (btn != null && !btn.isVisible()) {
-      this.m_cancelBtn.setVisible(false);
-
-      if (this.m_confirmBtn != null && this.isOpen()) {
-        this.layoutItems();
-        this.layout();
-      }
-    }
-  }
-
-  applyAllButtons() {
-    this.m_cancelBtnVis = true;
-
-    if (this.m_cancelBtn != null) {
-      this.m_cancelBtn.setVisible(true);
-    }
-  }
-
-  setPrompt(text) {
-    if (text != "" && this.m_prompt != text) {
-      this.m_prompt = text;
-      let pl = this.m_promptLabel;
-
-      if (pl != null) {
-        pl.setText(text);
-        let px = (this.m_panelW - pl.getWidth()) * 0.5;
-        pl.setX(px);
-        pl.update();
-
-        if (this.m_confirmBtn != null && this.isOpen()) {
-          this.layoutItems();
-          this.layout();
-        }
-      }
-    }
-  }
-
-  setPromptTextColor(color) {
-    let pl = this.m_promptLabel;
-
-    if (pl != null) {
-      pl.setColor(color);
-    }
-  }
-
-  setListener(confirmFunc, cancelFunc) {
-    this.m_confirmFunc = confirmFunc;
-    this.m_cancelFunc = cancelFunc;
-  }
-
-  destroy() {
-    super.destroy();
-    this.m_confirmFunc = null;
-    this.m_cancelFunc = null;
-
-    if (this.m_confirmBtn != null) {
-      this.m_confirmBtn.destroy();
-      this.m_cancelBtn.destroy();
-      this.m_bgLabel.destroy();
-      this.m_confirmBtn = null;
-      this.m_cancelBtn = null;
-      this.m_bgLabel = null;
-    }
-  }
-
-  buildPanel(pw, ph) {
-    this.buildItems();
-  }
-
-  buildItems() {
-    if (this.m_confirmBtn == null) {
-      let sc = this.getScene();
-      let tta = sc.transparentTexAtlas;
-      let fc4 = CoMaterial.createColor4;
-      let cfg = this.m_scene.uiConfig;
-      let gColor = cfg.getUIGlobalColor();
-      let uiCfg = cfg.getUIPanelCfgByName("promptPanel");
-      let keys = uiCfg.btnKeys;
-      let btf = uiCfg.btnTextFontFormat;
-      let ltf = uiCfg.textFontFormat;
-      let textLabel = new TextLabel_1.TextLabel();
-      textLabel.depthTest = true;
-      textLabel.transparent = true;
-      textLabel.premultiplyAlpha = true;
-      textLabel.initialize(this.m_prompt, sc, ltf.fontSize);
-      let color = fc4();
-      color.fromBytesArray3(ltf.fontColor);
-      textLabel.setColor(color);
-      this.m_promptLabel = textLabel; // console.log("textLabel.getHeight(): ", textLabel.getHeight());
-
-      let ME = CoRScene.MouseEvent;
-      let textParam = {
-        text: this.m_confirmNS,
-        textColor: fc4(),
-        fontSize: btf.fontSize,
-        font: ""
-      };
-      textParam.textColor.fromBytesArray3(btf.fontColor);
-      let colors = [fc4(), fc4(), fc4(), fc4() //.setRGB3Bytes(80, 80, 80)
-      ];
-      cfg.applyButtonColor(colors, gColor.button.light);
-      let builder = ButtonBuilder_1.ButtonBuilder;
-      let confirmBtn = builder.createTextButton(this.m_btnW, this.m_btnH, keys[0], tta, textParam, colors);
-      this.m_confirmBtn = confirmBtn;
-      textParam.text = this.m_cancelNS;
-      let cancelBtn = builder.createTextButton(this.m_btnW, this.m_btnH, keys[1], tta, textParam, colors); // cancelBtn.addEventListener(ME.MOUSE_UP, this, this.btnMouseUpListener);
-
-      this.m_cancelBtn = cancelBtn;
-      this.addEntity(cancelBtn);
-      this.addEntity(confirmBtn);
-      this.addEntity(textLabel);
-    }
-  }
-
-  updateBgSize() {
-    let pw = this.m_panelW;
-    let textLabel = this.m_promptLabel;
-    textLabel.update();
-    let confirmBtn = this.m_confirmBtn;
-    confirmBtn.update();
-    let cancelBtn = this.m_cancelBtn;
-    cancelBtn.update();
-    let bw = cancelBtn.isVisible() ? cancelBtn.getWidth() : 0;
-    let btw2 = confirmBtn.getWidth() + bw;
-    bw = btw2 + Math.round(0.2 * btw2) + this.marginWidth;
-    let tw = textLabel.getWidth() + this.marginWidth;
-    tw = bw > tw ? bw : tw;
-    pw = this.m_panelW = tw;
-    let bgLabel = this.m_bgLabel;
-
-    if (Math.abs(bgLabel.getWidth() - pw) > 0.01) {
-      bgLabel.setScaleX(1.0);
-      bgLabel.update();
-      tw = bgLabel.getWidth();
-      bgLabel.setScaleX(pw / tw);
-      bgLabel.update();
-    }
-  }
-
-  layoutItems() {
-    this.m_cancelBtn.setVisible(this.m_cancelBtnVis);
-    this.updateBgSize();
-    let pw = this.m_panelW;
-    let textLabel = this.m_promptLabel;
-    let sizes = [this.m_btnH, textLabel.getHeight()];
-    let pyList = this.m_alignCalc.calcAvgFixLayout(sizes, this.m_panelH, 15, this.marginYFactor, 0.5);
-    let px = (pw - textLabel.getWidth()) * 0.5;
-    textLabel.setXY(px, pyList[1]);
-    textLabel.update();
-
-    if (this.m_cancelBtn.isVisible()) {
-      this.layoutButtons(px, pyList[0]);
-    } else {
-      this.layoutOnlyConfirm(px, pyList[0]);
-    }
-  }
-
-  layoutButtons(px, py) {
-    let sizes = [this.m_btnW, this.m_btnW];
-    let pxList = this.m_alignCalc.calcAvgFixLayout(sizes, this.m_panelW, 10, this.marginXFactor, 0.5);
-    let confirmBtn = this.m_confirmBtn;
-    let cancelBtn = this.m_cancelBtn;
-    confirmBtn.setXY(pxList[0], py);
-    confirmBtn.update();
-    cancelBtn.setXY(pxList[1], py);
-    cancelBtn.update();
-  }
-
-  layoutOnlyConfirm(px, py) {
-    let sizes = [this.m_btnW];
-    let pxList = this.m_alignCalc.calcAvgFixLayout(sizes, this.m_panelW, 10, this.marginXFactor, 0.5);
-    let confirmBtn = this.m_confirmBtn;
-    confirmBtn.setXY(pxList[0], py);
-    confirmBtn.update();
-  }
-
-  openThis() {
-    let ME = CoRScene.MouseEvent;
-
-    if (this.m_scene != null) {
-      this.m_scene.addEventListener(ME.MOUSE_DOWN, this, this.stMouseDownListener);
-      this.m_confirmBtn.addEventListener(ME.MOUSE_UP, this, this.btnMouseUpListener);
-      this.m_cancelBtn.addEventListener(ME.MOUSE_UP, this, this.btnMouseUpListener);
-      this.layoutItems();
-    }
-  }
-
-  closeThis() {
-    this.m_cancelBtnVis = true;
-    let ME = CoRScene.MouseEvent;
-
-    if (this.m_scene != null) {
-      this.m_scene.removeEventListener(ME.MOUSE_DOWN, this, this.stMouseDownListener);
-      this.m_confirmBtn.removeEventListener(ME.MOUSE_UP, this, this.btnMouseUpListener);
-      this.m_cancelBtn.removeEventListener(ME.MOUSE_UP, this, this.btnMouseUpListener);
-    }
-  }
-
-  stMouseDownListener(evt) {
-    console.log("Prompt stMouseDownListener...");
-    let px = evt.mouseX;
-    let py = evt.mouseY;
-    let pv = this.m_v0;
-    pv.setXYZ(px, py, 0);
-    this.globalToLocal(pv);
-
-    if (pv.x < 0 || pv.x > this.m_panelW || pv.y < 0 || pv.y > this.m_panelH) {
-      this.close();
-    }
-  }
-
-  btnMouseUpListener(evt) {
-    console.log("PromptPanel::btnMouseUpListener(), evt.currentTarget: ", evt.currentTarget);
-    let uuid = evt.uuid;
-
-    switch (uuid) {
-      case "confirm":
-        this.close();
-
-        if (this.m_confirmFunc != null) {
-          this.m_confirmFunc();
-        }
-
-        break;
-
-      case "cancel":
-        this.close();
-
-        if (this.m_cancelFunc != null) {
-          this.m_cancelFunc();
-        }
-
-        break;
-
-      default:
-        break;
-    }
-  }
-
-}
-
-exports.PromptPanel = PromptPanel;
-
-/***/ }),
-
 /***/ "d460":
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -6366,11 +5356,7 @@ const NVNavigationUI_1 = __webpack_require__("3120");
 
 const NormalViewer_1 = __webpack_require__("d8b4");
 
-const PromptSystem_1 = __webpack_require__("3f7d");
-
 const CoModuleLoader_1 = __webpack_require__("2a2b");
-
-const TipsSystem_1 = __webpack_require__("1389");
 
 const UIConfig_1 = __webpack_require__("1c1e"); //*
 
@@ -6523,13 +5509,7 @@ class DemoVox3DEditor {
   }
 
   initEditUI() {
-    this.m_coUIScene = CoUI.createUIScene();
-    let coui = this.m_coUIScene;
-    coui.initialize(this.m_rsc, 512, 5);
-    this.m_uirsc = coui.rscene;
-    this.m_graph.addScene(this.m_uirsc);
     let uiConfig = new UIConfig_1.UIConfig();
-    coui.uiConfig = uiConfig;
     let cfgUrl = "static/apps/normalViewer/ui/zh-CN/uicfg.json";
     let language = CoRScene.RendererDevice.GetLanguage();
     console.log("XXX language: ", language);
@@ -6539,18 +5519,18 @@ class DemoVox3DEditor {
     }
 
     uiConfig.initialize(cfgUrl, () => {
+      this.m_coUIScene = CoUI.createUIScene(uiConfig, this.m_rsc, 512, 5);
+      let coui = this.m_coUIScene; // coui.initialize(this.m_rsc, 512, 5);
+
+      this.m_uirsc = coui.rscene;
+      this.m_graph.addScene(this.m_uirsc); // coui.uiConfig = uiConfig;
+
       this.initEditSceneSys();
     });
   }
 
   initEditSceneSys() {
     let coui = this.m_coUIScene;
-    let promptSys = new PromptSystem_1.PromptSystem();
-    promptSys.initialize(coui);
-    coui.prompt = promptSys;
-    let tipsSys = new TipsSystem_1.TipsSystem();
-    tipsSys.initialize(coui);
-    coui.tips = tipsSys;
     this.m_transUI.setOutline(this.m_outline);
     this.m_transUI.initialize(this.m_rsc, this.m_editUIRenderer, coui);
     this.m_nvaUI.initialize(this.m_rsc, this.m_editUIRenderer, coui);
