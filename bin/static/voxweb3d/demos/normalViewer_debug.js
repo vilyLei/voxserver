@@ -1650,6 +1650,7 @@ class NormalEntityNode {
     entity.addEventListener(ME.MOUSE_OVER, this, this.mouseOverTargetListener);
     entity.addEventListener(ME.MOUSE_OUT, this, this.mouseOutTargetListener);
     entity.addEventListener(ME.MOUSE_DOWN, this, this.mouseDownTargetListener); // entity.addEventListener(ME.MOUSE_UP, this, this.mouseUpTargetListener);
+    // 如果双击一个entity则全部选中这个group
   }
 
   mouseOverTargetListener(evt) {
@@ -2333,14 +2334,29 @@ class NVTransUI {
     this.m_keyInterac.addKeysDownListener(type, this, this.keyCtrlYDown);
     type = this.m_keyInterac.createKeysEventType([Key.CTRL, Key.Z]);
     this.m_keyInterac.addKeysDownListener(type, this, this.keyCtrlZDown);
-    this.m_recoder = CoEdit.createTransformRecorder();
+    this.m_recoder = CoEdit.createTransformRecorder(); // this.m_recoder = new CoTransformRecorder();
+
     this.initUI();
   }
 
   keyCtrlZDown(evt) {
+    // console.log("ctrl-z, undo() begin.");
     this.m_recoder.undo();
     let list = this.m_recoder.getCurrList();
-    this.selectEntities(list);
+
+    if (list != null) {
+      let flag = true;
+
+      for (let i = 0; i < list.length; ++i) {
+        if (!list[i].getVisible()) {
+          flag = false;
+        }
+      }
+
+      if (flag) {
+        this.selectEntities(list);
+      }
+    }
   }
 
   keyCtrlYDown(evt) {
@@ -2354,8 +2370,11 @@ class NVTransUI {
   }
 
   editBegin(evt) {
+    let list = evt.currentTarget.getTargetEntities(); // console.log("editBegin(), entity list: ", list);
+
     let st = this.m_rsc.getStage3D();
     this.m_prevPos.setXYZ(st.mouseX, st.mouseY, 0);
+    this.m_recoder.saveBegin(list);
   }
 
   editEnd(evt) {
@@ -2363,8 +2382,11 @@ class NVTransUI {
     this.m_currPos.setXYZ(st.mouseX, st.mouseY, 0);
 
     if (CoMath.Vector3D.Distance(this.m_prevPos, this.m_currPos) > 0.5) {
-      let list = evt.currentTarget.getTargetEntities();
-      this.m_recoder.save(list);
+      let list = evt.currentTarget.getTargetEntities(); // console.log("editEnd(), save list: ", list);
+
+      this.m_recoder.saveEnd(list);
+    } else {
+      this.m_recoder.saveEnd(null);
     }
   }
 
@@ -2427,7 +2449,6 @@ class NVTransUI {
 
   uiMouseUpListener(evt) {
     // console.log("NVTransUI::uiMouseUpListener(), evt: ", evt);
-    // console.log("ui up (x, y): ", evt.mouseX, evt.mouseY);
     if (this.m_selectFrame.isSelectEnabled()) {
       let b = this.m_selectFrame.bounds;
       let list = this.m_entityQuery.getEntities(b.min, b.max);
@@ -3385,7 +3406,6 @@ class NormalExampleGroup {
     pv.y += textHeight; // this.createStaticText(pv, "顶点绕序错误", h5Text);
 
     this.createStaticText(pv, items[3].text, h5Text);
-    this.m_transUI.getRecoder().save(this.m_nodeEntities); // node.entity.setRenderState(CoRScene.RendererState.FRONT_CULLFACE_NORMAL_STATE);
   }
 
   flipTriWrap(triIndex, ivs) {
@@ -3768,7 +3788,7 @@ class NormalEntityGroup {
 
       if (format == CoSpaceAppData_1.CoDataFormat.FBX) {
         unit.data.modelReceiver = (models, transforms, index, total) => {
-          console.log("XXX: ", index, ",", total);
+          // console.log("XXX: ", index, ",", total);
           this.createEntityFromModels(models, transforms);
         };
       }
@@ -3792,58 +3812,28 @@ class NormalEntityGroup {
     }
 
     this.updateLayout(false);
-    this.transUI.getRecoder().save(entities);
   }
 
   createEntityFromUnit(unit, status = 0) {
-    console.log("XXXXXX createEntityFromUnit, unit: ", unit);
-    /*
-    let entities: ITransformEntity[] = [];
-    let len = unit.data.models.length;
-      let nodes: NormalEntityNode[] = [];
-    for (let i = 0; i < len; ++i) {
-        let dt = unit.data;
-        const node = this.addEntityWithModel(dt.models[i], dt.transforms != null ? dt.transforms[i] : null);
-        if (node != null) {
-            this.entityManager.addNode(node);
-            nodes.push(node);
-            this.m_nodes.push(node);
-            entities.push(node.entity);
-        }
-    }
-    
-    this.updateLayout(false);
-    this.transUI.getRecoder().save(entities);
-    
-    // for (let i = 0; i < nodes.length; ++i) {
-    // 	nodes[i].createNormalLine();
-    // }
-    //*/
-    // let nodes = this.m_nodes;
-    // for (let i = 0; i < nodes.length; ++i) {
-    // 	nodes[i].createNormalLine();
-    // }
-
     this.m_loadedTotal++;
 
     if (this.m_loadedTotal >= this.m_loadTotal) {
       this.uiscene.prompt.getPromptPanel().applyConfirmButton();
       this.uiscene.prompt.showPrompt("Model loading finish!");
+      let ls = this.m_nodes;
 
-      for (let i = 0; i < this.m_nodes.length; ++i) {
-        this.m_nodes[i].applyEvent();
+      for (let i = 0; i < ls.length; ++i) {
+        ls[i].applyEvent();
       }
     }
   }
 
   addEntityWithModel(model, transform) {
     if (model != null) {
-      // let map = this.m_map;
       let node = new NormalEntityNode_1.NormalEntityNode();
       node.rsc = this.rsc;
       node.transUI = this.transUI;
-      let entity = node.setEntityModel(model); // map.set(node.getUid(), node);
-
+      let entity = node.setEntityModel(model);
       let mat4 = transform != null ? CoRScene.createMat4(transform) : null;
       this.m_transforms.push(mat4);
       this.m_transes.push(entity);
@@ -6549,7 +6539,6 @@ class DemoVox3DEditor {
     }
 
     uiConfig.initialize(cfgUrl, () => {
-      console.log("xxxx initEditSceneSys... ...");
       this.initEditSceneSys();
     });
   }
@@ -6605,9 +6594,7 @@ class DemoVox3DEditor {
       rparam.setCamPosition(1000.0, 1000.0, 1000.0);
       rparam.setCamProject(45, 20.0, 9000.0);
       let rscene = CoRScene.createRendererScene(rparam, 3);
-      rscene.setClearRGBColor3f(0.23, 0.23, 0.23); // console.log("60/255: ", 60/255);
-      // rscene.setClearUint24Color((60 << 16) + (60 << 8) + 60);
-
+      rscene.setClearRGBColor3f(0.23, 0.23, 0.23);
       rscene.addEventListener(CoRScene.MouseEvent.MOUSE_DOWN, this, this.mouseDownListener); // rscene.addEventListener(CoRScene.KeyboardEvent.KEY_DOWN, this, this.keyDown);
       // rscene.addEventListener(CoRScene.MouseEvent.MOUSE_BG_CLICK, this, this.mouseClickListener);
       // rscene.addEventListener(CoRScene.MouseEvent.MOUSE_RIGHT_UP, this, this.mouseUpListener, true, true);
