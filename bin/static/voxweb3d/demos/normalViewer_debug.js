@@ -3567,7 +3567,7 @@ class NormalEntityManager {
   }
 
   applyShiftKey(list) {
-    console.log("applyCtrlKey SHIFT Key Down.");
+    console.log("applyShiftKey SHIFT Key Down.");
     let map = this.m_map;
     let firstNode = null;
     let ls = list;
