@@ -1911,12 +1911,12 @@ class NormalEntityMaterial {
     		vec2 f2 = sign(dv);
     
     		vec3 nv = normalize(v_nv.xyz);
-    		vec3 color = nv;//pow(nv, gama);
+    		vec3 color = nv;
 
 			float nDotL0 = max(dot(v_vnv.xyz, direc0), 0.1);
 			float nDotL1 = max(dot(v_vnv.xyz, direc1), 0.1);
-			nDotL0 = 0.7 * (nDotL0 + nDotL1);
-			vec3 modelColor = u_params[0].xyz * vec3(nDotL0);
+			
+			vec3 modelColor = u_params[0].xyz * vec3( 0.7 * (nDotL0 + nDotL1) );
 			vec4 param = u_params[1];
 
     		vec3 frontColor = param.x > 0.5 ? modelColor : color.xyz;
@@ -1997,6 +1997,7 @@ class NVTransUI {
     this.m_selectList = null;
     this.m_transBtns = [];
     this.m_selectListeners = [];
+    this.m_selectFilter = null;
   }
 
   setOutline(outline) {
@@ -2010,6 +2011,10 @@ class NVTransUI {
       this.m_coUIScene = coUIScene;
       this.init();
     }
+  }
+
+  getKeyInterac() {
+    return this.m_keyInterac;
   }
 
   getCoUIScene() {
@@ -2029,6 +2034,7 @@ class NVTransUI {
     this.m_currPos = CoMath.createVec3();
     this.m_keyInterac = CoUIInteraction.createKeyboardInteraction();
     this.m_keyInterac.initialize(this.m_rsc);
+    this.m_coUIScene.keyboardInteraction = this.m_keyInterac;
     let Key = CoRScene.Keyboard;
     let type = this.m_keyInterac.createKeysEventType([Key.CTRL, Key.Y]);
     this.m_keyInterac.addKeysDownListener(type, this, this.keyCtrlYDown);
@@ -2188,7 +2194,7 @@ class NVTransUI {
   }
 
   keyDown(evt) {
-    console.log("NVTransUI::keyDown() ..., evt.keyCode: ", evt.keyCode);
+    // console.log("NVTransUI::keyDown() ..., evt.keyCode: ", evt.keyCode);
     let KEY = CoRScene.Keyboard;
 
     switch (evt.keyCode) {
@@ -2207,6 +2213,10 @@ class NVTransUI {
       default:
         break;
     }
+  }
+
+  addSelectFilter(filter) {
+    this.m_selectFilter = filter;
   }
 
   addSelectListener(listener) {
@@ -2228,6 +2238,16 @@ class NVTransUI {
     this.m_selectList = list;
 
     if (list != null && list.length > 0) {
+      if (this.m_selectFilter != null) {
+        list = this.m_selectFilter(list);
+        this.m_selectList = list;
+
+        if (list == null || list.length < 1) {
+          this.m_selectList = null;
+          return;
+        }
+      }
+
       let transCtr = this.m_transCtr;
       let pos = CoMath.createVec3();
       let pv = CoMath.createVec3();
@@ -2891,27 +2911,15 @@ Object.defineProperty(exports, "__esModule", {
 
 const NormalEntityNode_1 = __webpack_require__("43c4");
 
-class NormalExampleGroup {
+const NVEntityGroup_1 = __webpack_require__("f953");
+
+class NormalExampleGroup extends NVEntityGroup_1.NVEntityGroup {
   constructor() {
-    this.m_rscene = null;
-    this.m_visible = true;
+    super();
     this.m_nodes = [];
     this.m_nodeEntities = [];
     this.m_textEntities = [];
-    this.m_pv = null;
     this.m_textHeight = 130.0;
-    this.m_enabled = true;
-    this.m_runFlag = -1;
-  }
-
-  initialize(rscene, transUI) {
-    if (this.m_rscene == null) {
-      this.m_rscene = rscene;
-      this.m_transUI = transUI;
-      this.createNodes();
-      this.m_pv = CoRScene.createVec3();
-      rscene.runnableQueue.addRunner(this);
-    }
   }
 
   createNodes() {
@@ -3020,6 +3028,7 @@ class NormalExampleGroup {
 
     this.m_nodeEntities.push(node.entity);
     this.m_nodes.push(node);
+    node.groupUid = this.m_uid;
     return node;
   }
 
@@ -3048,15 +3057,13 @@ class NormalExampleGroup {
 
       this.m_enabled = enabled;
     }
-  }
+  } // setVisible(v: boolean): void {
+  // 	this.m_visible = v;
+  // }
+  // isVisible(): boolean {
+  // 	return this.m_visible;
+  // }
 
-  setVisible(v) {
-    this.m_visible = v;
-  }
-
-  isVisible() {
-    return this.m_visible;
-  }
 
   update() {}
 
@@ -3082,23 +3089,20 @@ class NormalExampleGroup {
       this.m_rscene = null;
       this.m_transUI = null;
     }
-  }
+  } // private m_runFlag: number = -1;
+  // setRunFlag(flag: number): void {
+  // 	this.m_runFlag = flag;
+  // }
+  // getRunFlag(): number {
+  // 	return this.m_runFlag;
+  // }
+  // isRunning(): boolean {
+  // 	return this.m_enabled;
+  // }
+  // isStopped(): boolean {
+  // 	return !this.m_enabled;
+  // }
 
-  setRunFlag(flag) {
-    this.m_runFlag = flag;
-  }
-
-  getRunFlag() {
-    return this.m_runFlag;
-  }
-
-  isRunning() {
-    return this.m_enabled;
-  }
-
-  isStopped() {
-    return !this.m_enabled;
-  }
 
   run() {
     let ns = this.m_nodes;
@@ -3288,9 +3292,11 @@ const CoSpaceAppData_1 = __webpack_require__("3347");
 
 const NormalEntityLayout_1 = __webpack_require__("4cf3");
 
-class NormalEntityGroup {
+const NVEntityGroup_1 = __webpack_require__("f953");
+
+class NormalEntityGroup extends NVEntityGroup_1.NVEntityGroup {
   constructor(coapp) {
-    this.m_uid = NormalEntityGroup.s_uid++;
+    super();
     this.m_loadTotal = 0;
     this.m_loadedTotal = 0;
     this.m_nodes = [];
@@ -3300,11 +3306,7 @@ class NormalEntityGroup {
     this.m_coapp = coapp;
   }
 
-  getUid() {
-    return this.m_uid;
-  }
-
-  initialize() {}
+  initialize(rscene, transUI) {}
 
   loadModels(urls, typeNS = "") {
     if (urls != null && urls.length > 0) {
@@ -3392,6 +3394,8 @@ class NormalEntityGroup {
       const node = this.addEntityWithModel(models[i], transforms != null ? transforms[i] : null);
 
       if (node != null) {
+        node.groupUid = this.getUid(); // console.log("XXXXX node.groupUid: ",node.groupUid);
+
         this.entityManager.addNode(node);
         nodes.push(node);
         this.m_nodes.push(node);
@@ -3472,7 +3476,6 @@ class NormalEntityGroup {
 
 }
 
-NormalEntityGroup.s_uid = 0;
 exports.NormalEntityGroup = NormalEntityGroup;
 
 /***/ }),
@@ -3564,6 +3567,43 @@ class NormalEntityManager {
   }
 
   initialize() {
+    this.transUI.addSelectFilter(list => {
+      console.log("use a list filter() ...");
+      let interac = this.transUI.getKeyInterac();
+      let keyCode = interac.getCurrDownKeyCode();
+
+      if (keyCode == 16) {
+        console.log("use a SHIFT Key Down.");
+        let map = this.m_map;
+        let firstNode = null;
+        let ls = list;
+
+        for (let i = 0; i < ls.length; ++i) {
+          const node = map.get(ls[i].getUid());
+
+          if (node != null) {
+            if (firstNode == null) {
+              firstNode = node;
+              break;
+            }
+          }
+        }
+
+        if (firstNode != null) {
+          let guid = firstNode.groupUid;
+          list = [];
+
+          for (var [k, v] of map.entries()) {
+            if (v.groupUid == guid) {
+              list.push(v.entity);
+            }
+          } // console.log("XXXXXX guid: ", guid, list);
+
+        }
+      }
+
+      return list;
+    });
     this.transUI.addSelectListener(list => {
       this.setSelectedModelVisible(true);
       let entitys = list;
@@ -3918,9 +3958,10 @@ class NormalCtrlPanel {
   constructor() {
     this.m_btnW = 90;
     this.m_btnH = 50;
+    this.m_normalScale = 0;
     this.m_scene = null;
     this.m_panel = null;
-    this.m_normalScale = 0.0;
+    this.m_colorPickPanel = null;
     this.autoLayout = true;
     this.m_dragging = false;
     this.m_dragMinX = 0;
@@ -3996,6 +4037,11 @@ class NormalCtrlPanel {
   close() {
     this.removeLayoutEvt();
     this.m_panel.close();
+
+    if (this.m_colorPickPanel != null) {
+      this.m_colorPickPanel.close();
+      this.m_colorPickPanel = null;
+    }
   }
 
   addEventListener(type, listener, func, captureEnabled = true, bubbleEnabled = false) {
@@ -4102,13 +4148,11 @@ class NormalCtrlPanel {
   }
 
   normalDisplaySelect(evt) {
-    // this.sendSelectionEvt(evt.uuid, true);
     this.setDisplayMode(evt.uuid, true);
   }
 
   setDisplayMode(uuid, sendEvt = false) {
-    console.log("setDisplayMode, uuid: ", uuid);
-
+    // console.log("setDisplayMode, uuid: ", uuid);
     if (sendEvt) {
       this.sendSelectionEvt(uuid, sendEvt);
     } else {
@@ -4127,24 +4171,39 @@ class NormalCtrlPanel {
     }
   }
 
+  layoutPickColorPanel() {
+    let panel = this.m_colorPickPanel;
+
+    if (panel != null && panel.isOpen()) {
+      this.m_normalLineColorBtn.update();
+      let bounds = this.m_normalLineColorBtn.getGlobalBounds();
+      panel.setXY(bounds.max.x - panel.getWidth(), bounds.max.y + 2);
+      panel.setZ(this.getZ() + 0.3);
+      panel.update();
+    }
+  }
+
   normalLineColorSelect(evt) {
     console.log("color select...evt: ", evt);
-    let uuid = evt.uuid;
-    let target = evt.target;
-    let bounds = target.getGlobalBounds();
-    let panel = this.m_scene.panel.getPanel("colorPickPanel");
+    let panel = this.m_colorPickPanel;
 
-    if (panel != null) {
-      if (panel.isOpen()) {
-        panel.close();
-      } else {
-        panel.open();
-        panel.setXY(bounds.max.x - panel.getWidth(), bounds.max.y);
-        panel.setZ(this.getZ() + 0.3);
-        panel.update();
-        panel.setSelectColorCallback(color => {
-          this.setNormalLineColor(color, true);
-        });
+    if (panel != null && panel.isOpen()) {
+      panel.close();
+      this.m_colorPickPanel = null;
+    } else {
+      let panel = this.m_scene.panel.getPanel("colorPickPanel");
+
+      if (panel != null) {
+        if (panel.isOpen()) {
+          panel.close();
+        } else {
+          this.m_colorPickPanel = panel;
+          panel.open();
+          this.layoutPickColorPanel();
+          panel.setSelectColorCallback(color => {
+            this.setNormalLineColor(color, true);
+          });
+        }
       }
     }
   }
@@ -4303,10 +4362,8 @@ class NormalCtrlPanel {
     let px = evt.mouseX;
     let py = evt.mouseY;
     let pv = this.m_v0;
-    pv.setXYZ(px, py, 0); // console.log("px,py: ", px,py);
-
-    this.m_panel.globalToLocal(pv); // console.log("pv.x, pv.y: ", pv.x, pv.y);
-
+    pv.setXYZ(px, py, 0);
+    this.m_panel.globalToLocal(pv);
     px = pv.x;
 
     if (px < this.m_dragMinX) {
@@ -4316,15 +4373,9 @@ class NormalCtrlPanel {
     }
 
     this.m_dragBar.setX(px);
-    this.m_dragBar.update(); // console.log("this.m_proBaseLen: ",this.m_proBaseLen, this.m_progressLen);
-    // let f = (px - this.m_dragMinX) / this.m_progressLen;
-
-    let f = (px - this.m_dragMinX) / this.m_proBaseLen; // console.log("f: ", f, px - this.m_dragMinX);
-    // console.log("f: ",f, (0.1 + f * 2.0));
-    // f = 0.1 + f * 3.0;
-
+    this.m_dragBar.update();
+    let f = (px - this.m_dragMinX) / this.m_proBaseLen;
     this.m_normalScale = f;
-    this.sendProgressEvt("normalScale", f);
   }
 
   createColorBtn(pw, ph, idns, colors) {
@@ -4376,6 +4427,7 @@ class NormalCtrlPanel {
       let py = Math.round(rect.y + (rect.height - this.getHeight()) * 0.5);
       this.setXY(px, py);
       this.update();
+      this.layoutPickColorPanel();
     }
   }
 
@@ -5916,6 +5968,77 @@ class Button extends UIEntityBase_1.UIEntityBase {
 }
 
 exports.Button = Button;
+
+/***/ }),
+
+/***/ "f953":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+class NVEntityGroup {
+  constructor() {
+    this.m_uid = NVEntityGroup.s_uid++;
+    this.m_enabled = true;
+    this.m_pv = null;
+    this.m_rscene = null;
+    this.m_visible = true;
+    this.m_runFlag = -1;
+  }
+
+  initialize(rscene, transUI) {
+    if (this.m_rscene == null) {
+      this.m_rscene = rscene;
+      this.m_transUI = transUI;
+      this.createNodes();
+      this.m_pv = CoRScene.createVec3();
+      rscene.runnableQueue.addRunner(this);
+    }
+  }
+
+  createNodes() {}
+
+  getUid() {
+    return this.m_uid;
+  }
+
+  setVisible(v) {
+    this.m_visible = v;
+  }
+
+  isVisible() {
+    return this.m_visible;
+  }
+
+  update() {}
+
+  setRunFlag(flag) {
+    this.m_runFlag = flag;
+  }
+
+  getRunFlag() {
+    return this.m_runFlag;
+  }
+
+  isRunning() {
+    return this.m_enabled;
+  }
+
+  isStopped() {
+    return !this.m_enabled;
+  }
+
+  run() {}
+
+}
+
+NVEntityGroup.s_uid = 0;
+exports.NVEntityGroup = NVEntityGroup;
 
 /***/ }),
 
