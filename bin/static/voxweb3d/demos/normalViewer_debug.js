@@ -1892,10 +1892,12 @@ class NormalEntityMaterial {
       material.addUniformDataAt("u_params", this.m_data);
       material.setShaderBuilder(coderBuilder => {
         let coder = coderBuilder.getShaderCodeBuilder();
-        coder.addVertLayout("vec3", "a_uvs");
+        coder.addVertLayout("vec2", "a_uvs");
         coder.addVertLayout("vec3", "a_nvs");
+        coder.addVertLayout("vec3", "a_nvs2");
         coder.addVertUniform("vec4", "u_params", 2);
         coder.addFragUniform("vec4", "u_params", 2);
+        coder.addVarying("vec2", "v_uv");
         coder.addVarying("vec4", "v_nv");
         coder.addVarying("vec3", "v_vnv");
         coder.addVarying("vec3", "v_dv");
@@ -1939,9 +1941,9 @@ class NormalEntityMaterial {
         coder.addVertMainCode(`
 			mat4 vmat = u_viewMat * u_objMat;
 			viewPosition = vmat * vec4(a_vs,1.0);
-			vec3 puvs = a_uvs;
+			v_uv = a_uvs;
 			vec3 pnv = u_params[1].zzz * a_nvs;
-			v_dv = vec3(dot(normalize(a_uvs), normalize( pnv )));
+			v_dv = vec3(dot(normalize(a_nvs2), normalize( pnv )));
 			vec4 pv = u_projMat * viewPosition;			
 			gl_Position = pv;
 			v_vnv = normalize(pnv * inverse(mat3(vmat)));
@@ -2511,6 +2513,96 @@ class ClipLabelBase extends UIEntityBase_1.UIEntityBase {
 }
 
 exports.ClipLabelBase = ClipLabelBase;
+
+/***/ }),
+
+/***/ "7228":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+class BoxLine3D {
+  constructor() {
+    this.m_entity = null;
+    this.m_material = null;
+  }
+
+  initializeWithAABB(rscene, rpi, aabb, color = null) {
+    this.initialize(rscene, rpi, aabb.min, aabb.max, color);
+  }
+
+  initialize(rscene, rpi, minV, maxV, color = null) {
+    if (this.m_entity == null) {
+      if (rpi < 0) rpi = 0;
+      if (color == null) color = CoMaterial.createColor4(0.3, 0.3, 0.3, 1.0);
+      this.m_rscene = rscene;
+      this.m_entity = CoEntity.createDisplayEntity();
+      let posarr = [// bottom frame plane: -y, first pos: (+x,-y,+z), plane positions wrap mode: CCW
+      minV.x, minV.y, minV.z, minV.x, minV.y, maxV.z, minV.x, minV.y, minV.z, maxV.x, minV.y, minV.z, minV.x, minV.y, maxV.z, maxV.x, minV.y, maxV.z, maxV.x, minV.y, minV.z, maxV.x, minV.y, maxV.z, // wall frame
+      minV.x, minV.y, minV.z, minV.x, maxV.y, minV.z, minV.x, minV.y, maxV.z, minV.x, maxV.y, maxV.z, maxV.x, minV.y, minV.z, maxV.x, maxV.y, minV.z, maxV.x, minV.y, maxV.z, maxV.x, maxV.y, maxV.z, // top frame plane: +y
+      minV.x, maxV.y, minV.z, minV.x, maxV.y, maxV.z, minV.x, maxV.y, minV.z, maxV.x, maxV.y, minV.z, minV.x, maxV.y, maxV.z, maxV.x, maxV.y, maxV.z, maxV.x, maxV.y, minV.z, maxV.x, maxV.y, maxV.z];
+      let pvs = new Float32Array(posarr);
+      CoMesh.line.dynColorEnabled = true;
+      this.m_material = CoMaterial.createLineMaterial(CoMesh.line.dynColorEnabled);
+      this.m_material.initializeByCodeBuf(false);
+      this.m_material.setColor(color);
+      CoMesh.line.setBufSortFormat(this.m_material.getBufSortFormat());
+      let mesh = CoMesh.line.createLinesWithFS32(pvs);
+      this.m_entity.setMaterial(this.m_material);
+      this.m_entity.setMesh(mesh);
+      rscene.addEntity(this.m_entity, rpi);
+    }
+  }
+
+  setVisible(v) {
+    if (this.m_entity != null) {
+      this.m_entity.setVisible(v);
+    }
+  }
+
+  isVisible() {
+    if (this.m_entity != null) {
+      return this.m_entity.getVisible();
+    }
+
+    return false;
+  }
+
+  setPosition(pv) {
+    if (this.m_entity != null) {
+      this.m_entity.setPosition(pv);
+    }
+  }
+
+  setXYZ(px, py, pz) {
+    if (this.m_entity != null) {
+      this.m_entity.setXYZ(px, py, pz);
+    }
+  }
+
+  update() {
+    if (this.m_entity != null) {
+      this.m_entity.update();
+    }
+  }
+
+  destroy() {
+    if (this.m_entity != null) {
+      this.m_entity.destroy();
+      this.m_entity = null;
+    }
+
+    this.m_rscene = null;
+  }
+
+}
+
+exports.BoxLine3D = BoxLine3D;
 
 /***/ }),
 
@@ -3294,6 +3386,8 @@ const NormalEntityLayout_1 = __webpack_require__("4cf3");
 
 const NVEntityGroup_1 = __webpack_require__("f953");
 
+const BoxLine3D_1 = __webpack_require__("7228");
+
 class NormalEntityGroup extends NVEntityGroup_1.NVEntityGroup {
   constructor(coapp) {
     super();
@@ -3416,7 +3510,18 @@ class NormalEntityGroup extends NVEntityGroup_1.NVEntityGroup {
 
       for (let i = 0; i < ls.length; ++i) {
         ls[i].applyEvent();
-      }
+      } // this.buildBounds();
+
+    }
+  }
+
+  buildBounds() {
+    let ls = this.m_nodes;
+
+    for (let i = 0; i < ls.length; ++i) {
+      //ls[i].applyEvent();
+      let box = new BoxLine3D_1.BoxLine3D();
+      box.initializeWithAABB(this.rsc, 1, ls[i].entity.getGlobalBounds(), CoMaterial.createColor4(Math.random() * 1.0 + 0.2, Math.random() * 1.0 + 0.2, Math.random() * 1.0 + 0.2));
     }
   }
 
@@ -3567,7 +3672,7 @@ class NormalEntityManager {
   }
 
   applyShiftKey(list) {
-    console.log("applyShiftKey SHIFT Key Down.");
+    console.log("applyCtrlKey SHIFT Key Down.");
     let map = this.m_map;
     let firstNode = null;
     let ls = list;
@@ -4435,7 +4540,9 @@ class NormalCtrlPanel {
     this.m_dragBar.setX(px);
     this.m_dragBar.update();
     let f = (px - this.m_dragMinX) / this.m_proBaseLen;
-    this.m_normalScale = f;
+    this.m_normalScale = f; // console.log("progress f: ", f);
+
+    this.sendProgressEvt(evt.uuid, f);
   }
 
   createColorBtn(pw, ph, idns, colors) {
@@ -4866,7 +4973,7 @@ class NormalEntityBuilder {
       nvs = new Float32Array(vs.length);
     }
 
-    let mesh = this.createEntityMesh(model.indices, model.vertices, nvs2, nvs, material);
+    let mesh = this.createEntityMesh(model.indices, model.vertices, model.uvsList[0], nvs, nvs2, material);
     let entity = CoRScene.createMouseEventEntity();
     entity.setMaterial(material);
     entity.setMesh(mesh);
@@ -4957,7 +5064,7 @@ class NormalEntityBuilder {
     return mesh;
   }
 
-  createEntityMesh(ivs, vs, uvs, nvs, matrial) {
+  createEntityMesh(ivs, vs, uvs, nvs, nvs2, matrial) {
     let mesh = CoMesh.createRawMesh(); // mesh.ivsEnabled = false;
     // mesh.aabbEnabled = true;
 
@@ -4965,8 +5072,9 @@ class NormalEntityBuilder {
     mesh.setBufSortFormat(matrial.getBufSortFormat());
     mesh.setIVS(ivs);
     mesh.addFloat32Data(vs, 3);
-    mesh.addFloat32Data(uvs, 3);
+    mesh.addFloat32Data(uvs, 2);
     mesh.addFloat32Data(nvs, 3);
+    mesh.addFloat32Data(nvs2, 3);
     mesh.vbWholeDataEnabled = false;
     mesh.initialize(); // mesh.toArraysLines();
     // mesh.vtCount = Math.floor(vs.length / 3);
