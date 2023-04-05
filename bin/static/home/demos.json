@@ -135,6 +135,10 @@
         {
             "name": "transparentSphere",
             "info": "MaterialGraph之半透明球体Demo(material graph demo: transparent sphere entity)"
+        },
+        {
+            "name": "stencilOutline",
+            "info": "MaterialGraph之stencil轮廓线Demo(material graph demo: stencil outline)"
         }
     ]
 }
