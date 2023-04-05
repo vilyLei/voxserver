@@ -131,6 +131,10 @@
         {
             "name": "occPOVBuilding",
             "info": "遮挡剔除Demo4(space occlusion demo4)"
+        },
+        {
+            "name": "transparentSphere",
+            "info": "MaterialGraph之半透明球体Demo(material graph demo: transparent sphere entity)"
         }
     ]
 }
