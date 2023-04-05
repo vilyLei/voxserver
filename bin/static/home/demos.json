@@ -139,6 +139,10 @@
         {
             "name": "stencilOutline",
             "info": "MaterialGraph之stencil轮廓线Demo(material graph demo: stencil outline)"
+        },
+        {
+            "name": "vtxDrawingInfo",
+            "info": "几何操作Demo1(geometry operation demo1)"
         }
     ]
 }
