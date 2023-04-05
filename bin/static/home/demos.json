@@ -37,6 +37,10 @@
             "info": "粒子Demo2(particle demo2)"
         },
         {
+            "name": "particleEruption",
+            "info": "粒子Demo3(particle demo3: particle eruption)"
+        },
+        {
             "name": "followParticle01",
             "info": "跟随粒子Demo1(path following particle demo)"
         },
