@@ -37,12 +37,20 @@
             "info": "粒子Demo2(particle demo2)"
         },
         {
+            "name": "followParticle01",
+            "info": "跟随粒子Demo1(path following particle demo)"
+        },
+        {
             "name": "vsmShadow",
             "info": "阴影和雾(shadow and fog)"
         },
         {
             "name": "multiLambertLights",
             "info": "多光源、雾、粒子(multi-lights, fog and particles)"
+        },
+        {
+            "name": "depthFog01",
+            "info": "体积雾Demo1(depth volume fog demo)"
         },
         {
             "name": "wasmMultiThead",
