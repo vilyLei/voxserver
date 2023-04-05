@@ -203,7 +203,7 @@ class NormalCheckMaterial {
   }
 
   getRGBA4f(color) {
-    color.fromArray(this.m_data);
+    color.fromArray4(this.m_data);
   }
 
   setLength(length) {
@@ -248,10 +248,11 @@ class NormalCheckMaterial {
    */
 
 
-  create() {
+  create(grayDisp = false) {
     if (this.material == null) {
-      let textureEnabled = false;
-      let material = new ShaderMaterial_1.default("normal_check_material"); // let material = CoRScene.createShaderMaterial("normal_entity_material");
+      let textureEnabled = false; // console.log("########## grayDisp: ", grayDisp);
+
+      let material = new ShaderMaterial_1.default("normal_check_material_" + grayDisp); // let material = CoRScene.createShaderMaterial("normal_entity_material");
 
       material.addUniformDataAt("u_params", this.m_data);
       material.setShaderBuilder(coderBuilder => {
@@ -264,6 +265,11 @@ class NormalCheckMaterial {
         coder.addVarying("vec3", "v_vnv");
         coder.addVarying("vec3", "v_dv");
         coder.addFragOutputHighp("vec4", "FragColor0");
+
+        if (grayDisp) {
+          coder.addDefine("GRAY_DISPLAY");
+        }
+
         coder.addFragHeadCode(`
 				const vec3 gama = vec3(1.0/2.2);
 				const vec3 direc0 = normalize(vec3(-0.3,-0.6,0.9));
@@ -297,7 +303,11 @@ class NormalCheckMaterial {
 			vec3 diffColor = vec3(1.0, s, s) * f + dstColor * (1.0 - f);
 			dstColor = param.y > 0.5 ? diffColor : dstColor;
 
+			#ifndef GRAY_DISPLAY
     		FragColor0 = vec4(dstColor, 1.0);
+			#else
+    		FragColor0 = vec4(vec3(0.8), 1.0);
+			#endif
     		// FragColor0 = vec4(u_params[0].xyz, 1.0);
 					`);
         coder.addVertMainCode(`
@@ -750,11 +760,6 @@ class RCExtension {
       selfT.EXT_blend_minmax = gl.getExtension('EXT_blend_minmax');
       if (selfT.EXT_blend_minmax != null) console.log("Use EXT_blend_minmax Extension success!");else console.log("EXT_blend_minmax Extension can not support!");
     } else {
-      //  selfT.OES_standard_derivatives = gl.getExtension('OES_standard_derivatives');
-      //  if(selfT.OES_standard_derivatives != null)
-      //  console.log("Use OES_standard_derivatives Extension success!");
-      //  else
-      //  console.log("OES_standard_derivatives Extension can not support!");
       selfT.EXT_shader_texture_lod = gl.getExtension('EXT_shader_texture_lod');
       if (selfT.EXT_shader_texture_lod != null) console.log("Use EXT_shader_texture_lod Extension success!");else console.log("EXT_shader_texture_lod Extension can not support!");
       selfT.EXT_color_buffer_half_float = gl.getExtension('EXT_color_buffer_half_float');
@@ -934,6 +939,221 @@ RenderColorMask.ALL_TRUE_COLOR_MASK = 0;
 RenderColorMask.ALL_FALSE_COLOR_MASK = 1;
 RenderColorMask.Rstate = null;
 exports.RenderColorMask = RenderColorMask;
+
+/***/ }),
+
+/***/ "0714":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+/***************************************************************************/
+
+/*                                                                         */
+
+/*  Copyright 2018-2022 by                                                 */
+
+/*  Vily(vily313@126.com)                                                  */
+
+/*                                                                         */
+
+/***************************************************************************/
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+/**
+ * 材质功能组装流水线, 组装符合一个流水线系统设定的材质, 最终形成完整的shader, 以及对应的数据输入
+ * 每个流水线是由若干pipe组成的， 每一个 pipe 都有自己的组装能力
+ * 组装功能举例: 全局的光照环境shader及数据, 灯光组shader及数据， 雾shader及数据, 等等
+ * material pipeline 输出 的控制码，也能控制渲染流程, 也就是 material pipelie 也能配合 render pipeline 一起协作完成渲染过程
+ */
+
+class MaterialPipeline {
+  constructor(shaderLib = null) {
+    this.m_uid = MaterialPipeline.s_uid++;
+    this.m_shaderCode = null;
+    this.m_shaderCodeFlag = false;
+    this.m_pipeMap = new Map();
+    this.m_keys = [];
+    this.m_sharedUniforms = null;
+    this.m_shaderLib = null;
+    this.m_pipetypes = null;
+    this.m_appendKeyStr = "";
+    this.uuid = "";
+    this.m_shaderLib = shaderLib;
+  }
+
+  getUid() {
+    return this.m_uid;
+  }
+  /**
+   * @param shaderCodeUUID IShaderCodeObject instance uuid
+   * @param force default value is false
+   */
+
+
+  addShaderCodeWithUUID(shaderCodeUUID, force) {
+    if (this.m_shaderLib != null) {
+      this.addShaderCode(this.m_shaderLib.getShaderCodeObjectWithUUID(shaderCodeUUID), force);
+    }
+  }
+
+  addShaderCode(shaderCode, force = false) {
+    this.m_shaderCodeFlag = shaderCode != null;
+
+    if (this.m_shaderCode == null || shaderCode != null && force) {
+      this.m_shaderCode = shaderCode;
+    }
+  }
+
+  hasShaderCode() {
+    return this.m_shaderCode != null;
+  }
+
+  addPipe(pipe) {
+    let types = pipe.getPipeTypes(); //console.log("#### MaterialPipeline, types: ",types);
+
+    for (let i = 0; i < types.length; ++i) {
+      if (!this.m_pipeMap.has(types[i])) {
+        this.m_pipeMap.set(types[i], pipe);
+      }
+    }
+  }
+
+  getPipeByType(type) {
+    return this.m_pipeMap.get(type);
+  }
+
+  hasPipeByType(type) {
+    return this.m_pipeMap.has(type);
+  }
+
+  createKeys(pipetypes) {
+    //console.log("#### MaterialPipeline::createKeys(), pipetypes: ",pipetypes);
+    this.m_keys = [];
+
+    if (pipetypes != null) {
+      let pipe;
+      let type;
+      let types = pipetypes;
+
+      for (let i = 0; i < types.length; ++i) {
+        type = types[i];
+
+        if (this.m_pipeMap.has(type)) {
+          pipe = this.m_pipeMap.get(type);
+          this.m_keys.push(pipe.getPipeKey(type));
+        }
+      }
+    }
+  }
+
+  buildSharedUniforms(pipetypes) {
+    this.m_sharedUniforms = [];
+    this.m_pipetypes = pipetypes;
+
+    if (pipetypes != null) {
+      let pipe;
+      let type;
+      let types = pipetypes;
+
+      for (let i = 0; i < types.length; ++i) {
+        type = types[i];
+
+        if (this.m_pipeMap.has(type)) {
+          pipe = this.m_pipeMap.get(type);
+          pipe.resetPipe();
+          this.m_sharedUniforms.push(pipe.getGlobalUinform());
+        }
+      }
+    }
+  }
+
+  build(shaderBuilder) {
+    // console.log("#### MaterialPipeline::build(), pipetypes: ",pipetypes,", this.m_shaderCode != null: ",this.m_shaderCode != null);
+    if (this.m_shaderCodeFlag && this.m_shaderCode != null) {
+      shaderBuilder.addShaderObject(this.m_shaderCode);
+    }
+
+    if (this.m_pipetypes != null) {
+      let pipe;
+      let type;
+      let types = this.m_pipetypes;
+
+      for (let i = 0; i < types.length; ++i) {
+        type = types[i];
+
+        if (this.m_pipeMap.has(type)) {
+          pipe = this.m_pipeMap.get(type);
+          pipe.useShaderPipe(shaderBuilder, type);
+        }
+      }
+    }
+  }
+
+  getTextures(shaderBuilder, outList, pipetypes) {
+    if (pipetypes != null) {
+      let pipe;
+      let type;
+      let types = pipetypes;
+
+      for (let i = 0; i < types.length; ++i) {
+        type = types[i];
+
+        if (this.m_pipeMap.has(type)) {
+          pipe = this.m_pipeMap.get(type);
+          pipe.getTextures(shaderBuilder, outList, type);
+        }
+      }
+    }
+  }
+
+  getSharedUniforms() {
+    return this.m_sharedUniforms;
+  }
+
+  getSelfUniformData() {
+    return null;
+  }
+
+  appendKeyString(key) {
+    this.m_appendKeyStr += key;
+  }
+
+  getKeys() {
+    return this.m_keys;
+  }
+
+  getKeysString() {
+    let str = "";
+
+    for (let i = 0; i < this.m_keys.length; ++i) {
+      str += this.m_keys[i];
+    }
+
+    return str + this.m_appendKeyStr;
+  }
+
+  reset() {
+    //this.m_texList = null;
+    this.m_appendKeyStr = "";
+    this.m_shaderCodeFlag = false;
+  }
+
+  clear() {
+    this.m_pipeMap = new Map();
+    this.m_keys = [];
+    this.m_sharedUniforms = null;
+    this.m_shaderCode = null;
+    this.m_shaderLib = null;
+    this.m_pipetypes = null;
+  }
+
+}
+
+MaterialPipeline.s_uid = 0;
+exports.MaterialPipeline = MaterialPipeline;
 
 /***/ }),
 
@@ -1372,10 +1592,6 @@ class TextureProxy {
     }
   }
 
-  toString() {
-    return "[TextureProxy(name:" + this.name + ",uid=" + this.getUid() + ",width=" + this.getWidth() + ",height=" + this.getHeight() + ")]";
-  }
-
 }
 
 exports.TextureProxy = TextureProxy;
@@ -1431,17 +1647,14 @@ class CameraStageDragSwinger {
     this.m_dragSwinger.autoRotationEnabled = enabled;
   }
 
+  initWithRScene(sc) {
+    this.initialize(sc.getStage3D(), sc.getCamera());
+  }
+
   initialize(stage3D, camera) {
     if (this.m_stage3D == null) {
       this.m_stage3D = stage3D;
-      this.m_dragSwinger.initialize(stage3D, camera); // if(bgMouseDown) {
-      //     stage3D.addEventListener(MouseEvent.MOUSE_BG_DOWN, this, this.mouseDownListener, true, false);
-      // }
-      // else {
-      //     stage3D.addEventListener(MouseEvent.MOUSE_DOWN, this, this.mouseDownListener, true, false);
-      // }
-      // stage3D.addEventListener(MouseEvent.MOUSE_UP, this, this.mouseUpListener, true, true);
-
+      this.m_dragSwinger.initialize(stage3D, camera);
       const ME = MouseEvent_1.default;
       let downType = ME.MOUSE_DOWN;
 
@@ -1685,6 +1898,7 @@ class RAdapterContext {
 
     this.autoSyncRenderBufferAndWindowSize = true;
     this.offscreenRenderEnabled = false;
+    this.bodyBgColor = "";
     this.m_resizeFlag = true;
     this.m_WEBGL_lose_context = null;
     this.m_displayWidth = 0;
@@ -1700,8 +1914,17 @@ class RAdapterContext {
   }
 
   contextlostHandler(evt) {
-    console.log("webglcontextlost...!!!");
+    console.warn("webglcontextlost...!!!");
     console.log(evt);
+  }
+
+  syncHtmlBodyColor(r, g, b) {
+    // if(document) {
+    this.bodyBgColor = this.m_viewEle.getCSSHEXRGB(r, g, b); // let value = this.m_viewEle.getCSSHEXRGB(r, g, b);
+    // const body = document.body;
+    // body.style.background = value;
+    // console.log("syncHtmlBodyColor(), this.bodyBgColor: ", this.bodyBgColor);
+    // }
   }
 
   setWebGLMaxVersion(webgl_ver) {
@@ -1738,7 +1961,7 @@ class RAdapterContext {
     return this.m_stencilTestEnabled;
   }
 
-  initialize(rcuid, stage, div, rattr = null) {
+  initialize(rcuid, stage, param) {
     this.m_stage = stage;
     var pdocument = null;
     var pwindow = null;
@@ -1753,10 +1976,12 @@ class RAdapterContext {
     }
 
     if (pdocument != null) {
+      let div = param.getDiv();
+      const rattr = param.getRenderContextAttri();
       this.m_devicePixelRatio = window.devicePixelRatio;
       RendererDevice_1.default.SetDevicePixelRatio(this.m_devicePixelRatio);
       this.m_viewEle.setDiv(div);
-      this.m_viewEle.createViewEle(pdocument, this.autoSyncRenderBufferAndWindowSize);
+      this.m_viewEle.createViewEle(pdocument, this.autoSyncRenderBufferAndWindowSize, param.divW, param.divH);
       this.m_div = div = this.m_viewEle.getDiv();
       let canvas = this.m_canvas = this.m_viewEle.getCanvas();
       this.m_devicePixelRatio = window.devicePixelRatio;
@@ -1772,17 +1997,17 @@ class RAdapterContext {
           stencil: this.m_stencilTestEnabled,
           preserveDrawingBuffer: true,
           powerPreference: "default"
-        };
+        }; // attr = { depth: this.m_depthTestEnabled, premultipliedAlpha: false, alpha: true, antialias: false, stencil: this.m_stencilTestEnabled, preserveDrawingBuffer: true, powerPreference: "high-performance" };
       } else {
         this.m_depthTestEnabled = attr.depth;
         this.m_stencilTestEnabled = attr.stencil;
       }
 
-      console.log("this.m_devicePixelRatio: " + this.m_devicePixelRatio + ",rattr == null: " + (rattr == null));
-      console.log("depthTestEnabled: " + attr.depth);
-      console.log("stencilTestEnabled: " + attr.stencil);
-      console.log("antialiasEnabled: " + attr.antialias);
-      console.log("alphaEnabled: " + attr.alpha);
+      console.log("this.m_devicePixelRatio: ", this.m_devicePixelRatio, ",rattr == null: ", rattr == null);
+      console.log("depthTestEnabled: ", attr.depth);
+      console.log("stencilTestEnabled: ", attr.stencil);
+      console.log("antialiasEnabled: ", attr.antialias);
+      console.log("alphaEnabled: ", attr.alpha);
       let offscreen = null;
 
       if (this.offscreenRenderEnabled) {
@@ -2151,8 +2376,15 @@ class ROTransform {
 
     this.m_invMatEnabled = false;
     this.m_rotFlag = false;
-    this.m_dt = 0;
+    this.m_dt = 0; // private m_updater: ITransUpdater = null;
+
+    this.wrapper = null;
     this.version = -1;
+    /**
+     * the default value is 0
+     */
+
+    this.__$transUpdate = 0;
     this.updatedStatus = ROTransform.UPDATE_POSITION;
     this.updateStatus = ROTransform.UPDATE_TRANSFORM; // local to world spcae matrix
 
@@ -2207,18 +2439,21 @@ class ROTransform {
     this.updateStatus |= 1;
     this.updatedStatus |= 1;
     this.m_fs32[12] = p;
+    this.updateTo();
   }
 
   setY(p) {
     this.updateStatus |= 1;
     this.updatedStatus |= 1;
     this.m_fs32[13] = p;
+    this.updateTo();
   }
 
   setZ(p) {
     this.updateStatus |= 1;
     this.updatedStatus |= 1;
     this.m_fs32[14] = p;
+    this.updateTo();
   }
 
   setXYZ(px, py, pz) {
@@ -2227,6 +2462,7 @@ class ROTransform {
     this.m_fs32[14] = pz;
     this.updateStatus |= 1;
     this.updatedStatus |= 1;
+    this.updateTo();
   }
 
   offsetPosition(pv) {
@@ -2235,6 +2471,7 @@ class ROTransform {
     this.m_fs32[14] += pv.z;
     this.updateStatus |= 1;
     this.updatedStatus |= 1;
+    this.updateTo();
   }
 
   setPosition(pv) {
@@ -2243,6 +2480,7 @@ class ROTransform {
     this.m_fs32[14] = pv.z;
     this.updateStatus |= 1;
     this.updatedStatus |= 1;
+    this.updateTo();
   }
 
   getPosition(pv) {
@@ -2258,6 +2496,7 @@ class ROTransform {
       this.m_fs32[14] = t.m_fs32[14];
       this.updateStatus |= ROTransform.UPDATE_POSITION;
       this.updatedStatus |= ROTransform.UPDATE_POSITION;
+      this.updateTo();
     }
   }
 
@@ -2278,6 +2517,7 @@ class ROTransform {
     this.m_rotFlag = true;
     this.updateStatus |= ROTransform.UPDATE_ROTATION;
     this.updatedStatus |= ROTransform.UPDATE_ROTATION;
+    this.updateTo();
   }
 
   setRotationY(degrees) {
@@ -2285,6 +2525,7 @@ class ROTransform {
     this.m_rotFlag = true;
     this.updateStatus |= ROTransform.UPDATE_ROTATION;
     this.updatedStatus |= ROTransform.UPDATE_ROTATION;
+    this.updateTo();
   }
 
   setRotationZ(degrees) {
@@ -2292,6 +2533,7 @@ class ROTransform {
     this.m_rotFlag = true;
     this.updateStatus |= ROTransform.UPDATE_ROTATION;
     this.updatedStatus |= ROTransform.UPDATE_ROTATION;
+    this.updateTo();
   }
 
   setRotationXYZ(rx, ry, rz) {
@@ -2301,6 +2543,7 @@ class ROTransform {
     this.updateStatus |= ROTransform.UPDATE_ROTATION;
     this.updatedStatus |= ROTransform.UPDATE_ROTATION;
     this.m_rotFlag = true;
+    this.updateTo();
   }
 
   getScaleX() {
@@ -2339,6 +2582,7 @@ class ROTransform {
     this.m_fs32[10] = sz;
     this.updateStatus |= ROTransform.UPDATE_SCALE;
     this.updatedStatus |= ROTransform.UPDATE_SCALE;
+    this.updateTo();
   }
 
   setScale(s) {
@@ -2347,6 +2591,7 @@ class ROTransform {
     this.m_fs32[10] = s;
     this.updateStatus |= ROTransform.UPDATE_SCALE;
     this.updatedStatus |= ROTransform.UPDATE_SCALE;
+    this.updateTo();
   }
 
   getRotationXYZ(pv) {
@@ -2432,6 +2677,8 @@ class ROTransform {
         this.updateStatus |= ROTransform.UPDATE_PARENT_MAT;
         this.updatedStatus = this.updateStatus;
       }
+
+      this.updateTo();
     }
   }
 
@@ -2444,6 +2691,7 @@ class ROTransform {
       this.updateStatus = ROTransform.UPDATE_NONE;
       this.m_invMatEnabled = true;
       this.m_omat.copyFrom(matrix);
+      this.updateTo();
     }
   }
 
@@ -2462,6 +2710,7 @@ class ROTransform {
       }
 
       this.m_omat = matrix;
+      this.updateTo();
     }
   }
 
@@ -2487,6 +2736,8 @@ class ROTransform {
     this.m_parentMat = null;
     this.updateStatus = ROTransform.UPDATE_TRANSFORM;
     this.m_fs32 = null;
+    this.wrapper = null;
+    this.wrapper = null;
   }
 
   copyFrom(src) {
@@ -2494,11 +2745,20 @@ class ROTransform {
     this.updatedStatus |= 1;
     this.updateStatus |= ROTransform.UPDATE_TRANSFORM;
     this.m_rotFlag = src.m_rotFlag;
+    this.updateTo();
   }
 
   forceUpdate() {
     this.updateStatus |= ROTransform.UPDATE_TRANSFORM;
     this.update();
+  }
+
+  updateTo() {
+    this.wrapper.updateTo();
+  }
+
+  setUpdater(updater) {
+    this.wrapper.setUpdater(updater);
   }
 
   update() {
@@ -2537,14 +2797,12 @@ class ROTransform {
       this.updateStatus = ROTransform.UPDATE_NONE;
       this.version++;
     }
+
+    this.__$transUpdate = 0;
   }
 
   getMatrixFS32() {
     return this.getMatrix().getLocalFS32();
-  }
-
-  toString() {
-    return "[ROTransform(uid = " + this.m_uid + ")]";
   }
 
   static GetFreeId() {
@@ -2579,7 +2837,13 @@ class ROTransform {
     unit.m_localMat = unit.m_omat;
 
     if (fs32 == null) {
-      unit.m_fs32.set(ROTransform.s_initData, 0);
+      let ida = ROTransform.s_initData;
+
+      if (unit.m_fs32 == null) {
+        unit.m_fs32 = ida.slice(0);
+      } else {
+        unit.m_fs32.set(ida, 0);
+      }
     }
 
     return unit;
@@ -2718,7 +2982,7 @@ class ContextMouseEvtDispatcher {
           stage.mouseUp(1);
           this.m_mouseClickTime = Date.now() - this.m_mouseClickTime;
 
-          if (Math.abs(this.m_mouseX - stage.mouseX) < 3 && Math.abs(this.m_mouseY - stage.mouseY) < 3 && this.m_mouseClickTime < 900) {
+          if (Math.abs(this.m_mouseX - stage.mouseX) < 2 && Math.abs(this.m_mouseY - stage.mouseY) < 2 && this.m_mouseClickTime < 900) {
             this.m_mouseX = stage.mouseX;
             this.m_mouseY = stage.mouseY;
             stage.mouseClick();
@@ -2897,7 +3161,7 @@ class ContextMouseEvtDispatcher {
         stage.mouseViewY = py;
         this.m_mouseClickTime = Date.now() - this.m_mouseClickTime;
 
-        if (Math.abs(this.m_mouseX - stage.mouseX) < 3 && Math.abs(this.m_mouseY - stage.mouseY) < 3 && this.m_mouseClickTime < 900) {
+        if (Math.abs(this.m_mouseX - stage.mouseX) < 2 && Math.abs(this.m_mouseY - stage.mouseY) < 2 && this.m_mouseClickTime < 900) {
           this.m_mouseX = stage.mouseX;
           this.m_mouseY = stage.mouseY; //console.log("ContextMouseEvtDispatcher::onclick()," + stage.mouseViewX + "," + stage.mouseViewY + ",evt.button: " + evt.button);
 
@@ -2920,7 +3184,7 @@ class ContextMouseEvtDispatcher {
 
         if (evt.button == 0) {
           stage.mouseDoubleClick();
-        } else if (evt.button == 2) {//stage.mouseRightDoubleClick();
+        } else if (evt.button == 2) {// stage.mouseRightDoubleClick();
         }
       };
     }
@@ -3232,6 +3496,7 @@ class RendererInstanceContext {
   setRenderToBackBuffer() {
     if (this.m_adapter != null) {
       this.m_adapter.setRenderToBackBuffer(FrameBufferType_1.default.FRAMEBUFFER);
+      this.m_renderProxy.rshader.resetRenderState();
       this.m_materialProxy.renderBegin();
     }
   }
@@ -3322,7 +3587,7 @@ class RendererInstanceContext {
   }
 
   getClearRGBAColor4f(color4) {
-    color4.fromArray(this.m_adapter.bgColor);
+    color4.fromArray4(this.m_adapter.bgColor);
   }
 
   updateRenderBufferSize() {
@@ -3419,7 +3684,9 @@ class MaterialBase {
     this.m_sharedUniforms = null;
     this.m_shaderUniformData = null;
     this.m_pipeLine = null;
-    this.m_uniqueShaderName = ""; // tex list unique hash value
+    this.m_uniqueShaderName = ""; // sub rendering pass
+
+    this.m_cases = null; // tex list unique hash value
 
     this.__$troMid = -1;
     this.__$uniform = null;
@@ -3427,11 +3694,34 @@ class MaterialBase {
      * pipes type list for material pipeline
      */
 
-    this.pipeTypes = null;
+    this.pipeTypes = null; // renderState = 0;
+    // colorMask = 0;
+    // /**
+    //  * the default value is null
+    //  */
+    // stencil: Stencil = null;
+    // multiPass = false;
+
+    /**
+     * 如果是同样的 vtxInfo 内容，则一个material 实例可以对应多个entity即便是mesh不一样也可以
+     * 如果 vtxInfo 内容 和 mesh 已经匹配，则附带这个vtxInfo只能用到对一个mesh的entity
+     */
+
+    this.vtxInfo = null;
+    this.graph = null;
     this.m_texList = null;
     this.m_texListLen = 0;
     this.m_texDataEnabled = false;
     this.m_attachCount = 0;
+  } // for multi - pass
+
+
+  setCases(ls) {
+    this.m_cases = ls;
+  }
+
+  getCases() {
+    return this.m_cases;
   }
   /*
    * specifies the scale factors and units to calculate depth values.
@@ -3479,21 +3769,15 @@ class MaterialBase {
   }
 
   hasShaderData() {
-    if (this.m_shdData != null) {
-      return this.m_shdData.haveTexture() ? this.texDataEnabled() : true; // if (this.m_shdData.haveTexture()) {
-      //     return this.texDataEnabled();
-      // }
-      // else {
-      //     return true;
-      // }
+    if (this.m_shdData) {
+      return this.m_shdData.haveTexture() ? this.texDataEnabled() : true;
     }
 
     return false;
-  }
+  } // initializeByRenderer(texEnabled: boolean = false): void {
+  //     this.initializeByCodeBuf(texEnabled);
+  // }
 
-  initializeByRenderer(texEnabled = false) {
-    this.initializeByCodeBuf(texEnabled);
-  }
 
   initializeByCodeBuf(texEnabled = false) {
     texEnabled = texEnabled || this.getTextureTotal() > 0;
@@ -3501,7 +3785,7 @@ class MaterialBase {
     if (this.m_shdData == null) {
       let buf = this.getCodeBuf();
 
-      if (buf != null) {
+      if (buf) {
         buf.reset();
         buf.pipeline = this.m_pipeLine;
         buf.pipeTypes = this.pipeTypes;
@@ -3648,7 +3932,8 @@ class MaterialBase {
   }
 
   getTextureAt(index) {
-    return this.m_texList[index];
+    if (this.m_texList != null && this.m_texList.length > index) return this.m_texList[index];
+    return null;
   }
 
   getTextureTotal() {
@@ -3759,12 +4044,17 @@ class MaterialBase {
 
         this.__$uniform = null;
       }
+
+      this.vtxInfo.destroy();
+
+      if (this.graph) {
+        this.graph.destroy();
+        this.graph = null;
+      }
     }
   }
 
-  toString() {
-    return "[MaterialBase()]";
-  }
+  update() {}
 
 }
 
@@ -3913,6 +4203,8 @@ class RSEntityFlag {
   }
 
   static TestSpaceEnabled2(flag) {
+    // console.log("   TestSpaceEnabled2(), 0xFFFFF & flag: ", (0xFFFFF & flag));
+    // console.log("                       (0x80000000 & flag) != 0x80000000: ", ((0x80000000 & flag) != 0x80000000));
     return (0xFFFFF & flag) < 1 && (0x80000000 & flag) != 0x80000000;
   }
 
@@ -4028,7 +4320,7 @@ class RenderAdapter {
       mb: true,
       ma: true
     };
-    this.m_rcontext = null;
+    this.m_rtx = null;
     this.m_clearMask = 0x0;
     this.m_fboBuf = null;
     this.m_fboIndex = 0;
@@ -4050,20 +4342,31 @@ class RenderAdapter {
     this.m_scissorEnabled = false;
     this.m_rState = null;
     this.m_webglVer = 2;
+    this.m_syncBgColor = true;
+    this.m_bodyBgColor = "";
     this.bgColor = new Float32Array([0, 0, 0, 1]);
     this.uViewProbe = null;
     this.m_devPRatio = 1.0;
     this.m_viewportUnlock = true;
     this.m_synFBOSizeWithViewport = false;
+    this.m_fboRunning = false;
     this.m_texResource = texResource;
     this.m_rcuid = rcuid;
   }
 
+  syncHtmlBodyColor() {
+    if (this.m_rtx) {
+      const c = this.bgColor;
+      this.m_rtx.syncHtmlBodyColor(c[0], c[1], c[2]);
+    }
+  }
+
   initialize(context, param, rState, uViewProbe) {
-    if (this.m_rcontext == null) {
+    if (this.m_rtx == null) {
+      this.m_syncBgColor = param.syncBgColor;
       this.m_webglVer = context.getWebGLVersion();
       this.m_rState = rState;
-      this.m_rcontext = context;
+      this.m_rtx = context;
       this.m_gl = context.getRC();
       this.m_gl.disable(this.m_gl.SCISSOR_TEST);
       if (context.isDepthTestEnabled()) this.m_gl.enable(this.m_gl.DEPTH_TEST);else this.m_gl.disable(this.m_gl.DEPTH_TEST);
@@ -4078,6 +4381,7 @@ class RenderAdapter {
       if (param.getPolygonOffsetEanbled()) this.enabledPolygonOffset();else this.disabledPolygonOffset();
       this.m_gl.enable(this.m_gl.CULL_FACE);
       this.m_gl.cullFace(this.m_gl.BACK);
+      this.m_gl.enable(this.m_gl.BLEND);
       this.m_gl.enable(this.m_gl.BLEND);
       if (param.getDitherEanbled()) this.m_gl.enable(this.m_gl.DITHER);else this.m_gl.disable(this.m_gl.DITHER);
       this.m_gl.frontFace(this.m_gl.CCW); //m_gl.hint(m_gl.PERSPECTIVE_CORRECTION_HINT, m_gl.NICEST);	// Really Nice Perspective Calculations
@@ -4150,11 +4454,11 @@ class RenderAdapter {
   }
 
   getDiv() {
-    return this.m_rcontext.getDiv();
+    return this.m_rtx.getDiv();
   }
 
   getCanvas() {
-    return this.m_rcontext.getCanvas();
+    return this.m_rtx.getCanvas();
   }
 
   setClearDepth(depth) {
@@ -4166,40 +4470,40 @@ class RenderAdapter {
   }
 
   setContextViewSize(pw, ph) {
-    this.m_rcontext.autoSyncRenderBufferAndWindowSize = false;
-    this.m_rcontext.resizeBufferSize(pw, ph);
+    this.m_rtx.autoSyncRenderBufferAndWindowSize = false;
+    this.m_rtx.resizeBufferSize(pw, ph);
   }
 
   getViewportX() {
-    return this.m_rcontext.getViewportX();
+    return this.m_rtx.getViewportX();
   }
 
   getViewportY() {
-    return this.m_rcontext.getViewportY();
+    return this.m_rtx.getViewportY();
   }
 
   getViewportWidth() {
-    return this.m_rcontext.getViewportWidth();
+    return this.m_rtx.getViewportWidth();
   }
 
   getViewportHeight() {
-    return this.m_rcontext.getViewportHeight();
+    return this.m_rtx.getViewportHeight();
   }
 
   getFBOFitWidth() {
-    return this.m_rcontext.getFBOWidth();
+    return this.m_rtx.getFBOWidth();
   }
 
   getFBOFitHeight() {
-    return this.m_rcontext.getFBOHeight();
+    return this.m_rtx.getFBOHeight();
   }
 
   getRCanvasWidth() {
-    return this.m_rcontext.getRCanvasWidth();
+    return this.m_rtx.getRCanvasWidth();
   }
 
   getRCanvasHeight() {
-    return this.m_rcontext.getRCanvasHeight();
+    return this.m_rtx.getRCanvasHeight();
   }
 
   setColorMask(mr, mg, mb, ma) {
@@ -4264,8 +4568,23 @@ class RenderAdapter {
 
 
   clearColor(color) {
+    this.m_rtx.syncHtmlBodyColor(color.r, color.g, color.b);
+    this.syncHtmlColor();
     this.m_gl.clearColor(color.r, color.g, color.b, color.a);
-    this.m_gl.clear(this.m_gl.COLOR_BUFFER_BIT);
+    this.m_gl.clear(this.m_gl.COLOR_BUFFER_BIT); // if (DebugFlag.Flag_0 > 0) {
+    // 	console.log("clearColor >>>>>>>");
+    // }
+  }
+
+  syncHtmlColor() {
+    // console.log("this.m_rtx.bodyBgColor: ", this.m_rtx.bodyBgColor);
+    if (this.m_syncBgColor) {
+      if (document && this.m_bodyBgColor != this.m_rtx.bodyBgColor) {
+        this.m_bodyBgColor = this.m_rtx.bodyBgColor;
+        const body = document.body;
+        body.style.background = this.m_bodyBgColor; // console.log("syncHtmlColor(), color: ", this.m_bodyBgColor);
+      }
+    }
   }
 
   clear() {
@@ -4277,30 +4596,37 @@ class RenderAdapter {
       this.m_gl.clearDepth(this.m_clearDepth);
     }
 
-    if (this.m_rcontext.isStencilTestEnabled()) {
+    if (this.m_rtx.isStencilTestEnabled()) {
       this.m_gl.clearStencil(this.m_clearStencil);
     }
 
-    let cvs = this.bgColor;
+    this.syncHtmlColor();
+    const cvs = this.bgColor; // if (DebugFlag.Flag_0 > 0) {
+    // 	console.log("clear >>>>>>>");
+    // }
+    // if(DebugFlag.Flag_0 > 0) {
+    // 	console.log("color cvs: ", cvs);
+    // }
+
     this.m_gl.clearColor(cvs[0], cvs[1], cvs[2], cvs[3]);
     this.m_gl.clear(this.m_clearMask); // this.m_rState.setDepthTestMode(mode);
-    //	if (this.m_rcontext.isStencilTestEnabled()) {
-    //		this.m_gl.stencilMask(0x0);
-    //	}
+    // if (this.m_rtx.isStencilTestEnabled()) {
+    // 	this.m_gl.stencilMask(0x0);
+    // }
   }
 
   reset() {
     this.m_rState.setCullFaceMode(RenderConst_1.CullFaceMode.BACK);
     this.m_rState.setDepthTestMode(RenderConst_1.DepthTestMode.OPAQUE);
-    RendererState_1.default.Reset(this.m_rcontext);
+    RendererState_1.default.Reset(this.m_rtx);
   }
 
   getRenderContext() {
-    return this.m_rcontext;
+    return this.m_rtx;
   }
 
   renderBegin() {
-    if (this.m_rcontext != null) {
+    if (this.m_rtx != null) {
       this.m_fboSizeFactor = 1.0;
       this.reseizeViewPort();
       RenderStateObject_1.RenderStateObject.Unlock();
@@ -4324,7 +4650,7 @@ class RenderAdapter {
 
   checkViewPort(dstSize) {
     let srcSize = this.m_viewPortRect;
-    let k = this.m_rcontext.getDevicePixelRatio();
+    let k = this.m_rtx.getDevicePixelRatio();
     let boo = srcSize.testEqual(dstSize);
     boo = boo || Math.abs(this.m_devPRatio - k) > 0.01;
 
@@ -4337,7 +4663,7 @@ class RenderAdapter {
 
   reseizeViewPort() {
     if (this.m_viewportUnlock) {
-      this.checkViewPort(this.m_rcontext.getViewPortSize());
+      this.checkViewPort(this.m_rtx.getViewPortSize());
     }
   }
 
@@ -4365,20 +4691,20 @@ class RenderAdapter {
   update() {}
 
   updateRenderBufferSize() {
-    this.m_rcontext.updateRenderBufferSize();
+    this.m_rtx.updateRenderBufferSize();
   }
 
   destroy() {
-    this.m_rcontext = null;
+    this.m_rtx = null;
     this.m_rState = null;
   }
 
   getDevicePixelRatio() {
-    return this.m_rcontext.getDevicePixelRatio();
+    return this.m_rtx.getDevicePixelRatio();
   }
 
   loseContext() {
-    this.m_rcontext.loseContext();
+    this.m_rtx.loseContext();
   }
   /**
    * @returns return gpu context lost status
@@ -4386,7 +4712,7 @@ class RenderAdapter {
 
 
   isContextLost() {
-    return this.m_rcontext.isContextLost();
+    return this.m_rtx.isContextLost();
   } // read data format include float or unsigned byte ,etc.
 
 
@@ -4454,7 +4780,7 @@ class RenderAdapter {
 
   asynFBOSizeWithViewport() {
     this.m_synFBOSizeWithViewport = false;
-  } // 
+  } //
 
   /**
    * if synFBOSizeWithViewport is true, fbo size = factor * view port size;
@@ -4512,6 +4838,10 @@ class RenderAdapter {
 
     return 0;
   }
+
+  isFBORunning() {
+    return this.m_fboRunning;
+  }
   /**
    * bind a texture to fbo attachment by attachment index
    * @param texProxy  IRenderTexture instance
@@ -4533,7 +4863,7 @@ class RenderAdapter {
       if (attachmentIndex == 0) {
         if (this.m_fboBuf != null) {
           if (this.m_synFBOSizeWithViewport) {
-            this.m_fboBuf.initialize(this.m_gl, Math.floor(this.m_rcontext.getFBOWidth() * this.m_fboSizeFactor), Math.floor(this.m_rcontext.getFBOHeight() * this.m_fboSizeFactor));
+            this.m_fboBuf.initialize(this.m_gl, Math.floor(this.m_rtx.getFBOWidth() * this.m_fboSizeFactor), Math.floor(this.m_rtx.getFBOHeight() * this.m_fboSizeFactor));
           } else {
             if (this.m_fboViewportRectBoo) {
               this.m_fboBuf.initialize(this.m_gl, this.m_fboViewportRectData[2], this.m_fboViewportRectData[3]);
@@ -4551,7 +4881,7 @@ class RenderAdapter {
             this.m_fboBuf.writeStencilEnabled = enableStencil;
 
             if (this.m_synFBOSizeWithViewport) {
-              this.m_fboBuf.initialize(this.m_gl, Math.floor(this.m_rcontext.getFBOWidth() * this.m_fboSizeFactor), Math.floor(this.m_rcontext.getFBOHeight() * this.m_fboSizeFactor));
+              this.m_fboBuf.initialize(this.m_gl, Math.floor(this.m_rtx.getFBOWidth() * this.m_fboSizeFactor), Math.floor(this.m_rtx.getFBOHeight() * this.m_fboSizeFactor));
             } else {
               if (this.m_fboViewportRectBoo) {
                 this.m_fboBuf.initialize(this.m_gl, this.m_fboViewportRectData[2], this.m_fboViewportRectData[3]);
@@ -4564,6 +4894,7 @@ class RenderAdapter {
       }
 
       if (this.m_fboBuf != null) {
+        this.m_fboRunning = true;
         this.m_fboBuf.renderToTexAt(this.m_gl, texProxy, attachmentIndex); //console.log("RenderProxy::setRenderToTexture(), fbo: ",this.m_fboBuf.getFBO());
       }
 
@@ -4607,8 +4938,26 @@ class RenderAdapter {
         }
 
         if (this.m_webglVer == 1) {
-          // m_gl.colorMask(m_colorMask.mr,m_colorMask.mg,m_colorMask.mb,m_colorMask.ma);
-          this.m_gl.clear(this.m_clearMask);
+          // // m_gl.colorMask(m_colorMask.mr,m_colorMask.mg,m_colorMask.mb,m_colorMask.ma);
+          // this.m_gl.clear(this.m_clearMask);
+          const gl = this.m_gl;
+          let mask = 0x0;
+
+          if (clearColorBoo) {
+            mask |= gl.COLOR_BUFFER_BIT;
+          }
+
+          if (clearDepthBoo) {
+            mask |= gl.DEPTH_BUFFER_BIT;
+          }
+
+          if (clearStencilBoo) {
+            mask |= gl.STENCIL_BUFFER_BIT;
+          }
+
+          if (mask > 0) {
+            gl.clear(mask);
+          }
         }
 
         let size = this.m_viewPortRect;
@@ -4624,7 +4973,7 @@ class RenderAdapter {
         } else {
           if (this.m_synFBOSizeWithViewport) {
             //console.log("this.m_fboSizeFactor: "+this.m_fboSizeFactor);
-            this.m_fboViewportRect.setTo(0, 0, Math.floor(this.m_rcontext.getFBOWidth() * this.m_fboSizeFactor), Math.floor(this.m_rcontext.getFBOHeight() * this.m_fboSizeFactor));
+            this.m_fboViewportRect.setTo(0, 0, Math.floor(this.m_rtx.getFBOWidth() * this.m_fboSizeFactor), Math.floor(this.m_rtx.getFBOHeight() * this.m_fboSizeFactor));
           } else {
             if (this.m_fboBuf.isSizeChanged()) {
               this.m_fboBuf.initialize(this.m_gl, this.m_fboBuf.getWidth(), this.m_fboBuf.getHeight());
@@ -4640,6 +4989,7 @@ class RenderAdapter {
   }
 
   setRenderToBackBuffer(frameBufferType = FrameBufferType_1.default.FRAMEBUFFER) {
+    this.m_fboRunning = false;
     this.m_activeAttachmentTotal = 1;
     FrameBufferObject_1.default.BindToBackbuffer(this.m_gl, frameBufferType);
     this.reseizeViewPort();
@@ -4791,35 +5141,55 @@ class DispEntity3DManager {
     let display = entity.getDisplay();
 
     if (display != null && display.__$$runit != null) {
+      const re = display.__$$runit.rentity;
+
+      let parent = re.__$getParent();
+
+      let flag = 0;
+
+      while (parent) {
+        if (!parent.hasParent() && parent.getREType() >= 20) {
+          console.log("DispEntity3DManager::removeEntity(), 容器内驱动渲染，不需要从渲染 process 中 移除, parent.__$wprocuid: ", parent.__$wprocuid);
+          const rprocess = this.m_processBuider.getNodeByUid(parent.__$wprocuid);
+          rprocess.forceRemoveDisp(display);
+          flag = 1;
+          break;
+        }
+
+        parent = parent.getParent();
+      }
+
       let puid = display.__$ruid;
       let po = this.m_rpoUnitBuilder.getRCRPObj(puid);
 
-      if (po != null) {
-        if (po.count > 0) {
-          if (po.count < 2) {
-            if (po.rprocessUid > -1) {
-              this.m_rprocess = this.m_processBuider.getNodeByUid(po.rprocessUid);
-              this.m_rprocess.removeDisp(display);
-              po.rprocessUid = -1;
-            }
-          } else {
-            let len = RPOUnitBuilder_1.RCRPObj.RenerProcessMaxTotal;
-
-            for (let i = 0; i < len; ++i) {
-              if ((po.idsFlag & 1 << i) > 0) {
-                // the value of list[i] is the uid of a node;
-                this.m_rprocess = this.m_processBuider.getNodeByUid(i);
+      if (flag < 1) {
+        if (po) {
+          if (po.count > 0) {
+            if (po.count < 2) {
+              if (po.rprocessUid > -1) {
+                this.m_rprocess = this.m_processBuider.getNodeByUid(po.rprocessUid);
                 this.m_rprocess.removeDisp(display);
+                po.rprocessUid = -1;
+              }
+            } else {
+              let len = RPOUnitBuilder_1.RCRPObj.RenerProcessMaxTotal;
+
+              for (let i = 0; i < len; ++i) {
+                if ((po.idsFlag & 1 << i) > 0) {
+                  // the value of list[i] is the uid of a node;
+                  this.m_rprocess = this.m_processBuider.getNodeByUid(i);
+                  this.m_rprocess.removeDisp(display);
+                }
               }
             }
           }
+        } else {
+          this.m_rprocess = this.m_processBuider.getNodeByUid(display.__$$runit.getRPROUid());
+          this.m_rprocess.removeDisp(display);
         }
-      } else {
-        this.m_rprocess = this.m_processBuider.getNodeByUid(display.__$$runit.getRPROUid());
-        this.m_rprocess.removeDisp(display);
       }
 
-      if (po.count == 0) {
+      if (flag > 0 || po.count == 0) {
         //console.log("DispEntity3DManager::removeEntity(), remove a entity from all processes.");
         if (display.__$$rsign != RenderConst_1.DisplayRenderSign.LIVE_IN_RENDERER) {
           // error!!!
@@ -4840,14 +5210,14 @@ class DispEntity3DManager {
     entity.__$rseFlag = RSEntityFlag_1.default.RemoveRendererLoad(entity.__$rseFlag);
     entity.__$rseFlag = RSEntityFlag_1.default.RemoveSortEnabled(entity.__$rseFlag);
 
-    if (this.m_entityManaListener != null) {
+    if (this.m_entityManaListener) {
       this.m_entityManaListener.removeFromRenderer(entity, this.m_rendererUid, -1);
     }
   }
 
   addEntity(entity, processUid, deferred = false) {
     if (entity != null) {
-      //console.log("add entity into entity 3d manager.");
+      // console.log("add entity into entity 3d manager B.");
       let disp = entity.getDisplay();
 
       if (disp != null) {
@@ -4905,6 +5275,16 @@ class DispEntity3DManager {
     return false;
   }
 
+  addContainer(container, processUid) {
+    const rprocess = this.m_processBuider.getNodeByUid(processUid);
+    rprocess.addContainer(container);
+  }
+
+  removeContainer(container, processUid) {
+    const rprocess = this.m_processBuider.getNodeByUid(processUid);
+    rprocess.removeContainer(container);
+  }
+
   ensureAdd(entity, disp, processUid) {
     entity.update();
     entity.__$rseFlag = RSEntityFlag_1.default.AddRendererUid(entity.__$rseFlag, this.m_rendererUid);
@@ -4923,7 +5303,7 @@ class DispEntity3DManager {
     if (disp.__$ruid > -1) {
       this.m_rprocess.addDisp(disp);
     } else {
-      if (this.m_dataBuilder.buildGpuDisp(disp)) {
+      if (this.m_dataBuilder.buildGpuDisp(disp, entity)) {
         this.m_rprocess.addDisp(disp);
       }
     }
@@ -4932,9 +5312,11 @@ class DispEntity3DManager {
       this.m_entityManaListener.addToRenderer(entity, this.m_rendererUid, processUid);
     }
 
-    if (entity.getGlobalBounds() != null) {
-      disp.__$$runit.bounds = entity.getGlobalBounds();
-      disp.__$$runit.pos = disp.__$$runit.bounds.center;
+    const b = entity.getGlobalBounds();
+
+    if (b) {
+      disp.__$$runit.bounds = b;
+      disp.__$$runit.pos = b.center;
     }
 
     this.version++;
@@ -5181,6 +5563,7 @@ class GeometryBufferParser {
   parseMeshGeometryBuffer(relationships, geoNode, deformers, fbxTree) {
     //console.log("GeometryBufferParser::genGeometryBuffers(), skeleton: ",skeleton);
     // let time = Date.now();
+    console.log("geoNode: ", geoNode);
     const geoInfo = this.parseGeoNode(geoNode); // let lossTime: number = Date.now() - time;
     // console.log("XXX geoInfo lossTime: ", lossTime);
 
@@ -5237,6 +5620,7 @@ class GeometryBufferParser {
     let advancedModel = geoInfo.vertexPositions.length == 5;
 
     if (advancedModel) {
+      // console.log("advancedModel, geoInfo: ", geoInfo);
       geoInfo.vertexIndices = this.parseData(geoInfo.vertexIndices);
       geoInfo.vertexPositions = this.parseData(geoInfo.vertexPositions);
 
@@ -5254,9 +5638,9 @@ class GeometryBufferParser {
 
       return this.m_egd.createBufObject(geoInfo);
     } // console.log("A1 geoInfo: ", geoInfo);
+    // console.log("VVV-XXX advancedModel is False.");
 
 
-    console.log("VVV-XXX advancedModel is False.");
     const bufObj = new FBXBufferObject_1.FBXBufferObject();
     bufObj.isEntity = true;
     let vivs = geoInfo.vertexIndices; // let vvs = geoInfo.vertexPositions;
@@ -5379,6 +5763,7 @@ class GeometryBufferParser {
 
 
   genFace(bufObj, geoInfo, facePositionIndexes, materialIndex, faceNormals, faceColors, faceUVs, faceWeights, faceWeightIndices, faceLength) {
+    console.log("XXXX genFace() bufObj.uvs: ", bufObj.uvs);
     let vps = geoInfo.vertexPositions;
     let vs = bufObj.vertex;
     let nvs = bufObj.normal;
@@ -5443,6 +5828,7 @@ class GeometryBufferParser {
 
     bufObj.i3 = i3;
     bufObj.i2 = i2;
+    console.log("XXXX bufObj.uvs: ", bufObj.uvs);
   } // Parse normal from FBXTree.Objects.Geometry.LayerElementNormal if it exists
 
 
@@ -5614,7 +6000,7 @@ class RawCodeShaderBuffer extends ShaderCodeBuffer_1.default {
     return this.m_fragCode;
   }
 
-  setVtxShaderCode(codeStr) {
+  setVertShaderCode(codeStr) {
     this.m_vtxCode = codeStr;
   }
 
@@ -5624,12 +6010,7 @@ class RawCodeShaderBuffer extends ShaderCodeBuffer_1.default {
   }
 
   getUniqueShaderName() {
-    //console.log("H ########################### this.m_uniqueName: "+this.m_uniqueName);
     return this.m_uniqueName;
-  }
-
-  toString() {
-    return "[RawCodeShaderBuffer()]";
   }
 
 }
@@ -5640,6 +6021,7 @@ class ShaderMaterial extends MaterialBase_1.default {
     this.m_buffer = new RawCodeShaderBuffer();
     this.m_uniformData = null;
     this.m_shaderBuilder = null;
+    this.m_map = new Map();
     this.vertColorEnabled = false;
     this.premultiplyAlpha = false;
     this.shadowReceiveEnabled = false;
@@ -5673,9 +6055,9 @@ class ShaderMaterial extends MaterialBase_1.default {
     this.m_buffer.setFragShaderCode(codeStr);
   }
 
-  setVtxShaderCode(codeStr) {
+  setVertShaderCode(codeStr) {
     this.m_buffer.shaderBuilder = null;
-    this.m_buffer.setVtxShaderCode(codeStr);
+    this.m_buffer.setVertShaderCode(codeStr);
   }
   /**
    * @param           uniform_name        the name of a uniform in the shader.
@@ -5684,7 +6066,7 @@ class ShaderMaterial extends MaterialBase_1.default {
 
 
   addUniformDataAt(uniform_name, data) {
-    if (data != null) {
+    if (data != null && uniform_name != "") {
       if (this.m_uniformData == null) {
         this.m_uniformData = new ShaderUniformData_1.default();
         this.m_uniformData.uniformNameList = [];
@@ -5693,7 +6075,28 @@ class ShaderMaterial extends MaterialBase_1.default {
 
       this.m_uniformData.uniformNameList.push(uniform_name);
       this.m_uniformData.dataList.push(data);
+      this.m_map.set(uniform_name, data);
     }
+  }
+
+  getUniformDataAt(uniform_name) {
+    if (this.m_map.has(uniform_name)) return this.m_map.get(uniform_name);
+    return null;
+  }
+
+  getUniformDataByIndex(index) {
+    if (this.m_uniformData) {
+      const ls = this.m_uniformData.uniformNameList;
+
+      if (ls.length >= index && index < ls.length) {
+        return {
+          data: this.m_uniformData.dataList[index],
+          name: ls[index]
+        };
+      }
+    }
+
+    return null;
   }
 
   getCodeBuf() {
@@ -5711,6 +6114,46 @@ class ShaderMaterial extends MaterialBase_1.default {
 }
 
 exports.default = ShaderMaterial;
+
+/***/ }),
+
+/***/ "13b1":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+/***************************************************************************/
+
+/*                                                                         */
+
+/*  Copyright 2018-2022 by                                                 */
+
+/*  Vily(vily313@126.com)                                                  */
+
+/*                                                                         */
+
+/***************************************************************************/
+
+class RenderDrawMode {}
+
+RenderDrawMode.ELEMENTS_TRIANGLES = 1;
+RenderDrawMode.ELEMENTS_TRIANGLE_STRIP = 2;
+RenderDrawMode.ELEMENTS_TRIANGLE_FAN = 3;
+RenderDrawMode.ELEMENTS_INSTANCED_TRIANGLES = 4;
+RenderDrawMode.ARRAYS_LINES = 5;
+RenderDrawMode.ARRAYS_LINE_STRIP = 6;
+RenderDrawMode.ARRAYS_POINTS = 7;
+RenderDrawMode.ELEMENTS_LINES = 8;
+RenderDrawMode.ELEMENTS_INSTANCED_LINES = 9;
+RenderDrawMode.ELEMENTS_LINES_STRIP = 10;
+RenderDrawMode.ELEMENTS_INSTANCED_TRIANGLES_STRIP = 11;
+RenderDrawMode.ELEMENTS_INSTANCED_LINES_STRIP = 12;
+RenderDrawMode.DISABLE = 0;
+exports.default = RenderDrawMode;
 
 /***/ }),
 
@@ -5785,10 +6228,6 @@ class MouseEvent extends EventBase_1.default {
 
   getClassType() {
     return MouseEvent.EventClassType;
-  }
-
-  toString() {
-    return "[MouseEvent]";
   }
 
 }
@@ -7440,6 +7879,66 @@ exports.default = Matrix4;
 
 /***/ }),
 
+/***/ "1b95":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+/***************************************************************************/
+
+/*                                                                         */
+
+/*  Copyright 2018-2022 by                                                 */
+
+/*  Vily(vily313@126.com)                                                  */
+
+/*                                                                         */
+
+/***************************************************************************/
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const MaterialPipeline_1 = __webpack_require__("0714");
+
+const SimpleMaterial_1 = __webpack_require__("ee6e");
+
+const Material_1 = __webpack_require__("6c6b");
+
+class RenderableMaterialBlock {
+  constructor() {
+    this.m_initFlag = true;
+  }
+
+  initialize() {
+    if (this.m_initFlag) {
+      this.m_initFlag = false;
+    }
+  }
+
+  createMaterial(decorator) {
+    let m = new Material_1.Material();
+    m.setDecorator(decorator);
+    return m;
+  }
+
+  createSimpleMaterial(decorator) {
+    let m = new SimpleMaterial_1.SimpleMaterial();
+    m.setDecorator(decorator);
+    return m;
+  }
+
+  createMaterialPipeline(shaderLib) {
+    return new MaterialPipeline_1.MaterialPipeline(shaderLib);
+  }
+
+}
+
+exports.RenderableMaterialBlock = RenderableMaterialBlock;
+
+/***/ }),
+
 /***/ "1e15":
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -7756,6 +8255,29 @@ if (typeof window !== 'undefined') {
 
 /***/ }),
 
+/***/ "1f32":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+/***************************************************************************/
+
+/*                                                                         */
+
+/*  Copyright 2018-2022 by                                                 */
+
+/*  Vily(vily313@126.com)                                                  */
+
+/*                                                                         */
+
+/***************************************************************************/
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+/***/ }),
+
 /***/ "1f61":
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -7919,6 +8441,206 @@ exports.DataReceiverBase = DataReceiverBase;
 
 /***/ }),
 
+/***/ "2048":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+/***************************************************************************/
+
+/*                                                                         */
+
+/*  Copyright 2018-2022 by                                                 */
+
+/*  Vily(vily313@126.com)                                                  */
+
+/*                                                                         */
+
+/***************************************************************************/
+
+var __importDefault = this && this.__importDefault || function (mod) {
+  return mod && mod.__esModule ? mod : {
+    "default": mod
+  };
+};
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const VtxBufConst_1 = __importDefault(__webpack_require__("8a0a"));
+
+class ROIvsData {
+  constructor() {
+    this.unitBytes = 2;
+    this.status = VtxBufConst_1.default.VTX_STATIC_DRAW;
+    this.wireframe = false;
+    this.shape = false;
+    this.ivs = null;
+    this.version = -2;
+  }
+
+  setData(ivs, status = VtxBufConst_1.default.VTX_STATIC_DRAW) {
+    if (ivs instanceof Uint16Array) {
+      if (ivs.length > 65536) {
+        throw Error("ivs.length > 65536, but its type is not Uint32Array.");
+      }
+    } else if (!(ivs instanceof Uint32Array)) {
+      throw Error("Error: ivs is not an Uint32Array or an Uint16Array bufferArray instance !!!!");
+    }
+
+    this.unitBytes = ivs.BYTES_PER_ELEMENT;
+    this.ivs = ivs;
+
+    if (ivs != null) {
+      this.version++;
+    }
+
+    return this;
+  }
+
+  destroy() {
+    this.wireframe = false;
+    this.version = -1;
+    this.ivs = null;
+  }
+
+}
+
+exports.default = ROIvsData;
+
+/***/ }),
+
+/***/ "20d6":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var __importDefault = this && this.__importDefault || function (mod) {
+  return mod && mod.__esModule ? mod : {
+    "default": mod
+  };
+};
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const EntityNodeQueue_1 = __importDefault(__webpack_require__("af68"));
+
+const Entity3DNodeLinker_1 = __importDefault(__webpack_require__("a80a"));
+
+class EntityFency {
+  constructor(rc) {
+    this.m_rc = null;
+    this.m_wlinker = null;
+    this.m_wq = null;
+    this.m_timeoutId = -1;
+    this.m_updating = false;
+    this.m_rc = rc;
+  }
+
+  addEntity(entity, processid) {
+    if (entity) {
+      // console.log("EntityFency::addEntity() entity: ", entity);
+      let et = entity; // wait queue
+
+      if (this.m_wlinker == null) {
+        this.m_wlinker = new Entity3DNodeLinker_1.default();
+        this.m_wq = new EntityNodeQueue_1.default();
+      }
+
+      let node = this.m_wq.addEntity(et);
+      node.rstatus = processid;
+      this.m_wlinker.addNode(node);
+
+      if (!this.m_updating) {
+        this.m_updating = true;
+        this.update();
+      }
+    }
+  }
+
+  removeEntity(entity) {
+    if (entity) {
+      if (this.m_wlinker) {
+        let re = entity;
+        let node = this.m_wq.getNodeByEntity(re);
+
+        if (node) {
+          re.getTransform().setUpdater(null);
+          this.m_wlinker.removeNode(node);
+          this.m_wq.removeEntity(re);
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  update() {
+    if (this.m_timeoutId < 0) {
+      console.log("启动 EntityFency::update() timer !!!");
+    }
+
+    if (this.m_timeoutId > -1) {
+      clearTimeout(this.m_timeoutId);
+      this.m_timeoutId = -1;
+    }
+
+    let flag = false;
+
+    if (this.m_wlinker != null) {
+      let nextNode = this.m_wlinker.getBegin();
+
+      if (nextNode != null) {
+        let pnode;
+        let status;
+
+        while (nextNode) {
+          // console.log("EntityFency::update(), nextNode.entity.hasMesh().");
+          const entity = nextNode.entity;
+          const retype = entity.getREType();
+
+          if (retype >= 12 || retype < 12 && entity.hasMesh()) {
+            pnode = nextNode;
+            nextNode = nextNode.next;
+            status = pnode.rstatus;
+            const entity = pnode.entity;
+            this.m_wlinker.removeNode(pnode);
+            this.m_wq.removeEntity(pnode.entity); // console.log("EntityFency::update(), ready a mesh data that was finished.");
+
+            this.m_rc.addEntity(entity, status);
+          } else {
+            flag = true;
+            nextNode = nextNode.next;
+          }
+        }
+      }
+    }
+
+    if (flag) {
+      this.m_timeoutId = setTimeout(this.update.bind(this), 100); // 10 fps
+    } else {
+      this.m_updating = false;
+      console.log("关闭 EntityFency::update() timer !!!");
+    }
+  }
+
+  destroy() {
+    if (this.m_rc) {
+      this.m_rc = null;
+    }
+  }
+
+}
+
+exports.default = EntityFency;
+
+/***/ }),
+
 /***/ "20ef":
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -7961,6 +8683,7 @@ class ShdProgram {
     this.m_texTotal = 0; // recorde uniform GLUniformLocation id
 
     this.m_aLocations = null;
+    this.m_aLocationIVS = new Array(12);
     this.m_aLocationTypes = null;
     this.m_aLocationSizes = null;
     this.m_uLocations = null;
@@ -7979,6 +8702,7 @@ class ShdProgram {
     this.m_uLc = null;
     this.m_uIndex = 0;
     this.m_uid = uid;
+    this.m_aLocationIVS.fill(0);
   }
 
   setShdData(shdData) {
@@ -8017,6 +8741,7 @@ class ShdProgram {
         this.m_aLocations = [];
         this.m_aLocationTypes = [];
         this.m_aLocationSizes = [];
+        const ls = this.m_aLocationTypes;
         len = attriNSList.length;
         let type = 0;
         let altI = 0;
@@ -8025,12 +8750,16 @@ class ShdProgram {
           altI = this.m_gl.getAttribLocation(this.m_program, attriNSList[i]);
           this.m_aLocations.push(altI);
           type = VtxBufConst_1.default.GetVBufAttributeTypeByNS(attriNSList[i]);
-          this.m_aLocationTypes.push(type);
+          ls.push(type);
           this.m_aLocationSizes.push(attriSizeList[i]);
           this.m_attribLIndexList[type] = altI;
           this.m_attribTypeSizeList[type] = attriSizeList[i];
           this.dataUniformEnabled = true;
           ++i;
+        }
+
+        for (i = 0; i < ls.length; ++i) {
+          this.m_aLocationIVS[ls[i]] = i;
         }
 
         this.m_attriSizeList = [];
@@ -8125,6 +8854,14 @@ class ShdProgram {
 
   getLocationSizeByIndex(index) {
     return this.m_aLocationSizes[index];
+  }
+
+  getLocationTypes() {
+    return this.m_aLocationTypes;
+  }
+
+  getLocationIVS() {
+    return this.m_aLocationIVS;
   }
 
   testVertexAttribPointerOffset(offsetList) {
@@ -8676,6 +9413,221 @@ exports.ThreadSendData = ThreadSendData;
 
 /***/ }),
 
+/***/ "251a":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+/***************************************************************************/
+
+/*                                                                         */
+
+/*  Copyright 2018-2022 by                                                 */
+
+/*  Vily(vily313@126.com)                                                  */
+
+/*                                                                         */
+
+/***************************************************************************/
+
+var __importDefault = this && this.__importDefault || function (mod) {
+  return mod && mod.__esModule ? mod : {
+    "default": mod
+  };
+};
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const DisplayEntity_1 = __importDefault(__webpack_require__("402a"));
+
+const VtxBufRenderData_1 = __webpack_require__("d08b");
+
+const DataMesh_1 = __importDefault(__webpack_require__("519e"));
+
+const AABB_1 = __importDefault(__webpack_require__("fecb"));
+
+const Vector3D_1 = __importDefault(__webpack_require__("8e17"));
+
+const Matrix4_1 = __importDefault(__webpack_require__("18c7"));
+
+class RenderableEntityBlock {
+  constructor() {
+    this.m_initFlag = true;
+    this.screenPlane = new DisplayEntity_1.default();
+    /**
+     * center align in the XOY Plane, its size is 1
+     */
+
+    this.unitXOYPlane = new DisplayEntity_1.default();
+    /**
+     * center align in the XOZ Plane, its size is 1
+     */
+
+    this.unitXOZPlane = new DisplayEntity_1.default();
+    /**
+     * center align in the YOZ Plane, its size is 1
+     */
+
+    this.unitYOZPlane = new DisplayEntity_1.default();
+    /**
+     * center align, its size is 1
+     */
+
+    this.unitBox = new DisplayEntity_1.default();
+    /**
+     * axis origin align in the XOY Plane, its size is 1
+     */
+
+    this.unitOXOYPlane = new DisplayEntity_1.default();
+    /**
+     * axis origin align in the XOZ Plane, its size is 1
+     */
+
+    this.unitOXOZPlane = new DisplayEntity_1.default();
+    /**
+     * axis origin align in the YOZ Plane, its size is 1
+     */
+
+    this.unitOYOZPlane = new DisplayEntity_1.default();
+    /**
+     * axis origin align, its size is 1
+     */
+
+    this.unitOBox = new DisplayEntity_1.default();
+  }
+
+  initialize() {
+    if (this.m_initFlag) {
+      this.m_initFlag = false;
+      let vtxData = new VtxBufRenderData_1.VtxBufRenderData();
+      let vs = new Float32Array([1, -1, 1, 1, -1, -1, -1, -1, -1, -1, -1, 1, 1, 1, 1, 1, 1, -1, -1, 1, -1, -1, 1, 1, 1, 1, 1, 1, 1, -1, 1, -1, -1, 1, -1, 1, 1, 1, -1, -1, 1, -1, -1, -1, -1, 1, -1, -1, -1, 1, 1, -1, 1, -1, -1, -1, -1, -1, -1, 1, 1, 1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1]);
+
+      for (let i = 0; i < vs.length; ++i) {
+        vs[i] *= 0.5;
+      }
+
+      let uvs = new Float32Array([0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1]);
+      let nvs = new Float32Array([0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1]);
+      let ivs = new Uint16Array([3, 2, 1, 3, 1, 0, 6, 7, 4, 6, 4, 5, 11, 10, 9, 11, 9, 8, 15, 14, 13, 15, 13, 12, 18, 19, 16, 18, 16, 17, 22, 23, 20, 22, 20, 21]);
+      let dm = new DataMesh_1.default();
+      dm.setVS(vs).setUVS(uvs).setNVS(nvs).setIVS(ivs).setVtxBufRenderData(vtxData);
+      dm.vbWholeDataEnabled = true;
+      dm.initialize();
+      this.unitBox.setMesh(dm);
+      vs = new Float32Array(vs);
+
+      for (let i = 0; i < vs.length; ++i) {
+        vs[i] += 0.5;
+      } // console.log("obox vs: ",vs);
+
+
+      dm = new DataMesh_1.default();
+      dm.setVS(vs).setUVS(uvs).setNVS(nvs).setIVS(ivs).setVtxBufRenderData(vtxData);
+      dm.vbWholeDataEnabled = true;
+      dm.initialize();
+      this.unitOBox.setMesh(dm);
+      vs = new Float32Array([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0]);
+      uvs = new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]);
+      nvs = new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1]);
+      ivs = new Uint16Array([0, 1, 2, 0, 2, 3]);
+      dm = new DataMesh_1.default();
+      dm.setVS(vs).setUVS(uvs).setNVS(nvs).setIVS(ivs).setVtxBufRenderData(vtxData);
+      dm.vbWholeDataEnabled = true;
+      dm.initialize();
+      this.screenPlane.setMesh(dm);
+
+      for (let i = 0; i < vs.length; ++i) {
+        vs[i] *= 0.5;
+      }
+
+      dm = new DataMesh_1.default();
+      dm.setVS(vs).setUVS(uvs).setNVS(nvs).setIVS(ivs).setVtxBufRenderData(vtxData);
+      dm.vbWholeDataEnabled = true;
+      dm.initialize();
+      this.unitXOYPlane.setMesh(dm);
+      vs = new Float32Array(vs);
+
+      for (let i = 0; i < vs.length;) {
+        vs[i++] += 0.5;
+        vs[i++] += 0.5;
+        i++;
+      }
+
+      dm = new DataMesh_1.default();
+      dm.setVS(vs).setUVS(uvs).setNVS(nvs).setIVS(ivs).setVtxBufRenderData(vtxData);
+      dm.vbWholeDataEnabled = true;
+      dm.initialize();
+      this.unitOXOYPlane.setMesh(dm);
+      vs = new Float32Array([0.5, 0, -0.5, -0.5, 0, -0.5, -0.5, 0, 0.5, 0.5, 0, 0.5]);
+      nvs = new Float32Array([0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0]);
+      dm = new DataMesh_1.default();
+      dm.setVS(vs).setUVS(uvs).setNVS(nvs).setIVS(ivs).setVtxBufRenderData(vtxData);
+      dm.vbWholeDataEnabled = true;
+      dm.initialize();
+      this.unitXOZPlane.setMesh(dm);
+      vs = new Float32Array(vs);
+
+      for (let i = 0; i < vs.length;) {
+        vs[i++] += 0.5;
+        i++;
+        vs[i++] += 0.5;
+      }
+
+      dm = new DataMesh_1.default();
+      dm.setVS(vs).setUVS(uvs).setNVS(nvs).setIVS(ivs).setVtxBufRenderData(vtxData);
+      dm.vbWholeDataEnabled = true;
+      dm.initialize();
+      this.unitOXOZPlane.setMesh(dm);
+      vs = new Float32Array([0, -0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5]);
+      nvs = new Float32Array([1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0]);
+      dm = new DataMesh_1.default();
+      dm.setVS(vs).setUVS(uvs).setNVS(nvs).setIVS(ivs).setVtxBufRenderData(vtxData);
+      dm.vbWholeDataEnabled = true;
+      dm.initialize();
+      this.unitYOZPlane.setMesh(dm);
+
+      for (let i = 0; i < vs.length;) {
+        i++;
+        vs[i++] += 0.5;
+        vs[i++] += 0.5;
+      }
+
+      dm = new DataMesh_1.default();
+      dm.setVS(vs).setUVS(uvs).setNVS(nvs).setIVS(ivs).setVtxBufRenderData(vtxData);
+      dm.vbWholeDataEnabled = true;
+      dm.initialize();
+      this.unitOYOZPlane.setMesh(dm);
+    }
+  }
+
+  createVector3(x = 0.0, y = 0.0, z = 0.0, w = 1.0) {
+    return new Vector3D_1.default(x, y, z, w);
+  }
+
+  createMatrix4() {
+    return new Matrix4_1.default();
+  }
+
+  createAABB() {
+    return new AABB_1.default();
+  }
+
+  createEntity() {
+    return new DisplayEntity_1.default();
+  }
+
+  createMesh() {
+    return new DataMesh_1.default();
+  }
+
+}
+
+exports.RenderableEntityBlock = RenderableEntityBlock;
+
+/***/ }),
+
 /***/ "2560":
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -8747,34 +9699,55 @@ exports.default = CameraUniformBuilder;
 
 /***************************************************************************/
 
+var __importDefault = this && this.__importDefault || function (mod) {
+  return mod && mod.__esModule ? mod : {
+    "default": mod
+  };
+};
+
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
-class RenderSortBlock {
+const RPONode_1 = __importDefault(__webpack_require__("265e"));
+
+const RPOBlock_1 = __importDefault(__webpack_require__("5f3c"));
+
+const PassProcess_1 = __importDefault(__webpack_require__("34cd"));
+
+const RPOUnitCont_1 = __importDefault(__webpack_require__("e39a"));
+
+class NodeCont {
+  destroy() {
+    this.container = null;
+    this.node.unit.reset();
+    this.node.reset();
+    this.node = null;
+  }
+
+}
+
+class RenderSortBlock extends RPOBlock_1.default {
   constructor(shader) {
+    // this.m_shader = shader;
+    super(shader);
     this.m_begin = null;
     this.m_end = null;
     this.m_next = null;
-    this.m_node = null;
-    this.m_nodes = [];
-    this.m_nodesTotal = 0;
-    this.m_shader = null;
+    this.m_unit = null;
+    this.m_units = [];
+    this.m_unitsTotal = 0;
     this.m_renderTotal = 0;
-    this.m_sorter = null;
-    this.sortEnabled = true;
-    this.m_shader = shader;
-  }
-
-  setSorter(sorter) {
-    this.m_sorter = sorter;
+    this.m_nodeConts = [];
+    this.m_passProc = new PassProcess_1.default();
+    this.m_shdUpdate = false;
   }
 
   showInfo() {
     let info = "";
     let next = this.m_begin;
 
-    while (next != null) {
+    while (next) {
       //info += "("+next.unit.value+","+next.uid+"),";
       info += next.unit.value + ",";
       next = next.next;
@@ -8784,8 +9757,8 @@ class RenderSortBlock {
   }
 
   clear() {
-    if (this.m_shader != null) {
-      if (this.m_nodes.length > 0) this.m_nodes = [];
+    if (this.m_shader) {
+      if (this.m_units.length > 0) this.m_units = [];
       let next = this.m_begin;
       let curr = null;
 
@@ -8797,7 +9770,7 @@ class RenderSortBlock {
       }
 
       this.m_begin = this.m_end = null;
-      this.m_nodesTotal = 0;
+      this.m_unitsTotal = 0;
       this.m_renderTotal = 0;
       this.sortEnabled = true;
       this.m_shader = null;
@@ -8812,61 +9785,154 @@ class RenderSortBlock {
     }
   }
 
+  addContainer(container) {
+    let i = 0;
+    const ls = this.m_nodeConts;
+
+    for (; i < ls.length; ++i) {
+      if (ls[i].container == container) {
+        break;
+      }
+    }
+
+    if (i >= ls.length) {
+      let unit = new RPOUnitCont_1.default();
+      unit.shader = this.m_shader;
+      unit.rentity = container;
+      unit.retype = container.getREType();
+      unit.bounds = container.getGlobalBounds();
+      unit.pos = unit.bounds.center;
+      let node = new RPONode_1.default();
+      node.unit = unit;
+      this.addNode(node);
+      let nc = new NodeCont();
+      nc.container = container;
+      nc.node = node;
+      ls.push(nc);
+      console.log("RenderSortBlock::addContainer() ...unit: ", unit);
+      return true;
+    }
+
+    return false;
+  }
+
+  removeContainer(container) {
+    let i = 0;
+    const ls = this.m_nodeConts;
+
+    for (; i < ls.length; ++i) {
+      if (ls[i].container == container) {
+        const node = ls[i].node;
+        this.removeNode(node);
+        ls[i].destroy();
+        ls.splice(i, 1);
+        console.log("RenderSortBlock::removeContainer() ...");
+        break;
+      }
+    }
+
+    if (i >= ls.length) {
+      let unit = new RPOUnitCont_1.default();
+      unit.shader = this.m_shader;
+      unit.rentity = container;
+      unit.retype = container.getREType();
+      let node = new RPONode_1.default();
+      node.unit = unit;
+      this.removeNode(node);
+      return true;
+    }
+
+    return false;
+  }
+
   run(rc) {
     this.m_shader.resetUniform();
     let unit = null;
-    let nodes = this.m_nodes; //let info:string = "";
+    let uints = this.m_units;
+    this.m_shdUpdate = false;
+    const proc = this.m_passProc;
+    proc.shader = this.m_shader;
 
     for (let i = 0; i < this.m_renderTotal; ++i) {
-      unit = nodes[i];
-      this.m_shader.bindToGpu(unit.shdUid);
-      unit.run(rc);
+      unit = uints[i];
 
-      if (unit.partTotal < 1) {
-        unit.drawThis(rc);
+      if (unit.retype < 12) {
+        if (unit.rendering) {
+          this.m_shader.bindToGpu(unit.shdUid);
+          unit.updateVtx();
+
+          if (unit.drawing) {
+            if (unit.rgraph && unit.rgraph.isEnabled()) {
+              proc.units = [unit];
+              proc.rc = rc;
+              proc.vtxFlag = true;
+              proc.texFlag = true;
+              unit.rgraph.run(proc);
+              this.m_shdUpdate = true;
+            } else {
+              if (this.m_shdUpdate) {
+                unit.applyShader(true);
+                this.m_shdUpdate = false;
+              }
+
+              unit.run(rc);
+              unit.draw(rc);
+            }
+          }
+        }
       } else {
-        unit.drawPart(rc);
-      } //info += unit.value+",";
-
-    } //console.log(info);
-
+        unit.run(rc);
+      }
+    }
   }
 
   runLockMaterial(rc) {
     this.m_shader.resetUniform();
     let unit = null;
-    let nodes = this.m_nodes;
+    let units = this.m_units;
 
     for (let i = 0; i < this.m_renderTotal; ++i) {
-      unit = nodes[i];
-      this.m_shader.bindToGpu(unit.shdUid);
-      unit.vro.run();
-      unit.runLockMaterial2(null);
+      unit = units[i];
 
-      if (unit.partTotal < 1) {
-        unit.drawThis(rc);
+      if (unit.retype < 12) {
+        if (unit.rendering) {
+          this.m_shader.bindToGpu(unit.shdUid);
+          unit.updateVtx();
+
+          if (unit.drawing) {
+            unit.vro.run();
+            unit.runLockMaterial2(null);
+            unit.draw(rc);
+          }
+        }
       } else {
-        unit.drawPart(rc);
+        unit.runLockMaterial2(null);
       }
     }
   }
 
   sort() {
-    if (this.m_nodesTotal > 0) {
-      //console.log("this.m_nodesTotal: ",this.m_nodesTotal);
+    if (this.m_unitsTotal > 0) {
       // 整个sort执行过程放在渲染运行时渲染执行阶段是不妥的,但是目前还没有好办法
       // 理想的情况是运行时不会被复杂计算打断，复杂计算应该再渲染执行之前完成
       let next = this.m_begin;
 
-      if (this.m_nodes.length < this.m_nodesTotal) {
-        this.m_nodes = new Array(Math.round(this.m_nodesTotal * 1.1) + 1);
+      if (this.m_units.length < this.m_unitsTotal) {
+        this.m_units = new Array(Math.round(this.m_unitsTotal * 1.1) + 1);
       }
 
       let i = 0;
 
       while (next != null) {
-        if (next.drawEnabled && next.unit.drawEnabled) {
-          this.m_nodes[i] = next.unit;
+        const unit = next.unit;
+
+        if (unit.retype < 12) {
+          if (unit.rendering && unit.drawing) {
+            this.m_units[i] = unit;
+            ++i;
+          }
+        } else {
+          this.m_units[i] = unit;
           ++i;
         }
 
@@ -8875,9 +9941,10 @@ class RenderSortBlock {
 
       this.m_renderTotal = i;
       let flat = 0;
+      const st = this.m_sorter;
 
-      if (this.m_sorter != null) {
-        flat = this.m_sorter.sortRODisplay(this.m_nodes, i);
+      if (st) {
+        flat = st.sortRODisplay(this.m_units, i);
       }
 
       if (flat < 1) {
@@ -8887,9 +9954,9 @@ class RenderSortBlock {
   }
 
   sorting(low, high) {
-    let arr = this.m_nodes;
-    this.m_node = arr[low];
-    let pvalue = this.m_node.value;
+    let arr = this.m_units;
+    this.m_unit = arr[low];
+    let pvalue = this.m_unit.value;
 
     while (low < high) {
       while (low < high && arr[high].value >= pvalue) {
@@ -8905,7 +9972,7 @@ class RenderSortBlock {
       arr[high] = arr[low];
     }
 
-    arr[low] = this.m_node;
+    arr[low] = this.m_unit;
     return low;
   }
 
@@ -8918,7 +9985,7 @@ class RenderSortBlock {
   }
 
   getNodesTotal() {
-    return this.m_nodesTotal;
+    return this.m_unitsTotal;
   }
 
   getBegin() {
@@ -8935,11 +10002,12 @@ class RenderSortBlock {
   }
 
   isEmpty() {
-    return this.m_nodesTotal < 1; // return this.m_begin == null;
+    return this.m_unitsTotal < 1;
   }
 
   addNode(node) {
-    //console.log("sort add node: ",node);
+    console.log("sort add node: ", node);
+
     if (node.prev == null && node.next == null) {
       if (this.m_begin == null) {
         this.m_end = this.m_begin = node;
@@ -8956,7 +10024,8 @@ class RenderSortBlock {
       }
 
       this.m_end.next = null;
-      this.m_nodesTotal++; //console.log("sort add node,this.m_nodesTotal: ",this.m_nodesTotal);
+      this.m_unitsTotal++;
+      console.log("sort add node,this.m_unitsTotal: ", this.m_unitsTotal);
     }
   }
 
@@ -8980,7 +10049,8 @@ class RenderSortBlock {
 
       node.prev = null;
       node.next = null;
-      this.m_nodesTotal--; //console.log("sort remove node,this.m_nodesTotal: ",this.m_nodesTotal);
+      this.m_unitsTotal--;
+      console.log("sort remove node,this.m_unitsTotal: ", this.m_unitsTotal);
     }
   }
 
@@ -9015,18 +10085,14 @@ Object.defineProperty(exports, "__esModule", {
 class RPONode {
   constructor() {
     this.__$ruid = -1;
-    this.drawEnabled = true;
     this.uid = -1;
-    this.index = -1; // only for show info
-
-    this.drawMode = 0;
-    this.ivsIndex = 0;
-    this.ivsCount = 0;
-    this.insCount = 0;
+    this.index = -1;
     this.shdUid = -1;
     this.vtxUid = -1;
     this.texMid = -1;
-    this.rtokey = -1;
+    this.rtokey = -1; // it the value is less 12, it is a renderable entity, or not is a entity container
+    // reType = 1;
+
     this.prev = null;
     this.next = null;
     this.unit = null;
@@ -9036,21 +10102,8 @@ class RPONode {
     this.rtroI = -1;
   }
 
-  setValue(value) {
-    this.unit.value = value;
-  }
-
-  isVsible() {
-    return this.unit == null || this.unit.drawEnabled;
-  }
-
   updateData() {
-    let p = this.unit;
-    this.drawMode = p.drawMode;
-    this.ivsIndex = p.ivsIndex;
-    this.ivsCount = p.ivsCount;
-    this.insCount = p.insCount;
-    p.drawOffset = p.ivsIndex * p.ibufStep;
+    const p = this.unit;
     this.vtxUid = p.vtxUid;
     this.vro = p.vro; // material info etc.
 
@@ -9060,13 +10113,9 @@ class RPONode {
   }
 
   reset() {
-    this.drawEnabled = true;
+    // this.reType = 1;
     this.uid = -1;
     this.index = -1;
-    this.drawMode = 0;
-    this.ivsIndex = 0;
-    this.ivsCount = 0;
-    this.insCount = 0;
     this.shdUid = -1;
     this.vtxUid = -1;
     this.texMid = -1;
@@ -9076,10 +10125,6 @@ class RPONode {
     this.tro = null;
     this.prev = null;
     this.next = null;
-  }
-
-  toString() {
-    return "[Object RPONode(uid = " + this.uid + ", index = " + this.index + ", shdUid = " + this.shdUid + ", vtxUid = " + this.vtxUid + ")]";
   }
 
 }
@@ -9594,6 +10639,10 @@ class PoolNodeBuilder {
 
   restoreUid(uid) {}
 
+  hasFreeNode() {
+    return this.m_freeIdList.length > 0;
+  }
+
   getFreeId() {
     if (this.m_freeIdList.length > 0) {
       return this.m_freeIdList.pop();
@@ -9604,6 +10653,10 @@ class PoolNodeBuilder {
 
   getNodeByUid(uid) {
     return this.m_nodes[uid];
+  }
+
+  getNodes() {
+    return this.m_nodes;
   }
 
   create() {
@@ -9648,6 +10701,13 @@ class PoolNodeBuilder {
     }
 
     return false;
+  }
+
+  destroy() {
+    this.m_nodes = [];
+    this.m_freeIdList = [];
+    this.m_flags = [];
+    this.m_nodesTotal = 0;
   }
 
 }
@@ -10376,6 +11436,12 @@ class OBJParserListerner {
         DivLog_1.default.ShowLogOnce("obj file loading " + k + "%");
       }, (status, url) => {
         console.error("load obj mesh data error, url: ", url);
+        this.objParseFinish([{
+          vertices: null,
+          uvsList: null,
+          normals: null,
+          indices: null
+        }], url);
       });
     }
   } // 一个任务数据处理完成后的侦听器回调函数
@@ -10558,7 +11624,7 @@ class Line3DMaterial extends MaterialBase_1.default {
   }
 
   getRGBA4f(color) {
-    color.fromArray(this.m_data);
+    color.fromArray4(this.m_data);
   }
 
   setAlpha(pa) {
@@ -10570,16 +11636,543 @@ class Line3DMaterial extends MaterialBase_1.default {
   }
 
   setColor(color) {
-    color.toArray(this.m_data);
+    color.toArray4(this.m_data);
   }
 
   getColor(color) {
-    color.fromArray(this.m_data);
+    color.fromArray4(this.m_data);
   }
 
 }
 
 exports.default = Line3DMaterial;
+
+/***/ }),
+
+/***/ "3420":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+/***************************************************************************/
+
+/*                                                                         */
+
+/*  Copyright 2018-2022 by                                                 */
+
+/*  Vily(vily313@126.com)                                                  */
+
+/*                                                                         */
+
+/***************************************************************************/
+// 用于对 MaterialRPOBlock 进行必要的组织, 例如 合批或者按照 shader不同来分类, 以及依据其他机制分类等等
+// 目前一个block内的所有node 所使用的shader program 是相同的
+
+var __importDefault = this && this.__importDefault || function (mod) {
+  return mod && mod.__esModule ? mod : {
+    "default": mod
+  };
+};
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const RendererDevice_1 = __importDefault(__webpack_require__("3b73"));
+
+const RPONodeLinker_1 = __importDefault(__webpack_require__("df9d"));
+
+const RenderColorMask_1 = __webpack_require__("070b");
+
+const RenderStateObject_1 = __webpack_require__("a5ba");
+
+const RPOBlock_1 = __importDefault(__webpack_require__("5f3c"));
+
+const PassProcess_1 = __importDefault(__webpack_require__("34cd"));
+
+class MaterialRPOBlock extends RPOBlock_1.default {
+  constructor(shader) {
+    super(shader);
+    this.m_nodeLinker = new RPONodeLinker_1.default();
+    this.m_runs = new Array(5);
+    this.m_passProc = new PassProcess_1.default();
+    this.m_shdUpdate = false;
+    const ls = this.m_runs;
+    ls.fill(null);
+    ls[0] = this.run0.bind(this);
+    ls[1] = this.run1.bind(this);
+    ls[2] = this.run2.bind(this);
+  }
+
+  showInfo() {
+    this.m_nodeLinker.showInfo();
+  }
+
+  addNode(node) {
+    this.m_nodeLinker.addNodeAndSort(node);
+  }
+
+  rejoinNode(node) {
+    if (this.m_nodeLinker.containsNode(node)) {
+      this.m_nodeLinker.removeNodeAndSort(node);
+      this.m_nodeLinker.addNodeAndSort(node);
+    }
+  }
+
+  removeNode(node) {
+    this.m_nodeLinker.removeNodeAndSort(node);
+  }
+
+  isEmpty() {
+    return this.m_nodeLinker.getBegin() == null;
+  }
+
+  run(rc) {
+    this.m_runs[this.runMode](rc);
+  }
+
+  run0(rc) {
+    let nextNode = this.m_nodeLinker.getBegin();
+
+    if (nextNode != null) {
+      this.m_shader.bindToGpu(this.shdUid);
+      this.m_shader.resetUniform();
+      let unit = null;
+      this.m_shdUpdate = false;
+      const proc = this.m_passProc;
+      proc.shader = this.m_shader;
+
+      while (nextNode) {
+        unit = nextNode.unit;
+
+        if (unit.rendering) {
+          unit.updateVtx();
+
+          if (unit.drawing) {
+            if (unit.rgraph && unit.rgraph.isEnabled()) {
+              proc.units = [unit];
+              proc.rc = rc;
+              proc.vtxFlag = true;
+              proc.texFlag = true;
+              unit.rgraph.run(proc);
+              this.m_shdUpdate = true;
+            } else {
+              if (this.m_shdUpdate) {
+                unit.applyShader(true);
+                this.m_shdUpdate = false;
+              }
+
+              unit.run(rc);
+              unit.draw(rc);
+            }
+          }
+        }
+
+        nextNode = nextNode.next;
+      }
+    }
+  }
+
+  run1(rc) {
+    let nextNode = this.m_nodeLinker.getBegin();
+
+    if (nextNode != null) {
+      this.m_shader.bindToGpu(this.shdUid);
+      this.m_shader.resetUniform();
+      const proc = this.m_passProc;
+      proc.shader = this.m_shader;
+      let linker = this.m_nodeLinker;
+      let unit = null;
+      let vtxTotal = linker.getVtxTotalAt(nextNode.rvroI);
+      let texTotal = linker.getTexTotalAt(nextNode.rtroI);
+      let vtxFlag = vtxTotal > 0;
+      let texFlag = texTotal > 0;
+      this.m_shdUpdate = false; // console.log("run1", vtxFlag, texFlag, this.procuid);
+
+      while (nextNode != null) {
+        if (vtxTotal < 1) {
+          vtxTotal = linker.getVtxTotalAt(nextNode.rvroI);
+          vtxFlag = true;
+        }
+
+        vtxTotal--;
+
+        if (texTotal < 1) {
+          texTotal = linker.getTexTotalAt(nextNode.rtroI);
+          texFlag = true;
+        }
+
+        texTotal--; // if(DebugFlag.Flag_0 > 0) console.log("nextNode.drawEnabled: ",nextNode.drawEnabled);
+
+        unit = nextNode.unit;
+
+        if (unit.rendering) {
+          // if(DebugFlag.Flag_0 > 0) console.log("unit.drawEnabled: ",unit.drawEnabled);
+          // console.log("unit.rdp.getUid(): ", unit.rdp.getUid(), unit.vdrInfo.rdp.getUid());
+          vtxFlag = unit.updateVtx() || vtxFlag;
+
+          if (unit.drawing) {
+            if (unit.rgraph && unit.rgraph.isEnabled()) {
+              proc.units = [unit];
+              proc.rc = rc;
+              proc.vtxFlag = vtxFlag;
+              proc.texFlag = texFlag;
+              unit.rgraph.run(proc);
+              this.m_shdUpdate = true;
+            } else {
+              this.draw1(rc, unit, vtxFlag, texFlag);
+            }
+
+            vtxFlag = false;
+            texFlag = false;
+          }
+        }
+
+        nextNode = nextNode.next;
+      }
+    }
+  }
+
+  draw1(rc, unit, vtxFlag, texFlag) {
+    if (this.m_shdUpdate) {
+      unit.applyShader(true);
+      this.m_shdUpdate = false;
+    }
+
+    if (vtxFlag) {
+      unit.vro.run();
+      vtxFlag = false;
+    }
+
+    if (texFlag) {
+      unit.tro.run();
+      texFlag = false;
+    }
+
+    unit.run2(rc);
+    unit.draw(rc);
+  }
+
+  run2(rc) {
+    let nextNode = this.m_nodeLinker.getBegin();
+
+    if (nextNode != null) {
+      const shader = this.m_shader;
+      shader.bindToGpu(this.shdUid);
+      shader.resetUniform();
+      let unit = null;
+      RenderStateObject_1.RenderStateObject.UseRenderState(nextNode.unit.renderState);
+      RenderColorMask_1.RenderColorMask.UseRenderState(nextNode.unit.rcolorMask);
+      let vtxTotal = this.m_nodeLinker.getVtxTotalAt(nextNode.rvroI);
+      let texTotal = this.m_nodeLinker.getTexTotalAt(nextNode.rtroI);
+      let vtxFlag = vtxTotal > 0;
+      let texFlag = texTotal > 0;
+
+      while (nextNode) {
+        if (vtxTotal < 0) {
+          vtxTotal = this.m_nodeLinker.getVtxTotalAt(nextNode.rvroI);
+          vtxFlag = true;
+        }
+
+        vtxTotal--;
+
+        if (texTotal < 0) {
+          texTotal = this.m_nodeLinker.getTexTotalAt(nextNode.rtroI);
+          texFlag = true;
+        }
+
+        texTotal--;
+        unit = nextNode.unit;
+
+        if (unit.rendering) {
+          vtxFlag = unit.updateVtx() || vtxFlag;
+
+          if (unit.drawing) {
+            if (vtxFlag) {
+              unit.vro.run();
+              vtxFlag = false;
+            }
+
+            if (texFlag) {
+              unit.tro.run();
+              texFlag = false;
+            }
+
+            if (unit.ubo != null) {
+              unit.ubo.run(rc);
+            }
+
+            shader.useTransUniform(unit.transUniform);
+            shader.useUniform(unit.uniform);
+            unit.draw(rc);
+          }
+        }
+
+        nextNode = nextNode.next;
+      }
+    }
+  }
+
+  runLockMaterial(rc) {
+    let nextNode = this.m_nodeLinker.getBegin();
+
+    if (nextNode) {
+      this.m_shader.bindToGpu(this.shdUid);
+      this.m_shader.resetUniform();
+      let texUnlock = this.m_shader.isTextureUnLocked();
+      rc.Texture.unlocked = texUnlock;
+      let unit = null;
+
+      if (this.batchEnabled) {
+        let vtxTotal = this.m_nodeLinker.getVtxTotalAt(nextNode.rvroI);
+        let vtxFlag = vtxTotal > 0;
+
+        while (nextNode != null) {
+          if (vtxTotal < 1) {
+            vtxTotal = this.m_nodeLinker.getVtxTotalAt(nextNode.rvroI);
+            vtxFlag = true;
+          }
+
+          vtxTotal--;
+          unit = nextNode.unit;
+
+          if (unit.rendering) {
+            vtxFlag = unit.updateVtx() || vtxFlag;
+
+            if (unit.drawing) {
+              if (vtxFlag) {
+                unit.vro.run();
+                vtxFlag = false;
+              }
+
+              if (texUnlock) {
+                unit.tro.run();
+              }
+
+              unit.runLockMaterial2(null);
+              unit.draw(rc);
+            }
+          }
+
+          nextNode = nextNode.next;
+        }
+      } else {
+        while (nextNode != null) {
+          unit = nextNode.unit;
+
+          if (unit.rendering) {
+            unit.updateVtx();
+
+            if (unit.drawing) {
+              unit.runLockMaterial();
+
+              if (texUnlock) {
+                nextNode.tro.run();
+              }
+
+              unit.draw(rc);
+            }
+          }
+
+          nextNode = nextNode.next;
+        }
+      }
+
+      rc.Texture.unlocked = false;
+    }
+  } // 在锁定material的时候,直接绘制单个unit
+
+
+  drawUnit(rc, unit, disp) {
+    unit.updateVtx();
+
+    if (unit.drawing) {
+      this.m_shader.bindToGpu(unit.shdUid);
+      unit.updateVtx();
+      unit.run(rc);
+      unit.draw(rc);
+    }
+  } // 在锁定material的时候,直接绘制单个unit
+
+
+  drawLockMaterialByUnit(rc, unit, disp, useGlobalUniform, forceUpdateUniform) {
+    unit.updateVtx();
+
+    if (unit.drawing) {
+      if (forceUpdateUniform) {
+        this.m_shader.resetUniform();
+      } // console.log("****** drawLockMaterialByUnit(), unit: ",unit);
+
+
+      let vro = unit.vro;
+
+      if (RendererDevice_1.default.IsMobileWeb()) {
+        // 如果不这么做，vro和shader attributes没有完全匹配的时候可能在某些设备上会有问题(例如ip6s上无法正常绘制)
+        // 注意临时产生的 vro 对象的回收问题
+        // let vro: IVertexRenderObj = this.vtxResource.getVROByResUid(disp.vbuf.getUid(), this.m_shader.getCurrentShd(), true);
+        vro = this.vtxResource.getVROByResUid(disp.getVtxResUid(), this.m_shader.getCurrentShd(), true);
+      }
+
+      vro.run();
+      unit.runLockMaterial2(useGlobalUniform ? this.m_shader.__$globalUniform : null);
+      unit.draw(rc);
+    }
+  }
+
+  reset() {
+    let nextNode = this.m_nodeLinker.getBegin();
+    let node = null;
+
+    if (nextNode != null) {
+      let runit;
+
+      while (nextNode != null) {
+        node = nextNode;
+        nextNode = nextNode.next;
+        this.rpoUnitBuilder.setRPNodeParam(node.__$ruid, this.procuid, -1);
+        node.reset();
+        runit = node.unit;
+
+        if (this.rpoNodeBuilder.restore(node)) {
+          this.rpoUnitBuilder.restore(runit);
+        }
+      }
+    }
+
+    this.m_nodeLinker.clear();
+    this.m_runs.fill(null);
+    super.reset();
+  }
+
+  destroy() {
+    super.destroy();
+  }
+
+}
+
+exports.default = MaterialRPOBlock;
+
+/***/ }),
+
+/***/ "34cd":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+/***************************************************************************/
+
+/*                                                                         */
+
+/*  Copyright 2018-2022 by                                                 */
+
+/*  Vily(vily313@126.com)                                                  */
+
+/*                                                                         */
+
+/***************************************************************************/
+
+var __importDefault = this && this.__importDefault || function (mod) {
+  return mod && mod.__esModule ? mod : {
+    "default": mod
+  };
+};
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const PassMaterialWrapper_1 = __importDefault(__webpack_require__("fd5e"));
+
+class PassProcess {
+  constructor() {
+    this.rc = null;
+    this.vtxFlag = false;
+    this.texFlag = false;
+    this.units = null;
+    this.materials = null;
+  }
+
+  resetUniform() {
+    this.shader.resetUniform();
+  }
+
+  resetTransUniform() {
+    this.shader.resetTransUniform();
+  }
+
+  createMaterialWrapper(m, hostRUnit) {
+    const rc = this.rc;
+    let w = new PassMaterialWrapper_1.default();
+    w.rdataBuilder = rc.rdataBuilder;
+    w.hostUnit = hostRUnit;
+    w.bindMaterial(m);
+    return w;
+  }
+
+  run() {
+    const units = this.units;
+
+    if (units != null) {
+      const rc = this.rc;
+      let vtxFlag = this.vtxFlag;
+      let texFlag = this.texFlag;
+      const mts = this.materials;
+
+      if (mts == null || mts.length < 1) {
+        for (let i = 0, ln = units.length; i < ln; ++i) {
+          const unit = units[i];
+          vtxFlag = unit.updateVtx() || vtxFlag;
+
+          if (vtxFlag) {
+            unit.vro.run();
+            vtxFlag = false;
+          }
+
+          if (texFlag) {
+            unit.tro.run();
+            texFlag = false;
+          }
+
+          unit.run2(rc);
+          unit.draw(rc);
+        }
+      } else {
+        const mtln = mts.length;
+
+        for (let i = 0, ln = units.length; i < ln; ++i) {
+          const mt = i < mtln ? mts[i] : mts[mtln - 1]; // console.log("mt.isEnabled(): ", mt.isEnabled());
+
+          if (mt.isEnabled()) {
+            const unit = units[i];
+            unit.copyMaterialFrom(mt.unit);
+            unit.applyShader(true);
+            vtxFlag = unit.updateVtx() || vtxFlag;
+
+            if (vtxFlag) {
+              unit.vro.run();
+              vtxFlag = false;
+            }
+
+            unit.tro.run();
+            unit.run2(rc);
+            unit.draw(rc);
+          }
+        }
+      }
+    }
+  }
+
+  destroy() {
+    this.materials = null;
+
+    if (this.units != null) {
+      this.units = null;
+    }
+  }
+
+}
+
+exports.default = PassProcess;
 
 /***/ }),
 
@@ -10862,6 +12455,8 @@ const RenderShader_1 = __importDefault(__webpack_require__("b30a"));
 const ROTransPool_1 = __importDefault(__webpack_require__("9156"));
 
 const GpuVtxObject_1 = __webpack_require__("670e");
+
+const EmptyVDRInfo_1 = __importDefault(__webpack_require__("744d"));
 /**
  * 本类实现了将 系统内存数据 合成为 渲染运行时系统所需的数据资源(包括: 渲染运行时管理数据和显存数据)
  */
@@ -10881,7 +12476,9 @@ class RODataBuilder {
     this.m_deferredTROs = [];
     this.m_deferredTextures = [];
     this.m_haveDeferredUpdate = false;
-    this.m_shdpBuilder = null;
+    this.m_shdpBuilder = null; // build vtx gpu data
+
+    this.m_emptyVDRInfo = new EmptyVDRInfo_1.default();
     this.m_shdpBuilder = shdProgramBuilder;
   }
 
@@ -10891,6 +12488,8 @@ class RODataBuilder {
       this.m_vtxRes = rc.Vertex;
       this.m_texRes = rc.Texture;
       this.m_shader = new RenderShader_1.default(rc.getRCUid(), rc.getRC(), rc.getRenderAdapter(), this.m_shdpBuilder);
+      rc.rshader = this.m_shader;
+      rc.rdataBuilder = this;
       this.m_rpoUnitBuilder = rpoUnitBuilder;
       this.m_processBuider = processBuider;
       this.m_roVtxBuild = roVtxBuild;
@@ -10943,9 +12542,9 @@ class RODataBuilder {
   }
 
   createTRO(texList, texTotal) {
-    if (texList != null) {
+    if (texList) {
       for (let i = 0; i < texList.length; ++i) {
-        if (texList[i] != null) {
+        if (texList[i]) {
           texList[i].__$setRenderProxy(this.m_rc);
         }
       }
@@ -10971,7 +12570,7 @@ class RODataBuilder {
           if (shdp != null) {
             if (shdp.getTexTotal() > 0) {
               if (tro == null) {
-                tro = this.createTRO(material.getTextureList(), shdp.getTexTotal()); //tro = TextureRenderObj.Create(texRes, material.getTextureList(), shdp.getTexTotal());
+                tro = this.createTRO(material.getTextureList(), shdp.getTexTotal());
               }
 
               if (runit.tro != tro) {
@@ -11005,96 +12604,97 @@ class RODataBuilder {
     }
   }
 
-  updateDispMaterial(runit, disp) {
-    let shdp = null;
+  updateDispMaterial(runit, material, disp = null) {
+    let shdp = null; // if (disp.__$ruid >= 0) {
 
-    if (disp.__$ruid >= 0) {
-      let rc = this.m_rc;
-      let material = disp.getMaterial();
+    const rc = this.m_rc; // let material = disp.getMaterial();
 
-      if (material != null) {
-        if (material.getShaderData() == null) {
-          let texList = material.getTextureList();
-          let texEnabled = texList != null && texList != null && texList.length > 0;
-          material.initializeByCodeBuf(texEnabled);
-        } // shdp = this.m_shader.create(material.getShaderData());
+    if (material) {
+      if (material.getShaderData() == null) {
+        let texList = material.getTextureList();
+        let texEnabled = texList != null && texList != null && texList.length > 0;
+        material.initializeByCodeBuf(texEnabled);
+      }
 
+      shdp = this.m_shdpBuilder.create(material.getShaderData());
+      shdp.upload(rc.RContext, rc.getUid());
+      runit.shdUid = shdp.getUid();
+      let tro = null;
 
-        shdp = this.m_shdpBuilder.create(material.getShaderData());
-        shdp.upload(rc.RContext, rc.getUid());
-        runit.shdUid = shdp.getUid();
-        let tro = null;
+      if (shdp.getTexTotal() > 0) {
+        tro = this.createTRO(material.getTextureList(), shdp.getTexTotal());
 
-        if (shdp.getTexTotal() > 0) {
-          tro = this.createTRO(material.getTextureList(), shdp.getTexTotal()); //tro = TextureRenderObj.Create(this.m_texRes, material.getTextureList(), shdp.getTexTotal());
-
-          if (runit.tro != tro) {
-            if (runit.tro != null) {
-              runit.tro.__$detachThis();
-            }
-
-            runit.tro = tro;
-
-            tro.__$attachThis();
-
-            runit.texMid = runit.tro.getMid();
-            if (runit.__$rprouid >= 0) this.m_processBuider.rejoinRunitForTro(runit);
-            material.__$troMid = runit.tro.getMid();
+        if (runit.tro != tro) {
+          if (runit.tro != null) {
+            runit.tro.__$detachThis();
           }
-        } else {
-          if (runit.tro != this.m_emptyTRO) {
-            if (runit.tro != null) {
-              runit.tro.__$detachThis();
-            }
 
-            runit.tro = this.m_emptyTRO;
-            runit.texMid = runit.tro.getMid();
-            if (runit.__$rprouid >= 0) this.m_processBuider.rejoinRunitForTro(runit);
-            material.__$troMid = runit.texMid;
+          runit.tro = tro;
+
+          tro.__$attachThis();
+
+          runit.texMid = runit.tro.getMid();
+          if (runit.__$rprouid >= 0) this.m_processBuider.rejoinRunitForTro(runit);
+          material.__$troMid = runit.tro.getMid();
+        }
+      } else {
+        if (runit.tro != this.m_emptyTRO) {
+          if (runit.tro != null) {
+            runit.tro.__$detachThis();
+          }
+
+          runit.tro = this.m_emptyTRO;
+          runit.texMid = runit.tro.getMid();
+          if (runit.__$rprouid >= 0) this.m_processBuider.rejoinRunitForTro(runit);
+          material.__$troMid = runit.texMid;
+        }
+      }
+
+      if (this.m_shader.getSharedUniformByShd(shdp) == null) {
+        let sharedMList = this.createsharedMList(material, shdp);
+
+        if (sharedMList) {
+          for (let i = 0; i < sharedMList.length; ++i) {
+            sharedMList[i].program = shdp.getGPUProgram();
           }
         }
 
-        if (this.m_shader.getSharedUniformByShd(shdp) == null) {
-          let sharedMList = this.createsharedMList(material, shdp);
+        this.m_shader.setSharedUniformByShd(shdp, this.m_shdUniformTool.buildShared(sharedMList, rc, shdp));
+      }
 
-          if (sharedMList != null) {
-            for (let i = 0; i < sharedMList.length; ++i) {
-              sharedMList[i].program = shdp.getGPUProgram();
-            }
-          }
+      let hasTrans = shdp.hasUniformByName(UniformConst_1.default.LocalTransformMatUNS);
 
-          this.m_shader.setSharedUniformByShd(shdp, this.m_shdUniformTool.buildShared(sharedMList, rc, shdp));
+      if (material.__$uniform == null) {
+        material.__$uniform = this.m_shdUniformTool.buildLocalFromData(material.createSelfUniformData(), shdp);
+      }
+
+      const dispFlag = disp && disp.__$ruid >= 0;
+
+      if (hasTrans) {
+        if (dispFlag && disp.getTransform() != null) {
+          //console.log("disp.getTransform().getUid(): "+disp.getTransform().getUid());
+          runit.transUniform = ROTransPool_1.default.GetTransUniform(disp.getTransform(), shdp); //console.log("RODataBuilder::updateDispMaterial(), get runit.transUniform: ",runit.transUniform);
         }
-
-        let hasTrans = shdp.hasUniformByName(UniformConst_1.default.LocalTransformMatUNS);
-
-        if (material.__$uniform == null) {
-          material.__$uniform = this.m_shdUniformTool.buildLocalFromData(material.createSelfUniformData(), shdp);
-        }
-
-        if (hasTrans) {
-          if (disp.getTransform() != null) {
-            //console.log("disp.getTransform().getUid(): "+disp.getTransform().getUid());
-            runit.transUniform = ROTransPool_1.default.GetTransUniform(disp.getTransform(), shdp); //console.log("RODataBuilder::updateDispMaterial(), get runit.transUniform: ",runit.transUniform);
-          }
-        } // console.log("RODataBuilder::updateDispMaterial(), runit: ",runit);
-        // console.log("RODataBuilder::updateDispMaterial(), runit.uid: ",runit.getUid());
-        // console.log("RODataBuilder::updateDispMaterial(), runit.transUniform == null: ",runit.transUniform == null);
+      } // console.log("RODataBuilder::updateDispMaterial(), runit: ",runit);
+      // console.log("RODataBuilder::updateDispMaterial(), runit.uid: ",runit.getUid());
+      // console.log("RODataBuilder::updateDispMaterial(), runit.transUniform == null: ",runit.transUniform == null);
 
 
+      if (dispFlag) {
         if (runit.transUniform == null) {
           runit.transUniform = this.m_shdUniformTool.buildLocalFromTransformV(hasTrans ? disp.getMatrixFS32() : null, shdp);
           ROTransPool_1.default.SetTransUniform(disp.getTransform(), runit.transUniform, shdp);
         } else {
           runit.transUniform = this.m_shdUniformTool.updateLocalFromTransformV(runit.transUniform, hasTrans ? disp.getMatrixFS32() : null, shdp);
         }
-
-        runit.polygonOffset = material.getPolygonOffset();
-        runit.uniform = material.__$uniform;
-      } else {
-        console.log("Error RODataBuilder::updateDispMaterial(), material is null !!!");
       }
-    }
+
+      runit.polygonOffset = material.getPolygonOffset();
+      runit.uniform = material.__$uniform;
+    } else {
+      console.error("Error RODataBuilder::updateDispMaterial(), material is null !!!");
+    } // }
+
 
     return shdp;
   }
@@ -11131,29 +12731,22 @@ class RODataBuilder {
         }
       }
     }
-  } // build vtx gpu data
-
+  }
 
   buildVtxRes(disp, runit, shdp) {
     if (disp.vbuf != null) {
       let vtxRes = this.m_vtxRes;
-      runit.ivsIndex = disp.ivsIndex;
-      runit.ivsCount = disp.ivsCount;
-      runit.insCount = disp.insCount;
-      runit.visible = disp.visible;
-      runit.setVisible(disp.visible);
-      runit.drawMode = disp.drawMode;
       runit.renderState = disp.renderState;
-      runit.rcolorMask = disp.rcolorMask;
-      runit.trisNumber = disp.trisNumber; // build vertex gpu resoure
+      runit.rcolorMask = disp.rcolorMask; // build vertex gpu resoure
 
-      let resUid = disp.vbuf.getUid();
+      let resUid = disp.getVtxResUid();
       let vtx;
       let needBuild = true;
+      let dispVtxVer = disp.getVtxResVer();
 
       if (vtxRes.hasResUid(resUid)) {
         vtx = vtxRes.getVertexRes(resUid);
-        needBuild = vtx.version != disp.vbuf.version; //console.log("GpuVtxObject instance repeat to be used,needBuild: "+needBuild,vtx.getAttachCount());
+        needBuild = vtx.version != dispVtxVer;
 
         if (needBuild) {
           vtxRes.destroyRes(resUid);
@@ -11164,14 +12757,20 @@ class RODataBuilder {
         vtx = new GpuVtxObject_1.GpuVtxObject();
         vtx.rcuid = vtxRes.getRCUid();
         vtx.resUid = resUid;
-        vtxRes.addVertexRes(vtx); //console.log("GpuVtxObject instance create new: ",vtx.resUid);
+        vtxRes.addVertexRes(vtx); // console.log("GpuVtxObject instance create new, resUid: ",resUid, ", vtx.indices.getUid(): ",vtx.indices.getUid());
       }
 
       if (needBuild) {
-        vtx.indices.ibufStep = disp.vbuf.getIBufStep();
-        vtx.indices.initialize(this.m_roVtxBuild, disp.vbuf);
-        vtx.vertex.initialize(this.m_roVtxBuild, shdp, disp.vbuf);
-        vtx.version = disp.vbuf.version;
+        // vtx.indices.ibufStep = disp.vbuf.getIBufStep();
+        // vtx.createVertexByVtxUid(disp.vbuf.getUid());
+        let ivbuf = disp.ivbuf == null ? disp.vbuf : disp.ivbuf; // console.log("RODataBuilder::buildVtxRes(), XXX OOO XXX ivbuf: ", ivbuf);
+        // vtx.indices.ibufStep = ivbuf.getIBufStep();
+
+        vtx.indices.initialize(this.m_rc, this.m_roVtxBuild, ivbuf, disp);
+        vtx.createVertex(this.m_roVtxBuild, shdp, disp.vbuf); // vtx.vertex.initialize(this.m_roVtxBuild, shdp, disp.vbuf);
+        // vtx.version = disp.vbuf.version;
+
+        vtx.version = dispVtxVer; // console.log("RODataBuilder::buildVtxRes(), XXXXXXXXXX AAA 1 ver: ", vtx.version, dispVtxVer);
       }
 
       vtxRes.__$attachRes(resUid);
@@ -11181,33 +12780,74 @@ class RODataBuilder {
 
       runit.vro.__$attachThis();
 
-      runit.vtxUid = disp.vbuf.getUid();
-      runit.ibufStep = runit.vro.ibufStep;
-      runit.ibufType = runit.ibufStep != 4 ? this.m_rc.UNSIGNED_SHORT : this.m_rc.UNSIGNED_INT;
+      runit.vtxUid = resUid;
+      let material = disp.getMaterial();
+
+      if (material.vtxInfo) {
+        // 如果是同一个material用在不同vtx 的entity上，会如何?
+        // 如果多个material对应到一个vtx如何用?
+        // 如果是多个对多个如何用?
+        // vdrInfo 需要和 mesh 对应协作
+        runit.vdrInfo = material.vtxInfo;
+        runit.rdp = runit.indicesRes.initRdp.clone();
+      } else {
+        runit.vdrInfo = this.m_emptyVDRInfo;
+        runit.rdp = runit.indicesRes.initRdp;
+      }
+
+      runit.rgraph = material.graph;
+      runit.setVisible(disp.visible);
     }
   }
 
-  buildGpuDisp(disp) {
+  createRPOUnit() {
+    return this.m_rpoUnitBuilder.create();
+  }
+
+  restoreRPOUnit(runit) {
+    return this.m_rpoUnitBuilder.restore(runit);
+  }
+
+  buildGpuDisp(disp, rentity) {
     if (disp.__$ruid < 0) {
       if (disp.getMaterial() != null) {
         disp.__$$rsign = RenderConst_1.DisplayRenderSign.LIVE_IN_RENDERER;
         let runit = this.m_rpoUnitBuilder.create();
+        runit.rentity = rentity;
+        runit.retype = rentity.getREType();
         disp.__$ruid = runit.uid;
         disp.__$$runit = runit;
+        runit.rendering = disp.rendering;
+        runit.shader = this.m_shader;
+        const group = disp.getPartGroup();
 
-        if (disp.getPartGroup() != null) {
-          runit.partGroup = disp.getPartGroup().slice(0);
-          runit.partTotal = runit.partGroup.length;
+        if (group) {
+          runit.partGroup = group.slice(0);
+          runit.partTotal = group.length;
           let fs = runit.partGroup;
+          let ibufStride = runit.indicesRes.rdp.rd.stride;
 
           for (let i = 0, len = runit.partTotal; i < len;) {
             i++;
-            fs[i++] *= runit.ibufStep;
+            fs[i++] *= ibufStride;
           }
         }
 
+        if (runit.partTotal < 1) {
+          runit.draw = runit.__$$drawThis;
+        } else {
+          runit.draw = runit.__$$drawPart;
+        }
+
         runit.setDrawFlag(disp.renderState, disp.rcolorMask);
-        this.buildVtxRes(disp, runit, this.updateDispMaterial(runit, disp));
+
+        if (disp.__$ruid >= 0) {
+          this.buildVtxRes(disp, runit, this.updateDispMaterial(runit, disp.getMaterial(), disp));
+        } else {
+          console.error("Error RODataBuilder::buildGpuDisp(), disp is unavailable !!!");
+          this.buildVtxRes(disp, runit, null);
+        }
+
         return true;
       } else {
         console.log("Error RODataBuilder::buildGpuDisp(), material is null !!!");
@@ -11301,15 +12941,14 @@ class RODataBuilder {
         material.initializeByCodeBuf(texEnabled);
       } else {
         texList = material.getTextureList();
-      } // shdp = this.m_shader.create(material.getShaderData());
-
+      }
 
       shdp = this.m_shdpBuilder.create(material.getShaderData());
       shdp.upload(rc.RContext, rc.getUid());
       let texTotal = shdp.getTexTotal();
 
       if (texTotal > 0) {
-        tro = this.createTRO(texList, texTotal); //tro = TextureRenderObj.Create(this.m_texRes, texList, texTotal);
+        tro = this.createTRO(texList, texTotal);
       }
 
       if (this.m_shader.getSharedUniformByShd(shdp) == null) {
@@ -11838,7 +13477,11 @@ class Color4 {
     this.a = pa;
   }
 
-  fromArray(arr, offset = 0) {
+  clone() {
+    return new Color4(this.r, this.g, this.b, this.a);
+  }
+
+  fromArray4(arr, offset = 0) {
     this.r = arr[offset];
     this.g = arr[offset + 1];
     this.b = arr[offset + 2];
@@ -11846,7 +13489,7 @@ class Color4 {
     return this;
   }
 
-  toArray(arr, offset = 0) {
+  toArray4(arr, offset = 0) {
     arr[offset] = this.r;
     arr[offset + 1] = this.g;
     arr[offset + 2] = this.b;
@@ -11868,10 +13511,15 @@ class Color4 {
     return this;
   }
 
-  setRGB3Bytes(r, g, b) {
-    this.r = r / 255.0;
-    this.g = g / 255.0;
-    this.b = b / 255.0;
+  fromBytesArray3(arr, offset = 0) {
+    this.setRGB3Bytes(arr[offset], arr[offset + 1], arr[offset + 2]);
+    return this;
+  }
+
+  toBytesArray3(arr, offset = 0) {
+    arr[offset] = Math.round(this.r * 255);
+    arr[offset + 1] = Math.round(this.g * 255);
+    arr[offset + 2] = Math.round(this.b * 255);
     return this;
   }
 
@@ -11882,13 +13530,20 @@ class Color4 {
     return this;
   }
 
-  setRGBUint8(uint8R, uint8G, uint8B) {
-    let k = 1.0 / 255.0;
+  setRGB3Bytes(uint8R, uint8G, uint8B) {
+    const k = 1.0 / 255.0;
     this.r = uint8R * k;
     this.g = uint8G * k;
     this.b = uint8B * k;
-    return this;
-  }
+    return this; // return this.setRGB3Bytes(r,g,b);
+  } // setRGB3Bytes(uint8R: number, uint8G: number, uint8B: number): Color4 {
+  //     let k = 1.0 / 255.0;
+  //     this.r = uint8R * k;
+  //     this.g = uint8G * k;
+  //     this.b = uint8B * k;
+  //     return this;
+  // }
+
 
   setRGBUint24(rgbUint24) {
     this.r = (rgbUint24 >> 16 & 0x0000ff) / 255.0;
@@ -11939,12 +13594,9 @@ class Color4 {
   }
 
   randomRGB(density = 1.0, bias = 0.0) {
-    this.r = Math.random() * density;
-    this.g = Math.random() * density;
-    this.b = Math.random() * density;
-    this.r += bias;
-    this.g += bias;
-    this.b += bias;
+    this.r = Math.random() * density + bias;
+    this.g = Math.random() * density + bias;
+    this.b = Math.random() * density + bias;
     return this;
   }
 
@@ -13295,6 +14947,8 @@ const RendererState_1 = __importDefault(__webpack_require__("29ef"));
 
 const ROTransform_1 = __importDefault(__webpack_require__("0929"));
 
+const ROTransUpdateWrapper_1 = __importDefault(__webpack_require__("f26a"));
+
 const SpaceCullingMask_1 = __webpack_require__("cc48");
 
 const RODisplay_1 = __importDefault(__webpack_require__("dc2b"));
@@ -13302,12 +14956,13 @@ const RODisplay_1 = __importDefault(__webpack_require__("dc2b"));
 class DisplayEntity {
   constructor(transform = null, sharedData = false) {
     this.m_uid = 0;
-    this.m_transfrom = null;
+    this.m_trs = null;
     this.m_eventDispatcher = null;
+    this.m_trw = null;
     this.m_visible = true;
     this.m_drawEnabled = true;
-    this.m_rcolorMask = RendererState_1.default.COLOR_MASK_ALL_TRUE;
-    this.m_renderState = RendererState_1.default.BACK_CULLFACE_NORMAL_STATE;
+    this.m_rcolorMask = 0;
+    this.m_renderState = 0;
     this.m_display = null;
     this.m_mesh = null; // 如果一个entity如果包含了多个mesh,则这个bounds就是多个mesh aabb 合并的aabb
 
@@ -13327,17 +14982,16 @@ class DisplayEntity {
      */
 
     this.__$rseFlag = RSEntityFlag_1.default.DEFAULT;
-    this.name = "DisplayEntity";
+    this.uuid = "";
     /**
      * 可见性裁剪是否开启, 如果不开启，则摄像机和遮挡剔除都不会裁剪, 取值于 SpaceCullingMask, 默认只会有摄像机裁剪
      */
 
-    this.spaceCullMask = SpaceCullingMask_1.SpaceCullingMask.CAMERA;
-    /**
-     * recorde a draw status
-     */
+    this.spaceCullMask = SpaceCullingMask_1.SpaceCullingMask.CAMERA; // /**
+    //  * recorde a draw status
+    //  */
+    // drawEnabled = false;
 
-    this.drawEnabled = false;
     /**
      * mouse interaction enabled
      */
@@ -13353,6 +15007,7 @@ class DisplayEntity {
      */
 
     this.pipeTypes = null;
+    this.m_rendering = true;
     this.m_texChanged = false;
     this.m_meshChanged = false;
     this.m_lBoundsVS = null;
@@ -13360,15 +15015,18 @@ class DisplayEntity {
     this.m_uid = DisplayEntity.s_uid++;
 
     if (transform == null) {
-      this.m_transfrom = ROTransform_1.default.Create();
+      this.m_trs = ROTransform_1.default.Create();
     } else {
       if (sharedData) {
-        this.m_transfrom = ROTransform_1.default.Create(null, transform.getFS32Data());
+        this.m_trs = ROTransform_1.default.Create(null, transform.getFS32Data());
       } else {
-        this.m_transfrom = transform;
+        this.m_trs = transform;
       }
     }
 
+    this.m_trw = new ROTransUpdateWrapper_1.default();
+    this.m_trw.__$target = this;
+    this.m_trs.wrapper = this.m_trw;
     this.createBounds();
   }
 
@@ -13381,9 +15039,11 @@ class DisplayEntity {
   }
 
   __$setParent(parent) {
-    if (this.m_parent == null) {}
-
     this.m_parent = parent;
+  }
+
+  hasParent() {
+    return this.m_parent != null;
   }
 
   __$getParent() {
@@ -13409,12 +15069,49 @@ class DisplayEntity {
     return RSEntityFlag_1.default.GetRendererUid(this.__$rseFlag);
   }
 
-  setMaterialPipeline(pipeline) {
+  setMaterialPipeline(pipeline, pipeTypes = null) {
     this.m_pipeLine = pipeline;
+    if (pipeTypes) this.pipeTypes = pipeTypes;
   }
 
   getMaterialPipeline() {
     return this.m_pipeLine;
+  }
+
+  isRendering() {
+    return this.m_rendering;
+  }
+
+  setRendering(rendering) {
+    this.m_rendering = rendering;
+    const d = this.m_display;
+
+    if (d) {
+      d.rendering = rendering;
+
+      if (d.__$$runit) {
+        d.__$$runit.rendering = rendering;
+      }
+    }
+  }
+
+  __$setDrawEnabled(boo) {
+    if (this.m_drawEnabled != boo) {
+      this.m_drawEnabled = boo;
+      const d = this.m_display;
+
+      if (d) {
+        d.visible = this.m_visible && boo;
+
+        if (d.__$$runit) {
+          d.__$$runit.setVisible(d.visible);
+        }
+      }
+    }
+  }
+
+  isDrawEnabled() {
+    return this.m_drawEnabled;
   }
   /**
    * @returns 自身是否未必任何渲染器相关的系统使用
@@ -13427,8 +15124,10 @@ class DisplayEntity {
 
   dispatchEvt(evt) {
     // if (evt.getClassType() == MouseEvent.EventClassType) {
-    if (this.m_eventDispatcher != null) {
-      return this.m_eventDispatcher.dispatchEvt(evt);
+    const dsp = this.m_eventDispatcher;
+
+    if (dsp) {
+      return dsp.dispatchEvt(evt);
     } // }
 
 
@@ -13436,7 +15135,9 @@ class DisplayEntity {
   }
 
   getEvtDispatcher(evtClassType) {
-    return this.m_eventDispatcher;
+    const dsp = this.m_eventDispatcher;
+    if (dsp && this.uuid != "") dsp.uuid = this.uuid;
+    return dsp;
   }
 
   setEvtDispatcher(evtDisptacher) {
@@ -13458,25 +15159,6 @@ class DisplayEntity {
 
     return -1;
   }
-
-  __$setDrawEnabled(boo) {
-    if (this.m_drawEnabled != boo) {
-      this.m_drawEnabled = boo;
-      const d = this.m_display;
-
-      if (d != null) {
-        d.visible = this.m_visible && boo;
-
-        if (d.__$$runit != null) {
-          d.__$$runit.setVisible(d.visible);
-        }
-      }
-    }
-  }
-
-  isDrawEnabled() {
-    return this.m_drawEnabled;
-  }
   /**
    * users need to call this function manually
    * 更新有两种形式, 1: 只是更改资源内部的数据, 2: 替换资源本身
@@ -13492,7 +15174,8 @@ class DisplayEntity {
         this.m_meshChanged = false;
         this.m_renderProxy.VtxBufUpdater.updateDispVbuf(this.m_display, deferred);
       } else {
-        this.m_renderProxy.VtxBufUpdater.updateVtxDataToGpuByUid(this.m_display.vbuf.getUid(), deferred);
+        // this.m_renderProxy.VtxBufUpdater.updateVtxDataToGpuByUid(this.m_display.vbuf.getUid(), deferred);
+        this.m_renderProxy.VtxBufUpdater.updateVtxDataToGpuByUid(this.m_display.getVtxResUid(), deferred);
       }
     }
   }
@@ -13564,49 +15247,72 @@ class DisplayEntity {
         }
       }
     }
+
+    return this;
   }
 
   getVisible() {
     return this.m_visible;
   }
 
+  isVisible() {
+    return this.m_visible;
+  }
+
+  getREType() {
+    return 1;
+  }
+
   getTransform() {
-    return this.m_transfrom;
+    return this.m_trs;
   }
 
   copyPositionFrom(entity) {
     if (entity != null) {
-      this.m_transfrom.copyPositionFrom(entity.getTransform());
+      this.m_trs.copyPositionFrom(entity.getTransform());
     }
+
+    return this;
   }
 
   copyMeshFrom(entity) {
     if (entity != null) {
       this.setMesh(entity.getMesh());
     }
+
+    return this;
   }
 
   copyMaterialFrom(entity) {
     if (entity != null) {
       this.setMaterial(entity.getMaterial());
     }
+
+    return this;
   }
 
   copyTransformFrom(entity) {
     let pe = entity;
 
     if (pe != null) {
-      this.m_transfrom.copyFrom(pe.m_transfrom);
+      this.m_trs.copyFrom(pe.m_trs);
     }
+
+    return this;
   }
 
   initDisplay(m) {
-    this.m_display.vbuf = m.__$attachVBuf();
-    this.m_display.ivsIndex = 0;
-    this.m_display.ivsCount = m.vtCount;
-    this.m_display.drawMode = m.drawMode;
-    this.m_display.trisNumber = m.trisNumber;
-    this.m_display.visible = this.m_visible && this.m_drawEnabled;
+    let vbuf = m.__$attachVBuf();
+
+    vbuf.setBufSortFormat(m.getBufSortFormat());
+    const d = this.m_display;
+    d.vbuf = vbuf;
+    d.ivbuf = m.__$attachIVBuf();
+    d.ivsIndex = 0;
+    d.ivsCount = m.vtCount;
+    d.drawMode = m.drawMode;
+    d.trisNumber = m.trisNumber;
+    d.visible = this.m_visible && this.m_drawEnabled;
   }
   /**
    * 设置几何相关的数据,必须是构建完备的mesh才能被设置进来
@@ -13615,7 +15321,6 @@ class DisplayEntity {
 
 
   setMesh(m) {
-    // let m = pm as MeshBase;
     if (this.m_mesh == null) {
       if (m != null) {
         if (!m.isEnabled()) {
@@ -13632,7 +15337,7 @@ class DisplayEntity {
           }
 
           if (this.m_display != null) {
-            this.m_display.setTransform(this.m_transfrom.getMatrix());
+            this.m_display.setTransform(this.m_trs.getMatrix());
             this.initDisplay(m);
           } //console.log("DisplayEntity::setMesh(), "+this.m_display.toString()+",m.drawMode: "+m.drawMode);
 
@@ -13648,9 +15353,11 @@ class DisplayEntity {
       }
     } else if (this.m_display != null && this.m_display.__$ruid > -1) {
       if (this.m_mesh != m && m != null) {
-        this.m_transfrom.updatedStatus |= 2;
+        this.m_trs.updatedStatus |= 2;
 
         this.m_mesh.__$detachVBuf(this.m_display.vbuf);
+
+        this.m_mesh.__$detachIVBuf(this.m_display.ivbuf);
 
         this.m_mesh.__$detachThis();
 
@@ -13662,6 +15369,8 @@ class DisplayEntity {
         this.m_meshChanged = true;
       }
     }
+
+    return this;
   }
 
   updateMesh() {}
@@ -13675,31 +15384,30 @@ class DisplayEntity {
   }
 
   setIvsParam(ivsIndex, ivsCount, updateBounds = false) {
-    if (this.m_display != null) {
-      this.m_display.ivsIndex = ivsIndex;
-      this.m_display.ivsCount = ivsCount;
-
-      if (this.m_display.__$ruid > -1) {
-        this.m_display.__$$runit.trisNumber = Math.floor((ivsCount - ivsIndex) / 3);
-
-        this.m_display.__$$runit.setIvsParam(ivsIndex, ivsCount);
-
-        this.m_display.__$$runit.drawMode = this.m_mesh.drawMode;
-
-        if (updateBounds && this.isPolyhedral()) {
-          if (this.m_localBounds == this.m_mesh.bounds) {
-            this.m_localBounds = new AABB_1.default();
-            this.m_localBounds.copyFrom(this.m_mesh.bounds);
-          }
-
-          this.m_transStatus = ROTransform_1.default.UPDATE_TRANSFORM;
-          this.m_localBounds.reset();
-          let ivs = this.m_mesh.getIVS();
-          this.m_localBounds.addXYZFloat32AndIndicesArr(this.m_mesh.getVS(), ivs.subarray(ivsIndex, ivsIndex + ivsCount));
-          this.m_localBounds.update();
-        }
-      }
-    }
+    // if (this.m_display != null) {
+    //     this.m_display.ivsIndex = ivsIndex;
+    //     this.m_display.ivsCount = ivsCount;
+    //     if (this.m_display.__$ruid > -1) {
+    //         const mh = this.m_mesh;
+    //         let ut = this.m_display.__$$runit;
+    //         ut.setIvsParam(ivsIndex, ivsCount);
+    //         if (updateBounds && this.isPolyhedral()) {
+    //             if (this.m_localBounds == mh.bounds) {
+    //                 this.m_localBounds = new AABB();
+    //                 this.m_localBounds.copyFrom(mh.bounds);
+    //             }
+    //             this.m_transStatus = ROTransform.UPDATE_TRANSFORM;
+    //             this.m_localBounds.reset();
+    //             let ivs = mh.getIVS();
+    //             this.m_localBounds.addFloat32AndIndices(mh.getVS(), ivs.subarray(ivsIndex, ivsIndex + ivsCount), mh.getVSStride());
+    //             this.m_localBounds.update();
+    //             if (this.m_trw != null) {
+    //                 this.m_trw.updateTo();
+    //             }
+    //         }
+    //     }
+    // }
+    throw Error("illagel operations ...");
   }
 
   getMesh() {
@@ -13738,23 +15446,21 @@ class DisplayEntity {
     if (m != null) {
       if (this.m_display == null) {
         this.m_display = RODisplay_1.default.Create();
-        this.m_display.setTransform(this.m_transfrom.getMatrix());
+        this.m_display.setTransform(this.m_trs.getMatrix());
         this.m_display.visible = this.m_visible && this.m_drawEnabled;
-      } //if(this.m_display.getMaterial() != m && this.__$wuid == RSEntityFlag.RENDERER_UID_FLAG && this.m_display.__$ruid < 0)
+      }
 
+      const flag = RSEntityFlag_1.default.RENDERER_UID_FLAG;
+      const disp = this.m_display;
 
-      if (this.m_display.getMaterial() != m && (RSEntityFlag_1.default.RENDERER_UID_FLAG & this.__$rseFlag) == RSEntityFlag_1.default.RENDERER_UID_FLAG && this.m_display.__$ruid < 0) {
-        // if(m.getMaterialPipeline() == null && this.getMaterialPipeline() != null) {
-        //     m.setMaterialPipeline( this.getMaterialPipeline() );
-        // }
-        // if(m.pipeTypes == null) {
-        //     m.pipeTypes = this.pipeTypes;
-        // }
-        this.m_display.renderState = this.m_renderState;
-        this.m_display.rcolorMask = this.m_rcolorMask;
-        this.m_display.setMaterial(m);
+      if (disp.getMaterial() != m && (flag & this.__$rseFlag) == flag && disp.__$ruid < 0) {
+        disp.renderState = this.m_renderState;
+        disp.rcolorMask = this.m_rcolorMask;
+        disp.setMaterial(m);
       }
     }
+
+    return this;
   }
 
   getMaterial() {
@@ -13770,7 +15476,7 @@ class DisplayEntity {
   }
 
   getInvMatrix() {
-    return this.m_transfrom.getInvMatrix();
+    return this.m_trs.getInvMatrix();
   }
   /**
    * 获取当前 entity 的 local space to world space matrix
@@ -13780,11 +15486,11 @@ class DisplayEntity {
 
 
   getMatrix(flag = true) {
-    return this.m_transfrom.getMatrix(flag);
+    return this.m_trs.getMatrix(flag);
   }
 
   getToParentMatrix() {
-    return this.m_transfrom.getToParentMatrix();
+    return this.m_trs.getToParentMatrix();
   }
 
   setRenderColorMask(rt) {
@@ -13821,6 +15527,12 @@ class DisplayEntity {
         this.m_display.__$$runit.setDrawFlag(this.m_renderState, this.m_rcolorMask);
       }
     }
+
+    return this;
+  }
+
+  getRenderState() {
+    return this.m_renderState;
   }
 
   setRenderStateByName(renderState_name) {
@@ -13867,7 +15579,7 @@ class DisplayEntity {
           this.__activeMesh(material); //  // for debug
 
 
-          this.m_display.name = this.name;
+          this.m_display.uuid = this.uuid;
         }
       }
     }
@@ -13881,55 +15593,66 @@ class DisplayEntity {
   }
 
   setXYZ(px, py, pz) {
-    this.m_transfrom.setXYZ(px, py, pz);
+    this.m_trs.setXYZ(px, py, pz);
+    return this;
   }
 
   offsetPosition(pv) {
-    this.m_transfrom.offsetPosition(pv);
+    this.m_trs.offsetPosition(pv);
   }
 
   setPosition(pv) {
-    this.m_transfrom.setPosition(pv);
+    this.m_trs.setPosition(pv);
+    return this;
   }
 
-  getPosition(pv) {
-    this.m_transfrom.getPosition(pv);
+  getPosition(pv = null) {
+    if (!pv) pv = new Vector3D_1.default();
+    this.m_trs.getPosition(pv);
     return pv;
   }
 
   setRotation3(rotV) {
-    this.m_transfrom.setRotationXYZ(rotV.x, rotV.y, rotV.z);
+    this.m_trs.setRotationXYZ(rotV.x, rotV.y, rotV.z);
+    return this;
   }
 
   setRotationXYZ(rx, ry, rz) {
-    this.m_transfrom.setRotationXYZ(rx, ry, rz);
+    this.m_trs.setRotationXYZ(rx, ry, rz);
+    return this;
   }
 
-  setScale3(scaleV) {
-    this.m_transfrom.setScaleXYZ(scaleV.x, scaleV.y, scaleV.z);
+  setScale3(sv) {
+    this.m_trs.setScaleXYZ(sv.x, sv.y, sv.z);
+    return this;
   }
 
   setScaleXYZ(sx, sy, sz) {
-    this.m_transfrom.setScaleXYZ(sx, sy, sz);
+    this.m_trs.setScaleXYZ(sx, sy, sz);
+    return this;
   }
 
-  getRotationXYZ(pv) {
-    this.m_transfrom.getRotationXYZ(pv);
+  getRotationXYZ(pv = null) {
+    if (!pv) pv = new Vector3D_1.default();
+    this.m_trs.getRotationXYZ(pv);
+    return pv;
   }
 
-  getScaleXYZ(pv) {
-    this.m_transfrom.getScaleXYZ(pv);
+  getScaleXYZ(pv = null) {
+    if (!pv) pv = new Vector3D_1.default();
+    this.m_trs.getScaleXYZ(pv);
+    return pv;
   }
 
   localToGlobal(pv) {
-    if (this.m_transfrom != null) {
-      this.m_transfrom.localToGlobal(pv);
+    if (this.m_trs != null) {
+      this.m_trs.localToGlobal(pv);
     }
   }
 
   globalToLocal(pv) {
-    if (this.m_transfrom != null) {
-      this.m_transfrom.globalToLocal(pv);
+    if (this.m_trs != null) {
+      this.m_trs.globalToLocal(pv);
     }
   }
   /**
@@ -13962,17 +15685,19 @@ class DisplayEntity {
 
 
   isRenderEnabled() {
-    return this.drawEnabled && this.m_visible && this.m_display != null && this.m_display.__$ruid > -1;
+    return this.m_rendering && this.m_visible && this.m_display != null && this.m_display.__$ruid > -1;
   }
 
   updateBounds() {
-    if (this.m_transfrom != null) {
+    if (this.m_trs != null) {
       this.m_transStatus = ROTransform_1.default.UPDATE_TRANSFORM;
 
       if (this.m_mesh != null && this.m_localBounds != this.m_mesh.bounds) {
+        const mh = this.m_mesh;
+        const dp = this.m_display;
         this.m_localBounds.reset();
-        let ivs = this.m_mesh.getIVS();
-        this.m_localBounds.addXYZFloat32AndIndicesArr(this.m_mesh.getVS(), ivs.subarray(this.m_display.ivsIndex, this.m_display.ivsIndex + this.m_display.ivsCount));
+        let ivs = mh.getIVS();
+        this.m_localBounds.addFloat32AndIndices(mh.getVS(), ivs.subarray(dp.ivsIndex, dp.ivsIndex + dp.ivsCount), mh.getVSStride());
         this.m_localBounds.update();
       }
 
@@ -13981,38 +15706,38 @@ class DisplayEntity {
   }
 
   updateLocalBoundsVS(bounds) {
-    let pminV = bounds.min;
-    let pmaxV = bounds.max;
+    let min = bounds.min;
+    let max = bounds.max;
 
     if (this.m_lBoundsVS == null) {
       this.m_lBoundsVS = new Float32Array(24);
     }
 
     let pvs = this.m_lBoundsVS;
-    pvs[0] = pminV.x;
-    pvs[1] = pminV.y;
-    pvs[2] = pminV.z;
-    pvs[3] = pmaxV.x;
-    pvs[4] = pminV.y;
-    pvs[5] = pminV.z;
-    pvs[6] = pminV.x;
-    pvs[7] = pminV.y;
-    pvs[8] = pmaxV.z;
-    pvs[9] = pmaxV.x;
-    pvs[10] = pminV.y;
-    pvs[11] = pmaxV.z;
-    pvs[12] = pminV.x;
-    pvs[13] = pmaxV.y;
-    pvs[14] = pminV.z;
-    pvs[15] = pmaxV.x;
-    pvs[16] = pmaxV.y;
-    pvs[17] = pminV.z;
-    pvs[18] = pminV.x;
-    pvs[19] = pmaxV.y;
-    pvs[20] = pmaxV.z;
-    pvs[21] = pmaxV.x;
-    pvs[22] = pmaxV.y;
-    pvs[23] = pmaxV.z;
+    pvs[0] = min.x;
+    pvs[1] = min.y;
+    pvs[2] = min.z;
+    pvs[3] = max.x;
+    pvs[4] = min.y;
+    pvs[5] = min.z;
+    pvs[6] = min.x;
+    pvs[7] = min.y;
+    pvs[8] = max.z;
+    pvs[9] = max.x;
+    pvs[10] = min.y;
+    pvs[11] = max.z;
+    pvs[12] = min.x;
+    pvs[13] = max.y;
+    pvs[14] = min.z;
+    pvs[15] = max.x;
+    pvs[16] = max.y;
+    pvs[17] = min.z;
+    pvs[18] = min.x;
+    pvs[19] = max.y;
+    pvs[20] = max.z;
+    pvs[21] = max.x;
+    pvs[22] = max.y;
+    pvs[23] = max.z;
   }
 
   updateGlobalBounds() {
@@ -14021,26 +15746,27 @@ class DisplayEntity {
     let bounds = this.m_localBounds;
 
     if (this.m_transStatus > ROTransform_1.default.UPDATE_POSITION || this.m_localBuondsVer != bounds.version) {
-      let st = this.m_transfrom.updateStatus;
-      this.m_transfrom.update();
+      let st = this.m_trs.updateStatus;
+      this.m_trs.update();
+      const mat = this.m_trs.getMatrix();
 
-      if (this.m_localBuondsVer != bounds.version || st != this.m_transfrom.updateStatus) {
+      if (this.m_localBuondsVer != bounds.version || st != this.m_trs.updateStatus) {
         this.m_localBuondsVer = bounds.version;
         this.updateLocalBoundsVS(bounds);
         let in_vs = this.m_lBoundsVS;
         let out_vs = DE.s_boundsOutVS;
-        this.m_transfrom.getMatrix().transformVectors(in_vs, 24, out_vs);
+        mat.transformVectors(in_vs, 24, out_vs);
         this.m_globalBounds.reset();
-        this.m_globalBounds.addXYZFloat32Arr(out_vs);
+        this.m_globalBounds.addFloat32Arr(out_vs);
         this.m_globalBounds.update();
       }
     } else {
       DE.s_prePos.setXYZ(0, 0, 0);
       DE.s_pos.setXYZ(0, 0, 0);
-      let matrix = this.m_transfrom.getMatrix(false);
+      let matrix = this.m_trs.getMatrix(false);
       matrix.transformVector3Self(DE.s_prePos);
-      this.m_transfrom.update();
-      matrix = this.m_transfrom.getMatrix(false);
+      this.m_trs.update();
+      matrix = this.m_trs.getMatrix(false);
       matrix.transformVector3Self(DE.s_pos);
       DE.s_pos.subtractBy(DE.s_prePos);
       let gbounds = this.m_globalBounds;
@@ -14052,17 +15778,17 @@ class DisplayEntity {
   }
 
   update() {
-    if (this.m_transfrom.updatedStatus > this.m_transStatus) this.m_transStatus = this.m_transfrom.updatedStatus;
+    if (this.m_trs.updatedStatus > this.m_transStatus) this.m_transStatus = this.m_trs.updatedStatus;
 
     if (this.m_transStatus != ROTransform_1.default.UPDATE_NONE) {
       if (this.m_mesh != null && this.m_globalBounds != null) {
         this.updateGlobalBounds();
       } else {
-        this.m_transfrom.update();
+        this.m_trs.update();
       }
 
       this.m_transStatus = ROTransform_1.default.UPDATE_NONE;
-      this.m_transfrom.updatedStatus = this.m_transStatus;
+      this.m_trs.updatedStatus = this.m_transStatus;
     }
   }
 
@@ -14074,7 +15800,7 @@ class DisplayEntity {
       this.m_eventDispatcher = null;
     }
 
-    if (this.m_transfrom != null && this.isFree()) {
+    if (this.m_trs != null && this.isFree()) {
       // 这里要保证其在所有的process中都被移除
       if (this.m_display != null) {
         this.m_mesh.__$detachVBuf(this.m_display.vbuf);
@@ -14083,8 +15809,8 @@ class DisplayEntity {
         this.m_display = null;
       }
 
-      ROTransform_1.default.Restore(this.m_transfrom);
-      this.m_transfrom = null;
+      ROTransform_1.default.Restore(this.m_trs);
+      this.m_trs = null;
 
       if (this.m_mesh != null) {
         this.m_mesh.__$detachThis();
@@ -14103,10 +15829,15 @@ class DisplayEntity {
     this.m_globalBounds = null;
     this.m_localBounds = null;
     this.m_pipeLine = null;
+
+    if (this.m_trw != null) {
+      this.m_trw.destroy();
+      this.m_trw = null;
+    }
   }
 
   toString() {
-    return "DisplayEntity(name=" + this.name + ",uid = " + this.m_uid + ", rseFlag = " + this.__$rseFlag + ")";
+    return "DisplayEntity(uuid=" + this.uuid + ",uid = " + this.m_uid + ", rseFlag = " + this.__$rseFlag + ")";
   }
 
 }
@@ -14212,6 +15943,8 @@ Object.defineProperty(exports, "__esModule", {
 
 const PoolNodeBuilder_1 = __importDefault(__webpack_require__("2be1"));
 
+const RPOUnit_1 = __importDefault(__webpack_require__("c62b"));
+
 const RPONode_1 = __importDefault(__webpack_require__("265e"));
 /*
  * render process object node pool management
@@ -14225,6 +15958,10 @@ class RPONodeBuilder extends PoolNodeBuilder_1.default {
 
   createRPONode() {
     return new RPONode_1.default();
+  }
+
+  createRPOUnit() {
+    return new RPOUnit_1.default();
   }
 
 }
@@ -14267,62 +16004,111 @@ const VaoVertexRenderObj_1 = __importDefault(__webpack_require__("fa60"));
 class ROVertexRes {
   constructor() {
     this.m_vtx = null;
+    this.m_typeList = null;
+    this.m_offsetList = null;
+    this.m_sizeList = null;
+    this.m_verList = null;
     this.m_vtxUid = -1;
     this.m_gpuBufs = [];
     this.m_gpuBufsTotal = 0;
     this.m_type = 0;
     this.m_attribsTotal = 0;
     this.m_wholeStride = 0;
-    this.m_typeList = null;
-    this.m_offsetList = null;
-    this.m_sizeList = null;
+    this.m_bufIVS = null;
     this.m_vroList = [];
     this.m_vroListLen = 0;
+    this.m_attachCount = 0;
+  }
+
+  static create(rc, shdp, vtx) {
+    let vtxUid = vtx.getUid();
+    let map = ROVertexRes.s_map;
+    let vt; // console.log("GpuVtxObject::createVertex(), vtxUid: ", vtxUid, ", uid: ", this.m_uid);
+
+    if (map.has(vtxUid)) {
+      vt = map.get(vtxUid);
+    } else {
+      // console.log("ROVertexRes::create() new instance, vtxUid: ", vtxUid);
+      vt = new ROVertexRes();
+      map.set(vtxUid, vt);
+      vt.initialize(rc, shdp, vtx);
+    }
+
+    return vt;
+  }
+
+  __$attachThis() {
+    ++this.m_attachCount; // console.log("ROVertexRes::__$attachThis() this.m_attachCount: "+this.m_attachCount);
+  }
+
+  __$detachThis() {
+    if (this.m_attachCount == 1) {
+      --this.m_attachCount; // console.log("ROVertexRes::__$detachThis() this.m_attachCount: "+this.m_attachCount);
+      // this.__$dispose();
+    } else {
+      --this.m_attachCount; // console.log("ROVertexRes::__$detachThis() this.m_attachCount: "+this.m_attachCount);
+    }
+
+    if (this.m_attachCount < 1) {
+      this.m_attachCount = 0;
+    }
+  }
+
+  getAttachCount() {
+    return this.m_attachCount;
   }
 
   updateToGpu(rc) {
-    let len = this.m_gpuBufs.length;
+    let len = this.m_gpuBufs.length; // console.log("ROVertexRes::updateToGpu(), len > 0: ", len > 0);
 
     if (len > 0) {
-      let vtx = this.m_vtx;
+      let vtx = this.m_vtx; // console.log("ROVertexRes::updateToGpu(), this.version != vtx.vertexVer: ", this.version != vtx.vertexVer);
 
       if (this.version != vtx.vertexVer) {
+        let fvs = null;
         let usage = vtx.getBufDataUsage();
-        let fvs;
         let sizeList = this.m_sizeList;
 
         for (let i = 0; i < len; ++i) {
-          fvs = vtx.getF32DataAt(i);
+          const ver = vtx.getF32DataVerAt(i); // console.log("updateToGpu(), i:", i, ", ver: ", ver, ", this.m_verList[i]: ", this.m_verList[i]);
 
-          if (sizeList[i] >= fvs.length) {
-            rc.bindArrBuf(this.m_gpuBufs[i]);
-            rc.arrBufSubData(fvs, 0);
-          } else {
-            rc.bindArrBuf(this.m_gpuBufs[i]);
-            rc.arrBufData(fvs, usage);
-            sizeList[i] = fvs.length;
+          if (this.m_verList[i] != ver) {
+            this.m_verList[i] = ver; // console.log("updateToGpu() updating data i: ", i);
+
+            fvs = vtx.getF32DataAt(i); // console.log("sizeList[i], fvs.length: ", sizeList[i], fvs.length);
+
+            if (sizeList[i] >= fvs.byteLength) {
+              rc.bindArrBuf(this.m_gpuBufs[i]);
+              rc.arrBufSubData(fvs, 0);
+            } else {
+              rc.bindArrBuf(this.m_gpuBufs[i]);
+              rc.arrBufData(fvs, usage);
+              sizeList[i] = fvs.byteLength;
+            }
           }
         }
 
         this.version = vtx.vertexVer;
       }
     }
-  } //private m_preCombinedSize: number = 0;
-
+  }
 
   uploadCombined(rc, shdp) {
     let vtx = this.m_vtx;
-    let fvs = vtx.getF32DataAt(0); //console.log("uploadCombined combSize: ",this.m_preCombinedSize, fvs.length);
-    //this.m_preCombinedSize = fvs.length;
+    let fvs = vtx.getF32DataAt(0); // console.log("uploadCombined(), combSize: ",this.m_preCombinedSize, fvs.length);
 
     this.m_gpuBufs.push(rc.createBuf());
-    rc.bindArrBuf(this.m_gpuBufs[0]); // console.log("uploadCombined, this.m_gpuBufs: "+this.m_gpuBufs);
-
+    rc.bindArrBuf(this.m_gpuBufs[0]);
     rc.arrBufData(fvs, vtx.getBufDataUsage());
     this.m_gpuBufsTotal = 1;
-    this.m_sizeList = [fvs.length];
+    this.m_sizeList = [fvs.byteLength];
+
+    if (this.m_verList == null) {
+      this.m_verList = [0];
+    }
 
     if (this.m_typeList == null) {
+      this.m_bufIVS = shdp.getLocationIVS();
       this.m_wholeStride = 0;
       this.m_typeList = new Array(this.m_attribsTotal);
       this.m_offsetList = new Array(this.m_attribsTotal);
@@ -14351,15 +16137,23 @@ class ROVertexRes {
     let buf = null;
     let dataUsage = vtx.getBufDataUsage();
     this.m_gpuBufsTotal = this.m_vtx.getBuffersTotal();
-    this.m_sizeList = new Array(this.m_attribsTotal); // console.log("uploadSeparated, this.m_gpuBufs: "+this.m_gpuBufs);
+    this.m_sizeList = new Array(this.m_attribsTotal);
+    this.m_bufIVS = shdp.getLocationIVS(); // console.log("uploadSeparated, this.m_gpuBufs: "+this.m_gpuBufs);
+
+    if (this.m_verList == null) {
+      this.m_verList = new Array(this.m_attribsTotal);
+      this.m_verList.fill(0);
+    }
 
     if (vtx.bufData == null) {
       for (; i < this.m_attribsTotal; ++i) {
         buf = rc.createBuf();
         this.m_gpuBufs.push(buf);
-        rc.bindArrBuf(buf);
+        rc.bindArrBuf(buf); // const ver = vtx.getF32DataVerAt(i);
+        // console.log("uploadSeparated(), i:", i, ", ver: ", ver);
+
         rc.arrBufData(vtx.getF32DataAt(i), dataUsage);
-        this.m_sizeList[i] = vtx.getF32DataAt(i).length;
+        this.m_sizeList[i] = vtx.getF32DataAt(i).byteLength;
       }
     } else {
       //console.log(">>>>>>>>vtxSepbuf use (this.bufData == null) : "+(this.bufData == null));
@@ -14367,7 +16161,6 @@ class ROVertexRes {
       let j = 0;
       let tot = 0;
       let offset = 0;
-      let dataSize = 0;
 
       for (; i < this.m_attribsTotal; ++i) {
         buf = rc.createBuf(); //console.log("this.bufData.getAttributeDataTotalBytesAt("+i+"): "+this.bufData.getAttributeDataTotalBytesAt(i));
@@ -14376,17 +16169,15 @@ class ROVertexRes {
         rc.bindArrBuf(buf);
         rc.arrBufDataMem(vtx.bufData.getAttributeDataTotalBytesAt(i), dataUsage);
         offset = 0;
-        dataSize = 0;
         tot = vtx.bufData.getAttributeDataTotalAt(i);
 
         for (j = 0; j < tot; ++j) {
           fs32 = vtx.bufData.getAttributeDataAt(i, j);
-          dataSize += fs32.length;
           rc.arrBufSubData(fs32, offset);
           offset += fs32.byteLength;
         }
 
-        this.m_sizeList[i] = dataSize;
+        this.m_sizeList[i] = offset;
       }
     }
 
@@ -14403,9 +16194,11 @@ class ROVertexRes {
           this.m_typeList[i] = typeList[i];
         }
       } else {
+        const floatSize = 4;
+
         for (let i = 0; i < this.m_attribsTotal; ++i) {
           this.m_offsetList[i] = this.m_wholeStride;
-          this.m_wholeStride += shdp.getLocationSizeByIndex(i) * 4;
+          this.m_wholeStride += shdp.getLocationSizeByIndex(i) * floatSize;
           this.m_typeList[i] = shdp.getLocationTypeByIndex(i);
         }
       }
@@ -14415,17 +16208,22 @@ class ROVertexRes {
   }
 
   initialize(rc, shdp, vtx) {
+    /**
+     * 这里的初始化可能会出现错误, 因为 shd 中使用的buffers数量可能少于实际 vtx 中的 attributes 数量
+     * 为了防止错误, 构建这个 RoVertexRes 实例的shdp中的attributes必须是和vtx buffers匹配的
+     */
     if (this.m_gpuBufs.length < 1 && vtx != null) {
       this.version = vtx.vertexVer;
       this.m_vtx = vtx;
       this.m_vtxUid = vtx.getUid();
       this.m_type = vtx.getType();
-      let typeList = vtx.getBufTypeList(); //let sizeList: number[] = vtx.getBufSizeList();
-
+      let typeList = vtx.getBufTypeList();
       this.m_attribsTotal = typeList != null ? typeList.length : shdp.getLocationsTotal();
 
       if (shdp.getLocationsTotal() != vtx.getAttribsTotal()) {
-        console.warn("shdp.getLocationsTotal() is " + shdp.getLocationsTotal() + " != vtx.getAttribsTotal() is " + vtx.getAttribsTotal() + "/" + (typeList != null ? typeList.length : 0));
+        let info = "shdp.getLocationsTotal() is " + shdp.getLocationsTotal() + " != vtx.getAttribsTotal(), shdp has " + shdp.getLocationsTotal() + ", vtx has " + vtx.getAttribsTotal();
+        info += "\n这可能会导致渲染过程无法正常使用所有的 vtx buffers";
+        console.warn(info);
       }
 
       if (this.m_type < 1) {
@@ -14434,6 +16232,24 @@ class ROVertexRes {
       } else {
         // separated buf
         this.uploadSeparated(rc, shdp);
+      }
+
+      let layoutBit = vtx.getBufSortFormat();
+
+      if (layoutBit > 0) {
+        // console.log("XXXXX ROVtx XXX layoutBit: ", layoutBit);
+        let ivs = new Array(12);
+        let index = 0;
+
+        for (let i = 0; i < 10; ++i) {
+          const bit = 1 << i;
+
+          if ((bit & layoutBit) > 0) {
+            ivs[i + 1] = index++;
+          }
+        }
+
+        this.m_bufIVS = ivs;
       }
     }
   }
@@ -14451,22 +16267,27 @@ class ROVertexRes {
   } // 创建被 RPOUnit 使用的 vro 实例
 
 
-  createVRO(rc, shdp, vaoEnabled, ibufRes, ibufId) {
+  createVRO(rc, shdp, vaoEnabled, ibufRes) {
     let attribsTotal = shdp.getLocationsTotal();
 
     if (this.m_attribsTotal * attribsTotal > 0 && attribsTotal <= this.m_attribsTotal) {
-      let mid = this.getVROMid(rc, shdp, vaoEnabled, ibufId);
+      // console.log("ROVertexRes::createVRO(), this.m_type: ",this.m_type, ", ibufRes.getUid(): ",ibufRes.getUid(),", vtxUid: ", this.m_vtxUid);
+      let mid = this.getVROMid(rc, shdp, vaoEnabled, ibufRes.getUid());
       let i = 0;
       let pvro = VaoVertexRenderObj_1.default.GetByMid(mid);
 
       if (pvro != null) {
         return pvro;
-      } // console.log("VtxCombinedBuf::createVROBegin(), this.m_type: ",this.m_type, "mid: ",mid);
-      // TODO(vilyLei): 暂时注释掉下面这行代码
+      } // TODO(vilyLei): 暂时注释掉下面这行代码
       // let flag: boolean = shdp.testVertexAttribPointerOffset(this.m_offsetList);
       // console.log("createVRO testVertexAttribPointerOffset flag: ",flag, this.m_typeList);
       // DivLog.ShowLog("createVRO testVertexAttribPointerOffset flag: "+flag);
+      // 如果这个ivs的数据和 vtx buffers 数据项不匹配, 则会出现渲染错误的情况
+      // 因为数据项匹配的ROVertexRes实例可能不会构建或者比较迟才构建
+      // 这会导致ivs 是不正确的, 甚至vtx buffers
 
+
+      const ivs = this.m_bufIVS;
 
       if (vaoEnabled) {
         // vao 的生成要记录标记,防止重复生成, 因为同一组数据在不同的shader使用中可能组合方式不同，导致了vao可能是多样的
@@ -14479,20 +16300,52 @@ class ROVertexRes {
 
         if (this.m_type < 1) {
           // combined buf vro
-          rc.bindArrBuf(this.m_gpuBufs[0]);
+          rc.bindArrBuf(this.m_gpuBufs[0]); // if (this.m_typeList.length == attribsTotal) {
+          //     for (i = 0; i < attribsTotal; ++i) {
+          //         shdp.vertexAttribPointerTypeFloat(this.m_typeList[i], this.m_wholeStride, this.m_offsetList[i]);
+          //     }
+          // } else {
+          //     const types = shdp.getLocationTypes();
+          //     for (i = 0; i < types.length; ++i) {
+          //         const k = types[i] - 1;
+          //         shdp.vertexAttribPointerTypeFloat(this.m_typeList[k], this.m_wholeStride, this.m_offsetList[k]);
+          //     }
+          // }
 
-          for (i = 0; i < attribsTotal; ++i) {
-            shdp.vertexAttribPointerTypeFloat(this.m_typeList[i], this.m_wholeStride, this.m_offsetList[i]);
+          const types = shdp.getLocationTypes();
+
+          for (i = 0; i < types.length; ++i) {
+            const k = ivs[types[i]];
+            shdp.vertexAttribPointerTypeFloat(this.m_typeList[k], this.m_wholeStride, this.m_offsetList[k]);
           }
         } else {
-          for (i = 0; i < attribsTotal; ++i) {
-            rc.bindArrBuf(this.m_gpuBufs[i]);
-            shdp.vertexAttribPointerTypeFloat(this.m_typeList[i], 0, 0);
+          // console.log("A attribsTotal: ", attribsTotal, this.m_typeList);
+          // console.log("B shdp.getLocationTypes(): ", shdp.getLocationTypes());
+          // if (this.m_typeList.length == attribsTotal) {
+          //     for (i = 0; i < attribsTotal; ++i) {
+          //         rc.bindArrBuf(this.m_gpuBufs[i]);
+          //         shdp.vertexAttribPointerTypeFloat(this.m_typeList[i], 0, 0);
+          //     }
+          // } else {
+          //     const types = shdp.getLocationTypes();
+          //     for (i = 0; i < types.length; ++i) {
+          //         const k = types[i] - 1;
+          //         rc.bindArrBuf(this.m_gpuBufs[k]);
+          //         shdp.vertexAttribPointerTypeFloat(this.m_typeList[k], 0, 0);
+          //     }
+          // }
+          // const ivs = shdp.getLocationIVS();
+          const types = shdp.getLocationTypes();
+
+          for (i = 0; i < types.length; ++i) {
+            const k = ivs[types[i]];
+            rc.bindArrBuf(this.m_gpuBufs[k]);
+            shdp.vertexAttribPointerTypeFloat(this.m_typeList[k], 0, 0);
           }
         }
 
-        pvro = vro;
-        vro.ibuf = ibufRes.getGpuBuf(); // rc.bindEleBuf(vro.ibuf);
+        pvro = vro; // vro.ibuf = ibufRes.getGpuBuf();
+        // rc.bindEleBuf(vro.ibuf);
 
         rc.bindVertexArray(null);
       } else {
@@ -14517,46 +16370,56 @@ class ROVertexRes {
           }
         }
 
-        vro.attribTypesLen = vro.attribTypes.length;
-        vro.ibuf = ibufRes.getGpuBuf();
+        vro.attribTypesLen = vro.attribTypes.length; // vro.ibuf = ibufRes.getGpuBuf();
+
         pvro = vro;
       }
 
       this.m_vroList.push(pvro);
       ++this.m_vroListLen;
       return pvro;
+    } else {
+      console.error("shader 中需要的 attribute 数量 比当前 vertex buffer 多... shader.attribsTotal: ", attribsTotal, ", this.attribsTotal: ", this.m_attribsTotal);
+      return null;
     }
-
-    return null;
   }
 
   destroy(rc) {
-    if (this.m_gpuBufs.length > 0) {
-      console.log("ROVertexRes::destroy(), type: " + this.m_type);
-      this.m_type = -1;
-      let i = 0;
-      let vro = null;
+    // console.log("ROVertexRes::destroy(), this.m_attachCount: ", this.m_attachCount);
+    if (this.m_attachCount < 1) {
+      if (this.m_gpuBufs.length > 0) {
+        console.log("ROVertexRes::destroy(), type: ", this.m_type, ", vtxUid: ", this.m_vtxUid);
+        this.m_bufIVS = null;
+        this.m_type = -1;
+        let i = 0;
+        let vro = null;
 
-      for (; i < this.m_vroListLen; ++i) {
-        vro = this.m_vroList.pop();
-        vro.restoreThis();
-        this.m_vroList[i] = null;
+        for (; i < this.m_vroListLen; ++i) {
+          this.m_vroList[i].restoreThis();
+        }
+
+        this.m_vroList = [];
+        this.m_vroListLen = 0;
+
+        for (i = 0; i < this.m_attribsTotal; ++i) {
+          rc.deleteBuf(this.m_gpuBufs[i]);
+          this.m_gpuBufs[i] = null;
+        }
+
+        this.m_attribsTotal = 0;
+        this.m_gpuBufs = [];
       }
 
-      this.m_vroListLen = 0;
-
-      for (i = 0; i < this.m_attribsTotal; ++i) {
-        rc.deleteBuf(this.m_gpuBufs[i]);
-        this.m_gpuBufs[i] = null;
+      if (this.m_vtxUid >= 0) {
+        ROVertexRes.s_map.delete(this.m_vtxUid);
+        this.m_vtxUid = -1;
       }
-
-      this.m_attribsTotal = 0;
-      this.m_gpuBufs = [];
     }
   }
 
 }
 
+ROVertexRes.s_map = new Map();
 exports.ROVertexRes = ROVertexRes;
 
 /***/ }),
@@ -14656,8 +16519,9 @@ class ShaderCodeBuilder {
     this.vertMatrixInverseEnabled = false;
     this.vtxUVTransfromEnabled = false;
     this.fragMatrixInverseEnabled = false;
-    let self = this;
-    self.uniform = uniform;
+    this.uns = "";
+    let selfT = this;
+    selfT.uniform = uniform;
   }
 
   getUniqueNSKeyID() {
@@ -14673,6 +16537,7 @@ class ShaderCodeBuilder {
   }
 
   reset() {
+    this.uns = "";
     this.m_vertObjMat = true;
     this.m_vertViewMat = true;
     this.m_vertProjMat = true;
@@ -14720,7 +16585,7 @@ class ShaderCodeBuilder {
     this.vertMatrixInverseEnabled = false;
     this.fragMatrixInverseEnabled = false;
     this.vtxUVTransfromEnabled = false;
-    this.m_preCompileInfo = null;
+    this.m_preCompileInfo = new ShaderCompileInfo_1.default();
     this.uniform.reset();
   }
 
@@ -15000,7 +16865,11 @@ class ShaderCodeBuilder {
       this.autoBuildHeadCode();
     }
 
+    const scp = this.m_preCompileInfo;
+    scp.fragOutputTotal = this.m_fragOutputNames.length;
+
     if (this.m_fragOutputNames.length < 1) {
+      scp.fragOutputTotal = 1;
       this.addFragOutput("vec4", "FragColor0");
     }
 
@@ -15014,9 +16883,9 @@ class ShaderCodeBuilder {
 
     if (RendererDevice_1.default.IsWebGL2()) {
       code += this.m_versionDeclare;
-    }
+    } // this.m_preCompileInfo = new ShaderCompileInfo();
 
-    this.m_preCompileInfo = new ShaderCompileInfo_1.default();
+
     this.m_preCompileInfo.info = "\n//##COMPILE_INFO_BEGIN"; // complie info, for example: uniform info
 
     this.m_preCompileInfo.info += "\n//##COMPILE_INFO_END";
@@ -16378,21 +18247,24 @@ const SurfaceNormalCalc_1 = __importDefault(__webpack_require__("35fa"));
 class DataMesh extends MeshBase_1.default {
   constructor(bufDataUsage = VtxBufConst_1.default.VTX_STATIC_DRAW) {
     super(bufDataUsage);
-    this.m_initIVS = null;
     this.m_boundsChanged = true;
-    this.m_vs = null;
-    this.m_uvs = null;
-    this.m_nvs = null;
-    this.m_cvs = null;
-    this.m_tvs = null;
-    this.m_btvs = null;
+    this.m_ils = new Array(1);
+    this.m_iverls = new Array(1);
+    this.m_iver1ls = new Array(1);
+    this.m_ists = new Array(1);
+    this.m_ls = new Array(10);
+    this.m_verls = new Array(10);
     this.m_rayTester = null;
     this.m_boundsVersion = -2;
-    this.autoBuilding = true;
-    this.vsStride = 3;
-    this.uvsStride = 2;
-    this.nvsStride = 3;
-    this.cvsStride = 3;
+    this.autoBuilding = true; // v,u,n,c,t, v2,u2,n2,c2,t2
+
+    this.m_strides = new Uint8Array([3, 2, 3, 3, 3, 3, 2, 3, 3, 3]);
+    this.m_ls.fill(null);
+    this.m_ils.fill(null);
+    this.m_iverls.fill(0);
+    this.m_iver1ls.fill(0);
+    this.m_ists.fill([true, false]);
+    this.m_verls.fill(0);
   }
 
   setRayTester(rayTester) {
@@ -16404,8 +18276,23 @@ class DataMesh extends MeshBase_1.default {
    */
 
 
-  setVS(vs) {
-    this.m_vs = vs;
+  setVS(vs, stride = 3) {
+    this.m_ls[0] = vs;
+    this.m_strides[0] = stride;
+    this.m_verls[0]++;
+    this.m_boundsChanged = true;
+    return this;
+  }
+  /**
+   * set second  vertex position data
+   * @param vs vertex position buffer Float32Array
+   */
+
+
+  setVS2(vs, stride = 3) {
+    this.m_ls[5] = vs;
+    this.m_strides[5] = stride;
+    this.m_verls[5]++;
     this.m_boundsChanged = true;
     return this;
   }
@@ -16415,16 +18302,38 @@ class DataMesh extends MeshBase_1.default {
 
 
   getVS() {
-    return this.m_vs;
+    return this.m_ls[0];
   }
   /**
-   * set vertex uv data
-   * @param vs vertex uv buffer Float32Array
+   * @returns vertex position buffer Float32Array
    */
 
 
-  setUVS(uvs) {
-    this.m_uvs = uvs;
+  getVS2() {
+    return this.m_ls[5];
+  }
+  /**
+   * set vertex uv data
+   * @param uvs vertex uv buffer Float32Array
+   */
+
+
+  setUVS(uvs, stride = 2) {
+    this.m_ls[1] = uvs;
+    this.m_strides[1] = stride;
+    this.m_verls[1]++;
+    return this;
+  }
+  /**
+   * set second vertex uv data
+   * @param uvs vertex uv buffer Float32Array
+   */
+
+
+  setUVS2(uvs, stride = 2) {
+    this.m_ls[6] = uvs;
+    this.m_strides[6] = stride;
+    this.m_verls[6]++;
     return this;
   }
   /**
@@ -16433,7 +18342,15 @@ class DataMesh extends MeshBase_1.default {
 
 
   getUVS() {
-    return this.m_uvs;
+    return this.m_ls[1];
+  }
+  /**
+   * @returns second vertex uv buffer Float32Array
+   */
+
+
+  getUVS2() {
+    return this.m_ls[6];
   }
   /**
    * set vertex normal data
@@ -16441,8 +18358,10 @@ class DataMesh extends MeshBase_1.default {
    */
 
 
-  setNVS(nvs) {
-    this.m_nvs = nvs;
+  setNVS(nvs, stride = 3) {
+    this.m_ls[2] = nvs;
+    this.m_strides[2] = stride;
+    this.m_verls[2]++;
     return this;
   }
   /**
@@ -16451,7 +18370,27 @@ class DataMesh extends MeshBase_1.default {
 
 
   getNVS() {
-    return this.m_nvs;
+    return this.m_ls[2];
+  }
+  /**
+   * set vertex color(r,g,b) data
+   * @param vs vertex color(r,g,b) buffer Float32Array
+   */
+
+
+  setCVS(cvs, stride = 3) {
+    this.m_ls[3] = cvs;
+    this.m_strides[3] = stride;
+    this.m_verls[3]++;
+    return this;
+  }
+  /**
+   * @returns vertex color(r,g,b) data
+   */
+
+
+  getCVS() {
+    return this.m_ls[3];
   }
   /**
    * set vertex tangent data
@@ -16459,8 +18398,10 @@ class DataMesh extends MeshBase_1.default {
    */
 
 
-  setTVS(tvs) {
-    this.m_tvs = tvs;
+  setTVS(tvs, stride = 3) {
+    this.m_ls[4] = tvs;
+    this.m_strides[4] = stride;
+    this.m_verls[4]++;
     return this;
   }
   /**
@@ -16469,134 +18410,174 @@ class DataMesh extends MeshBase_1.default {
 
 
   getTVS() {
-    return this.m_tvs;
-  }
-  /**
-   * set vertex bitangent data
-   * @param vs vertex bitangent buffer Float32Array
-   */
-
-
-  setBTVS(btvs) {
-    this.m_btvs = btvs;
-    return this;
-  }
-  /**
-   * set vertex color(r,g,b) data
-   * @param vs vertex color(r,g,b) buffer Float32Array
-   */
-
-
-  setCVS(cvs) {
-    this.m_cvs = cvs;
-    return this;
-  }
-  /**
-   * @returns vertex bitangent buffer Float32Array
-   */
-
-
-  getBTVS() {
-    return this.m_btvs;
-  }
-
-  setIVS(ivs) {
-    this.m_initIVS = ivs;
-    this.m_ivs = ivs;
-    this.m_boundsChanged = true;
-    return this;
+    return this.m_ls[4];
   }
 
   initializeFromGeometry(geom) {
-    this.m_vs = geom.getVS();
-    this.m_uvs = geom.getUVS();
-    this.m_nvs = geom.getNVS();
-    this.m_tvs = geom.getTVS();
-    this.m_btvs = geom.getBTVS();
-    this.m_cvs = geom.getCVS();
-    this.m_ivs = geom.getIVS();
-    this.m_initIVS = this.m_ivs;
+    this.setVS(geom.getVS());
+    this.setUVS(geom.getUVS());
+    this.setNVS(geom.getNVS());
+    this.setCVS(geom.getCVS());
+    this.setTVS(geom.getTVS());
+    this.setIVSAt(geom.getIVS());
     this.m_boundsChanged = true;
-    this.initialize();
+    return this.initialize();
+  }
+
+  addFloat32Data(data, type, stride, ver, info = "") {
+    let free = this.getBufSortFormat() < 1;
+    free = this.isVBufEnabledAt(type) || free && data != null; // console.log("DataMesh::addFloat32Data(), info: ", info, ", free: ", free, ", ver: ", ver);
+
+    if (free) {
+      ROVertexBuffer_1.default.AddFloat32DataVer(ver);
+      ROVertexBuffer_1.default.AddFloat32Data(data, stride);
+    }
+  }
+
+  setIVS(ivs) {
+    this.m_ivs = ivs;
+    this.m_ils[0] = ivs;
+    this.m_iverls[0] += 1;
+    return this;
+  }
+  /**
+   * @returns vertex indices buffer Uint16Array or Uint32Array
+   */
+
+
+  getIVS() {
+    return this.m_ils[0];
+  }
+
+  setIVSAt(ivs, index = 0, wireframe = false, shape = true) {
+    // console.log("DataMesh::setIVSAt(), index: ", index);
+    if (index == 0) this.m_ivs = ivs;
+    this.m_boundsChanged = true;
+
+    if (index < this.m_ils.length) {
+      this.m_ils[index] = ivs;
+      this.m_iverls[index] += 1;
+      let ls = this.m_ists[index];
+      ls[0] = shape;
+      ls[1] = wireframe;
+    } else if (index == this.m_ils.length) {
+      this.m_ils.push(ivs);
+      this.m_ists.push([shape, wireframe]);
+      this.m_iverls.push(1);
+      this.m_iver1ls.push(0);
+    }
+
+    return this;
+  }
+
+  getIVSAt(index) {
+    return this.m_ils[index];
   }
 
   initialize() {
-    if (this.m_vs != null) {
+    let ls = this.m_ls;
+
+    if (ls[0] != null) {
+      let ds = this.m_strides;
+      let vs = ls[0];
+      let vsStride = ds[0];
+
       if (this.autoBuilding) {
         if (this.bounds == null) {
           this.bounds = new AABB_1.default();
-          this.bounds.addXYZFloat32Arr(this.m_vs);
+          this.bounds.addFloat32Arr(vs, vsStride);
           this.bounds.update();
         } else if (this.m_boundsChanged || this.m_boundsVersion == this.bounds.version) {
           this.bounds.reset(); // 如果重新init, 但是版本号却没有改变，说明bounds需要重新计算
 
-          this.bounds.addXYZFloat32Arr(this.m_vs);
+          this.bounds.addFloat32Arr(vs, vsStride);
           this.bounds.update();
         }
       }
 
       this.m_boundsVersion = this.bounds.version;
       this.m_boundsChanged = false;
-      this.m_ivs = this.m_initIVS;
-      ROVertexBuffer_1.default.Reset();
-      ROVertexBuffer_1.default.AddFloat32Data(this.m_vs, this.vsStride);
+      const ils = this.m_ils;
+      const ivs = ils[0];
+      const verls = this.m_verls;
+      const rvb = ROVertexBuffer_1.default;
+      ROVertexBuffer_1.default.Reset(); // console.log("XXXXXX vsStride: ", vsStride, ", vs: ", vs);
 
-      if (this.isVBufEnabledAt(VtxBufConst_1.default.VBUF_UVS_INDEX)) {
-        ROVertexBuffer_1.default.AddFloat32Data(this.m_uvs, this.uvsStride);
-      } else {
-        console.warn("DataMesh hasn't uv data.");
+      rvb.AddFloat32DataVer(verls[0]);
+      rvb.AddFloat32Data(vs, vsStride);
+      const vc = VtxBufConst_1.default;
+      const vcf = this.addFloat32Data.bind(this);
+      vcf(ls[1], vc.VBUF_UVS_INDEX, ds[1], verls[1]);
+      let nvsIndex = 2;
+      let nvs = ls[nvsIndex];
+      let free = this.getBufSortFormat() < 1;
+
+      if (this.isVBufEnabledAt(VtxBufConst_1.default.VBUF_NVS_INDEX) || free && nvs != null) {
+        if (nvs == null) {
+          let trisNumber = ivs.length / 3;
+          nvs = new Float32Array(vs.length);
+          SurfaceNormalCalc_1.default.ClacTrisNormal(vs, vs.length, trisNumber, ivs, nvs);
+          ls[nvsIndex] = nvs;
+        } // console.log("XXXXXX vsStride: ", ds[nvsIndex], ", nvs: ", nvs);
+
+
+        rvb.AddFloat32DataVer(verls[nvsIndex]);
+        rvb.AddFloat32Data(nvs, ds[nvsIndex]);
       }
 
-      if (this.isVBufEnabledAt(VtxBufConst_1.default.VBUF_NVS_INDEX)) {
-        if (this.m_nvs == null) {
-          let trisNumber = this.m_ivs.length / 3;
-          this.m_nvs = new Float32Array(this.m_vs.length);
-          SurfaceNormalCalc_1.default.ClacTrisNormal(this.m_vs, this.m_vs.length, trisNumber, this.m_ivs, this.m_nvs);
-        }
-
-        ROVertexBuffer_1.default.AddFloat32Data(this.m_nvs, this.nvsStride);
-      } else {
-        console.warn("DataMesh hasn't normal(nvs) data.");
-      }
-
-      if (this.isVBufEnabledAt(VtxBufConst_1.default.VBUF_CVS_INDEX)) {
-        ROVertexBuffer_1.default.AddFloat32Data(this.m_cvs, this.cvsStride);
-      } else {
-        console.warn("DataMesh hasn't color(cvs) data.");
-      }
-
-      if (this.isVBufEnabledAt(VtxBufConst_1.default.VBUF_TVS_INDEX)) {
-        ROVertexBuffer_1.default.AddFloat32Data(this.m_tvs, 3);
-        ROVertexBuffer_1.default.AddFloat32Data(this.m_btvs, 3);
-      }
-
-      ROVertexBuffer_1.default.vbWholeDataEnabled = this.vbWholeDataEnabled;
-      this.vtCount = this.m_ivs.length;
-
-      if (this.autoBuilding) {
-        this.vtxTotal = this.m_vs.length / this.vsStride;
-        this.updateWireframeIvs();
-        this.vtCount = this.m_ivs.length;
-        this.trisNumber = this.vtCount / 3;
-      }
+      vcf(ls[3], vc.VBUF_CVS_INDEX, ds[3], verls[3]);
+      vcf(ls[4], vc.VBUF_TVS_INDEX, ds[4], verls[4]);
+      vcf(ls[5], vc.VBUF_VS2_INDEX, ds[5], verls[5]);
+      vcf(ls[6], vc.VBUF_UVS2_INDEX, ds[6], verls[6]);
+      rvb.vbWholeDataEnabled = this.vbWholeDataEnabled;
+      this.vtCount = ivs.length;
+      this.vtxTotal = vs.length / vsStride;
+      this.vtCount = ivs.length;
+      this.trisNumber = this.vtCount / 3;
 
       if (this.m_vbuf != null) {
-        ROVertexBuffer_1.default.UpdateBufData(this.m_vbuf);
+        rvb.UpdateBufData(this.m_vbuf);
       } else {
         let u = this.getBufDataUsage();
         let f = this.getBufSortFormat();
-        this.m_vbuf = ROVertexBuffer_1.default.CreateBySaveData(u, f);
 
         if (this.vbWholeDataEnabled) {
-          this.m_vbuf = ROVertexBuffer_1.default.CreateBySaveData(u, f);
+          this.m_vbuf = rvb.CreateBySaveData(u, f);
         } else {
-          this.m_vbuf = ROVertexBuffer_1.default.CreateBySaveDataSeparate(u);
+          this.m_vbuf = rvb.CreateBySaveDataSeparate(u);
         }
       }
 
-      this.m_vbuf.setUintIVSData(this.m_ivs);
+      let sts = this.m_ists;
+      let bls = sts[0];
+      bls[0] = this.shape;
+      bls[1] = this.wireframe;
+
+      for (let i = 0; i < ils.length; ++i) {
+        let ird = this.m_vbuf.getIvsDataAt(i);
+        let flag = true;
+
+        if (ird == null) {
+          ird = this.crateROIvsData();
+          bls = sts[i];
+          ird.shape = bls[0];
+          ird.wireframe = bls[1];
+        } else {
+          flag = this.m_iver1ls[i] != this.m_iverls[i];
+        }
+
+        this.m_iver1ls[i] = this.m_iverls[i];
+
+        if (flag) {
+          ird.setData(ils[i]);
+          this.m_vbuf.setIVSDataAt(ird, i);
+        }
+      }
+
       this.buildEnd();
     }
+
+    return this;
   }
   /**
    * 射线和自身的相交检测(多面体或几何函数(例如球体))
@@ -16625,13 +18606,10 @@ class DataMesh extends MeshBase_1.default {
         this.m_rayTester = null;
       }
 
-      this.m_vs = null;
-      this.m_uvs = null;
-      this.m_nvs = null;
-      this.m_cvs = null;
-      this.m_tvs = null;
-      this.m_btvs = null;
-      this.m_initIVS = null;
+      this.m_iverls = [];
+      this.m_iver1ls = [];
+      this.m_ls = [];
+      this.m_ils = [];
 
       super.__$destroy();
     }
@@ -16648,17 +18626,6 @@ exports.default = DataMesh;
 
 "use strict";
 
-/***************************************************************************/
-
-/*                                                                         */
-
-/*  Copyright 2018-2022 by                                                 */
-
-/*  Vily(vily313@126.com)                                                  */
-
-/*                                                                         */
-
-/***************************************************************************/
 
 Object.defineProperty(exports, "__esModule", {
   value: true
@@ -17202,7 +19169,13 @@ exports.default = RenderFBOProxy;
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
-
+ // interface GeometryModelDataType {
+//   uvsList: Float32Array[];
+//   vertices: Float32Array;
+//   normals: Float32Array;
+//   indices: Uint16Array | Uint32Array;
+//   status? : number;
+// }
 
 Object.defineProperty(exports, "__esModule", {
   value: true
@@ -17295,16 +19268,102 @@ class ElementGeomData {
     return ivs;
   }
 
-  buildBufs(obj, sivs, svs, snvs) {
+  buildVS(sivs, svs, sivsLen) {
     let vsLen = sivs.length * 3;
-    let nvs = null;
-    let ivs = this.calcVtxIVS(sivs);
     let vs = new Float32Array(vsLen);
-    let sivsLen = sivs.length;
     let sk = 0;
     let k = 0;
 
-    if (snvs == null || snvs.length == vs.length) {
+    for (let i = 0; i < sivsLen; ++i) {
+      k = i * 3;
+      sk = sivs[i];
+      if (sk < 0) sk = sk * -1 - 1;
+      sk *= 3;
+      vs[k] = svs[sk];
+      vs[k + 1] = svs[sk + 1];
+      vs[k + 2] = svs[sk + 2];
+      k += 3;
+    }
+
+    return vs;
+  }
+
+  buildNVS(sivs, snvs, sivsLen) {
+    let nvs = null;
+    let vsLen = sivs.length * 3;
+
+    if (snvs == null || snvs.length == vsLen) {
+      if (snvs != null) {
+        nvs = new Float32Array(snvs);
+      }
+    } else {
+      let sk = 0;
+      let k = 0;
+      nvs = new Float32Array(vsLen);
+
+      for (let i = 0; i < sivsLen; ++i) {
+        k = i * 3;
+        sk = sivs[i];
+        if (sk < 0) sk = sk * -1 - 1;
+        sk *= 3;
+        nvs[k] = snvs[sk];
+        nvs[k + 1] = snvs[sk + 1];
+        nvs[k + 2] = snvs[sk + 2];
+        k += 3;
+      }
+    }
+
+    return nvs;
+  }
+
+  buildUVS(sivs, suvs) {
+    let uvs = null;
+    let vsLen = sivs.length * 2;
+
+    if (suvs == null || suvs.length == vsLen) {
+      if (suvs != null) {
+        uvs = new Float32Array(suvs);
+      }
+    } else {
+      let sk = 0;
+      let k = 0;
+      uvs = new Float32Array(vsLen);
+
+      for (let i = 0; i < vsLen; ++i) {
+        k = i * 2;
+        sk = sivs[i];
+        if (sk < 0) sk = sk * -1 - 1;
+        sk *= 2;
+        uvs[k] = suvs[sk];
+        uvs[k + 1] = suvs[sk + 1];
+        k += 2;
+      }
+    }
+
+    return uvs;
+  }
+
+  buildBufs(obj, sivs, svs, snvs, suvs, suvivs) {
+    let vsLen = sivs.length * 3;
+    let sivsLen = sivs.length;
+    let nvs = null;
+    let ivs = this.calcVtxIVS(sivs);
+    obj.vertex = this.buildVS(sivs, svs, sivsLen);
+    obj.normal = this.buildNVS(sivs, snvs, sivsLen);
+
+    if (suvs) {
+      obj.uvs = [this.buildUVS(suvivs, suvs)];
+    } else {
+      obj.uvs = null;
+    }
+
+    obj.indices = ivs;
+    return;
+    let vs = new Float32Array(vsLen);
+    let sk = 0;
+    let k = 0;
+
+    if (snvs == null || snvs.length == vsLen) {
       if (snvs != null) {
         nvs = new Float32Array(snvs);
       }
@@ -17356,19 +19415,40 @@ class ElementGeomData {
   }
 
   createBufObject(geoInfo) {
+    console.log("createBufObject(), geoInfo: ", geoInfo);
     let obj = new FBXBufferObject_1.FBXBufferObject();
+    let puvs = null;
+    let uvList = geoInfo.uv;
 
-    if (geoInfo.normal != null) {
-      this.buildBufs(obj, geoInfo.vertexIndices, geoInfo.vertexPositions, geoInfo.normal.buffer);
-    } else {
-      this.buildBufs(obj, geoInfo.vertexIndices, geoInfo.vertexPositions, null);
-      console.error("当前FBX模型法线数据缺失!!!");
+    if (uvList && uvList.length > 0) {
+      puvs = uvList[0];
     }
 
-    let uvsLen = 2 * obj.vertex.length / 3;
-    let uvs = new Float32Array(uvsLen);
-    obj.isEntity = true;
-    obj.uvs = [uvs];
+    let uv_buffer = null;
+    let uv_indices = null;
+
+    if (puvs != null) {
+      uv_buffer = puvs.buffer;
+      uv_indices = puvs.indices;
+    }
+
+    if (geoInfo.normal != null) {
+      this.buildBufs(obj, geoInfo.vertexIndices, geoInfo.vertexPositions, geoInfo.normal.buffer, uv_buffer, uv_indices);
+    } else {
+      this.buildBufs(obj, geoInfo.vertexIndices, geoInfo.vertexPositions, null, uv_buffer, uv_indices);
+      console.error("Error: 当前FBX模型法线数据缺失!!!");
+    }
+
+    if (obj.uvs == null) {
+      obj.uvs = [new Float32Array(2 * obj.indices.length / 3)];
+      console.error("Error: uvs data is empty !!!");
+      obj.errorStatus = 1;
+    } // let uvsLen = 2 * obj.vertex.length / 3;
+    // let uvs = new Float32Array(uvsLen);
+
+
+    obj.isEntity = true; // obj.uvs = [uvs];
+
     return obj;
   }
 
@@ -17414,6 +19494,7 @@ class HttpFileLoader {
    * @param progress its value is 0.0 -> 1.0
    */
   onProgress = null, onError = null, responseType = "blob", headRange = "") {
+    // console.log("HttpFileLoader::load(), A url: ", url);
     // console.log("loadBinBuffer, headRange != '': ", headRange != "");
     if (onLoad == null) {
       throw Error("onload == null !!!");
@@ -17436,6 +19517,7 @@ class HttpFileLoader {
 
     request.onload = e => {
       // console.log("loaded binary buffer request.status: ", request.status, e);
+      // console.log("HttpFileLoader::load(), B url: ", url);
       if (request.status <= 206) {
         reader.readAsArrayBuffer(request.response);
       } else if (onError != null) {
@@ -17588,8 +19670,8 @@ class TextureBlock {
     }
   }
   /**
-   * 设置当前的渲染器
-   * @param renderProxy 当前的渲染器
+   * 设置当前的渲染器代理
+   * @param renderProxy 当前的渲染器代理
    */
 
 
@@ -17606,11 +19688,11 @@ class TextureBlock {
     return this.m_rttStore;
   }
 
-  createWrapperTex(pw, ph, powerof2Boo = false) {
+  createWrapperTex(pw = 128, ph = 128, powerof2Boo = false) {
     return this.m_rttStore.createWrapperTex(pw, ph, powerof2Boo);
   }
 
-  createRTTTex2D(pw, ph, powerof2Boo = false) {
+  createRTTTex2D(pw = 128, ph = 128, powerof2Boo = false) {
     let tex = this.m_rttStore.createRTTTex2D(pw, ph, powerof2Boo);
 
     tex.__$setRenderProxy(this.m_renderProxy);
@@ -17618,11 +19700,11 @@ class TextureBlock {
     return tex;
   }
 
-  createImageTex2D(pw, ph, powerof2Boo = false) {
+  createImageTex2D(w = 64, h = 64, powerof2Boo = false) {
     let tex = this.m_texPool.getTexture(TextureProxyType_1.TextureProxyType.Image);
 
     if (tex == null) {
-      tex = new ImageTextureProxy_1.default(pw, ph, powerof2Boo);
+      tex = new ImageTextureProxy_1.default(w, h, powerof2Boo);
     }
 
     tex.__$setRenderProxy(this.m_renderProxy);
@@ -17668,11 +19750,11 @@ class TextureBlock {
     return new FloatCubeTextureProxy_1.default(pw, ph);
   }
 
-  createBytesTex(texW, texH) {
+  createBytesTex(w, h) {
     let tex = this.m_texPool.getTexture(TextureProxyType_1.TextureProxyType.Bytes);
 
     if (tex == null) {
-      tex = new BytesTextureProxy_1.default(texW, texH);
+      tex = new BytesTextureProxy_1.default(w, h);
     }
 
     tex.__$setRenderProxy(this.m_renderProxy);
@@ -17680,28 +19762,28 @@ class TextureBlock {
     return tex;
   }
 
-  createBytesCubeTex(texW, texH) {
-    let tex = new BytesCubeTextureProxy_1.default(texW, texH);
+  createBytesCubeTex(w, h) {
+    let tex = new BytesCubeTextureProxy_1.default(w, h);
 
     tex.__$setRenderProxy(this.m_renderProxy);
 
     return tex;
   }
 
-  createImageCubeTex(texW, texH) {
-    let tex = new ImageCubeTextureProxy_1.default(texW, texH);
+  createImageCubeTex(w = 64, h = 64) {
+    let tex = new ImageCubeTextureProxy_1.default(w, h);
 
     tex.__$setRenderProxy(this.m_renderProxy);
 
     return tex;
   }
 
-  createTex3D(texW, texH, depth = 1) {
+  createTex3D(w, h, depth = 1) {
     if (depth < 1) {
       depth = 1;
     }
 
-    let tex = new Texture3DProxy_1.default(texW, texH, depth);
+    let tex = new Texture3DProxy_1.default(w, h, depth);
 
     tex.__$setRenderProxy(this.m_renderProxy);
 
@@ -17730,7 +19812,6 @@ class TextureBlock {
 
     tex.__$setRenderProxy(this.m_renderProxy);
 
-    return tex;
     return tex;
   }
 
@@ -18069,10 +20150,6 @@ class ImageTextureProxy extends TextureProxy_1.default {
     }
   }
 
-  toString() {
-    return "[ImageTextureProxy(name:" + this.name + ",uid=" + this.getUid() + ",width=" + this.getWidth() + ",height=" + this.getHeight() + ")]";
-  }
-
 }
 
 exports.default = ImageTextureProxy;
@@ -18095,7 +20172,7 @@ exports.default = ImageTextureProxy;
 /*                                                                         */
 
 /***************************************************************************/
-// 用于对 RPOBlock 进行必要的组织, 例如 合批或者按照 shader不同来分类, 以及依据其他机制分类等等
+// 用于对 MaterialRPOBlock 进行必要的组织, 例如 合批或者按照 shader不同来分类, 以及依据其他机制分类等等
 // 目前一个block内的所有node 所使用的shader program 是相同的
 
 var __importDefault = this && this.__importDefault || function (mod) {
@@ -18110,19 +20187,15 @@ Object.defineProperty(exports, "__esModule", {
 
 const RendererDevice_1 = __importDefault(__webpack_require__("3b73"));
 
-const RPONodeLinker_1 = __importDefault(__webpack_require__("df9d"));
-
-const RenderColorMask_1 = __webpack_require__("070b");
-
-const RenderStateObject_1 = __webpack_require__("a5ba"); //import DebugFlag from "../debug/DebugFlag";
+const SortNodeLinker_1 = __webpack_require__("f571"); //import DebugFlag from "../debug/DebugFlag";
 
 
-class RPOBlock {
+class RPOBlock extends SortNodeLinker_1.SortNodeLinkerNode {
   constructor(shader) {
-    this.m_uid = -1; // 用于唯一记录运行时的自己(RPOBlock实例)唯一id
-
-    this.m_nodeLinker = new RPONodeLinker_1.default();
+    super();
+    this.m_uid = -1;
     this.m_shader = null;
+    this.m_sorter = null;
     this.index = -1; // 记录自身在 RenderProcess blocks数组中的序号
 
     this.shdUid = -1; // 记录 material 对应的 shader program uid
@@ -18134,338 +20207,84 @@ class RPOBlock {
     this.rpoNodeBuilder = null;
     this.rpoUnitBuilder = null;
     this.vtxResource = null;
+    this.sortEnabled = true;
     this.m_shader = shader;
     this.m_uid = RPOBlock.s_uid++;
   }
 
-  showInfo() {
-    this.m_nodeLinker.showInfo();
+  showInfo() {}
+
+  getType() {
+    return -1;
   }
 
-  addNode(node) {
-    this.m_nodeLinker.addNodeAndSort(node);
+  setSorter(sorter) {
+    this.m_sorter = sorter;
   }
 
-  rejoinNode(node) {
-    if (this.m_nodeLinker.containsNode(node)) {
-      this.m_nodeLinker.removeNodeAndSort(node);
-      this.m_nodeLinker.addNodeAndSort(node);
-    }
-  }
+  sort() {}
 
-  removeNode(node) {
-    this.m_nodeLinker.removeNodeAndSort(node);
-  }
+  addNode(node) {}
+
+  rejoinNode(node) {}
+
+  removeNode(node) {}
 
   isEmpty() {
-    return this.m_nodeLinker.getBegin() == null;
+    return true;
   }
 
-  run(rc) {
-    switch (this.runMode) {
-      case 2:
-        this.run2(rc);
-        break;
+  run(rc) {}
 
-      case 1:
-        this.run1(rc);
-        break;
-
-      case 0:
-        this.run0(rc);
-        break;
-
-      default:
-        break;
-    }
-  }
-
-  run0(rc) {
-    let nextNode = this.m_nodeLinker.getBegin();
-
-    if (nextNode != null) {
-      this.m_shader.bindToGpu(this.shdUid);
-      this.m_shader.resetUniform();
-      let unit = null;
-
-      while (nextNode != null) {
-        if (nextNode.drawEnabled) {
-          unit = nextNode.unit;
-
-          if (unit.drawEnabled) {
-            unit.run(rc);
-
-            if (unit.partTotal < 1) {
-              unit.drawThis(rc);
-            } else {
-              unit.drawPart(rc);
-            }
-          }
-        }
-
-        nextNode = nextNode.next;
-      }
-    }
-  }
-
-  run1(rc) {
-    let nextNode = this.m_nodeLinker.getBegin();
-
-    if (nextNode != null) {
-      this.m_shader.bindToGpu(this.shdUid);
-      this.m_shader.resetUniform();
-      let unit = null;
-      let vtxTotal = this.m_nodeLinker.getVtxTotalAt(nextNode.rvroI);
-      let texTotal = this.m_nodeLinker.getTexTotalAt(nextNode.rtroI);
-      let vtxFlag = vtxTotal > 0;
-      let texFlag = texTotal > 0; //console.log("run1",vtxFlag,texFlag);
-
-      while (nextNode != null) {
-        if (vtxTotal < 1) {
-          vtxTotal = this.m_nodeLinker.getVtxTotalAt(nextNode.rvroI);
-          vtxFlag = true;
-        }
-
-        vtxTotal--;
-
-        if (texTotal < 1) {
-          texTotal = this.m_nodeLinker.getTexTotalAt(nextNode.rtroI);
-          texFlag = true;
-        }
-
-        texTotal--; // if(DebugFlag.Flag_0 > 0) console.log("nextNode.drawEnabled: ",nextNode.drawEnabled);
-
-        if (nextNode.drawEnabled) {
-          unit = nextNode.unit; // if(DebugFlag.Flag_0 > 0) console.log("unit.drawEnabled: ",unit.drawEnabled);
-
-          if (unit.drawEnabled) {
-            if (vtxFlag) {
-              nextNode.vro.run();
-              vtxFlag = false;
-            }
-
-            if (texFlag) {
-              nextNode.tro.run();
-              texFlag = false;
-            }
-
-            unit.run2(rc);
-
-            if (unit.partTotal < 1) {
-              unit.drawThis(rc);
-            } else {
-              unit.drawPart(rc);
-            }
-          }
-        }
-
-        nextNode = nextNode.next;
-      }
-    }
-  }
-
-  run2(rc) {
-    let nextNode = this.m_nodeLinker.getBegin();
-
-    if (nextNode != null) {
-      this.m_shader.bindToGpu(this.shdUid);
-      this.m_shader.resetUniform();
-      let unit = null;
-      RenderStateObject_1.RenderStateObject.UseRenderState(nextNode.unit.renderState);
-      RenderColorMask_1.RenderColorMask.UseRenderState(nextNode.unit.rcolorMask);
-      let vtxTotal = this.m_nodeLinker.getVtxTotalAt(nextNode.rvroI);
-      let texTotal = this.m_nodeLinker.getTexTotalAt(nextNode.rtroI);
-      let vtxFlag = vtxTotal > 0;
-      let texFlag = texTotal > 0;
-
-      while (nextNode != null) {
-        if (vtxTotal < 0) {
-          vtxTotal = this.m_nodeLinker.getVtxTotalAt(nextNode.rvroI);
-          vtxFlag = true;
-        }
-
-        vtxTotal--;
-
-        if (texTotal < 0) {
-          texTotal = this.m_nodeLinker.getTexTotalAt(nextNode.rtroI);
-          texFlag = true;
-        }
-
-        texTotal--;
-
-        if (nextNode.drawEnabled) {
-          unit = nextNode.unit;
-
-          if (unit.drawEnabled) {
-            if (vtxFlag) {
-              nextNode.vro.run();
-              vtxFlag = false;
-            }
-
-            if (texFlag) {
-              nextNode.tro.run();
-              texFlag = false;
-            }
-
-            if (unit.ubo != null) {
-              unit.ubo.run(rc);
-            }
-
-            this.m_shader.useTransUniform(unit.transUniform);
-            this.m_shader.useUniform(unit.uniform);
-
-            if (unit.partTotal < 1) {
-              unit.drawThis(rc);
-            } else {
-              unit.drawPart(rc);
-            }
-          }
-        }
-
-        nextNode = nextNode.next;
-      }
-    }
-  }
-
-  runLockMaterial(rc) {
-    let nextNode = this.m_nodeLinker.getBegin();
-
-    if (nextNode != null) {
-      this.m_shader.bindToGpu(this.shdUid);
-      this.m_shader.resetUniform();
-      let texUnlock = this.m_shader.isTextureUnLocked();
-      rc.Texture.unlocked = texUnlock;
-      let unit = null;
-
-      if (this.batchEnabled) {
-        let vtxTotal = this.m_nodeLinker.getVtxTotalAt(nextNode.rvroI);
-        let vtxFlag = vtxTotal > 0;
-
-        while (nextNode != null) {
-          if (vtxTotal < 1) {
-            vtxTotal = this.m_nodeLinker.getVtxTotalAt(nextNode.rvroI);
-            vtxFlag = true;
-          }
-
-          vtxTotal--;
-          unit = nextNode.unit;
-
-          if (nextNode.drawEnabled && unit.drawEnabled) {
-            if (vtxFlag) {
-              nextNode.vro.run();
-              vtxFlag = false;
-            }
-
-            if (texUnlock) {
-              nextNode.tro.run();
-            }
-
-            unit.runLockMaterial2(null);
-
-            if (unit.partTotal < 1) {
-              unit.drawThis(rc);
-            } else {
-              unit.drawPart(rc);
-            }
-          }
-
-          nextNode = nextNode.next;
-        }
-      } else {
-        while (nextNode != null) {
-          unit = nextNode.unit;
-
-          if (nextNode.drawEnabled && unit.drawEnabled) {
-            unit.runLockMaterial();
-
-            if (texUnlock) {
-              nextNode.tro.run();
-            }
-
-            if (unit.partTotal < 1) {
-              unit.drawThis(rc);
-            } else {
-              unit.drawPart(rc);
-            }
-          }
-
-          nextNode = nextNode.next;
-        }
-      }
-
-      rc.Texture.unlocked = false;
-    }
-  } // 在锁定material的时候,直接绘制单个unit
+  runLockMaterial(rc) {} // 在锁定material的时候,直接绘制单个unit
 
 
   drawUnit(rc, unit, disp) {
-    if (unit.drawEnabled) {
-      this.m_shader.bindToGpu(unit.shdUid);
-      unit.run(rc);
+    unit.updateVtx();
 
-      if (unit.partTotal < 1) {
-        unit.drawThis(rc);
-      } else {
-        unit.drawPart(rc);
-      }
+    if (unit.drawing) {
+      this.m_shader.bindToGpu(unit.shdUid);
+      unit.updateVtx();
+      unit.run(rc);
+      unit.draw(rc);
     }
   } // 在锁定material的时候,直接绘制单个unit
 
 
   drawLockMaterialByUnit(rc, unit, disp, useGlobalUniform, forceUpdateUniform) {
-    if (unit.drawEnabled) {
+    unit.updateVtx();
+
+    if (unit.drawing) {
       if (forceUpdateUniform) {
         this.m_shader.resetUniform();
-      } // console.log("***8** drawLockMaterialByUnit(), unit: ",unit);
+      } // console.log("****** drawLockMaterialByUnit(), unit: ",unit);
 
+
+      let vro = unit.vro;
 
       if (RendererDevice_1.default.IsMobileWeb()) {
         // 如果不这么做，vro和shader attributes没有完全匹配的时候可能在某些设备上会有问题(例如ip6s上无法正常绘制)
         // 注意临时产生的 vro 对象的回收问题
-        let vro = this.vtxResource.getVROByResUid(disp.vbuf.getUid(), this.m_shader.getCurrentShd(), true);
-        vro.run();
-      } else {
-        unit.vro.run();
+        // let vro: IVertexRenderObj = this.vtxResource.getVROByResUid(disp.vbuf.getUid(), this.m_shader.getCurrentShd(), true);
+        vro = this.vtxResource.getVROByResUid(disp.getVtxResUid(), this.m_shader.getCurrentShd(), true);
       }
 
+      vro.run();
       unit.runLockMaterial2(useGlobalUniform ? this.m_shader.__$globalUniform : null);
-
-      if (unit.partTotal < 1) {
-        unit.drawThis(rc);
-      } else {
-        unit.drawPart(rc);
-      }
+      unit.draw(rc);
     }
   }
 
   reset() {
-    let nextNode = this.m_nodeLinker.getBegin();
-    let node = null;
-
-    if (nextNode != null) {
-      let runit;
-
-      while (nextNode != null) {
-        node = nextNode;
-        nextNode = nextNode.next;
-        this.rpoUnitBuilder.setRPNodeParam(node.__$ruid, this.procuid, -1);
-        node.reset();
-        runit = node.unit;
-
-        if (this.rpoNodeBuilder.restore(node)) {
-          this.rpoUnitBuilder.restore(runit);
-        }
-      }
-    }
-
     this.index = -1;
     this.shdUid = -1;
     this.procuid = -1;
-    this.m_nodeLinker.clear();
     this.rpoNodeBuilder = null;
     this.rpoUnitBuilder = null;
     this.vtxResource = null;
   }
+
+  clear() {}
 
   destroy() {
     this.reset();
@@ -18473,10 +20292,6 @@ class RPOBlock {
 
   getUid() {
     return this.m_uid;
-  }
-
-  toString() {
-    return "[RPOBlock(uid = " + this.m_uid + ", index = " + this.index + ", shdUid = " + this.shdUid + ")]";
   }
 
 }
@@ -18801,10 +20616,14 @@ Object.defineProperty(exports, "__esModule", {
 
 const ROVertexRes_1 = __webpack_require__("45db");
 
-const ROIndicesRes_1 = __webpack_require__("8ae4");
+const ROIndicesRes_1 = __webpack_require__("8ae4"); // class VtxMap {
+// }
+
 
 class GpuVtxObject {
   constructor() {
+    this.m_uid = GpuVtxObject.s_uid++;
+    this.m_attachCount = 0;
     this.version = -1; // wait del times
 
     this.waitDelTimes = 0; // renderer context unique id
@@ -18812,9 +20631,14 @@ class GpuVtxObject {
     this.rcuid = 0; // texture resource unique id
 
     this.resUid = 0;
-    this.vertex = new ROVertexRes_1.ROVertexRes();
+    this.vertex = null;
     this.indices = new ROIndicesRes_1.ROIndicesRes();
-    this.m_attachCount = 0;
+  }
+
+  createVertex(rc, shdp, vtx) {
+    this.vertex = ROVertexRes_1.ROVertexRes.create(rc, shdp, vtx);
+
+    this.vertex.__$attachThis();
   }
 
   __$attachThis() {
@@ -18825,8 +20649,8 @@ class GpuVtxObject {
     --this.m_attachCount; //console.log("GpuVtxObject::__$detachThis() this.m_attachCount: "+this.m_attachCount);
 
     if (this.m_attachCount < 1) {
-      this.m_attachCount = 0;
-      console.log("GpuVtxObject::__$detachThis() this.m_attachCount value is 0."); // do something
+      this.m_attachCount = 0; // console.log("GpuVtxObject::__$detachThis() this.m_attachCount value is 0.");
+      // do something
     }
   }
 
@@ -18835,9 +20659,9 @@ class GpuVtxObject {
   }
 
   createVRO(rc, shdp, vaoEnabled) {
-    let vro = this.vertex.createVRO(rc, shdp, vaoEnabled, this.indices, this.indices.getUid()); //vro.ibuf = this.indices.getGpuBuf();
+    // console.log("GpuVtxObject::createVRO(), this.resUid: ", this.resUid, ", uid: ", this.m_uid, ", this.indices.getUid(): ", this.indices.getUid());
+    let vro = this.vertex.createVRO(rc, shdp, vaoEnabled, this.indices); // vro.ibufStep = this.indices.ibufStep;
 
-    vro.ibufStep = this.indices.ibufStep;
     return vro;
   }
 
@@ -18848,7 +20672,13 @@ class GpuVtxObject {
 
   destroy(rc) {
     if (this.getAttachCount() < 1 && this.resUid >= 0) {
-      this.vertex.destroy(rc);
+      if (this.vertex != null) {
+        this.vertex.__$detachThis();
+
+        this.vertex.destroy(rc);
+        this.vertex = null;
+      }
+
       this.indices.destroy(rc);
       this.resUid = -1;
     }
@@ -18856,6 +20686,7 @@ class GpuVtxObject {
 
 }
 
+GpuVtxObject.s_uid = 0;
 exports.GpuVtxObject = GpuVtxObject;
 
 /***/ }),
@@ -19006,6 +20837,154 @@ DataPhaseFlag.PHASE_CPU = 1 << 3;
 
 DataPhaseFlag.PHASE_GPU = 1 << 4;
 exports.DataPhaseFlag = DataPhaseFlag;
+
+/***/ }),
+
+/***/ "6c6b":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+/***************************************************************************/
+
+/*                                                                         */
+
+/*  Copyright 2018-2022 by                                                 */
+
+/*  Vily(vily313@126.com)                                                  */
+
+/*                                                                         */
+
+/***************************************************************************/
+
+var __importDefault = this && this.__importDefault || function (mod) {
+  return mod && mod.__esModule ? mod : {
+    "default": mod
+  };
+};
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const MaterialBase_1 = __importDefault(__webpack_require__("0fc4"));
+
+const ShaderCodeBuffer_1 = __importDefault(__webpack_require__("faa5"));
+
+class MaterialShaderBuffer extends ShaderCodeBuffer_1.default {
+  constructor() {
+    super();
+    this.m_uniqueName = "";
+    this.decorator = null;
+  }
+
+  initialize(texEnabled) {
+    super.initialize(texEnabled);
+    console.log("MaterialShaderBuffer::initialize()... texEnabled: " + texEnabled);
+    this.m_uniqueName = "MS_"; // this.m_hasTex = texEnabled;
+
+    if (texEnabled) this.m_uniqueName += "Tex";
+  }
+
+  createTextureList() {
+    this.m_texBuilder.reset();
+    this.decorator.buildTextureList(this.m_texBuilder);
+    return this.m_texBuilder.getTextures();
+  }
+
+  buildShader() {
+    if (this.decorator.vertUniform != null) {
+      this.decorator.vertUniform.use(this.m_coder);
+    }
+
+    this.decorator.buildShader(this.m_coder);
+  }
+
+  getShaderCodeObjectUUID() {
+    return this.decorator.getShaderCodeObjectUUID();
+  }
+
+  getShaderCodeObject() {
+    return this.decorator.getShaderCodeObject();
+  }
+
+  getUniqueShaderName() {
+    let ns = this.m_uniqueName + this.decorator.getUniqueName();
+
+    if (this.decorator.vertUniform != null) {
+      ns += this.decorator.vertUniform.getUniqueNSKeyString();
+    }
+
+    return ns;
+  }
+
+}
+
+class Material extends MaterialBase_1.default {
+  constructor() {
+    super();
+    this.m_decorator = null;
+    if (Material.s_shdBufins == null) Material.s_shdBufins = new MaterialShaderBuffer();
+  }
+
+  buildBuf() {
+    let buf = Material.s_shdBufins;
+    let decorator = this.m_decorator;
+    buf.decorator = decorator;
+    decorator.buildBufParams();
+    buf.vertColorEnabled = decorator.vertColorEnabled;
+    buf.premultiplyAlpha = decorator.premultiplyAlpha;
+    buf.shadowReceiveEnabled = decorator.shadowReceiveEnabled;
+    buf.lightEnabled = decorator.lightEnabled;
+    buf.fogEnabled = decorator.fogEnabled;
+    buf.envAmbientLightEnabled = decorator.envAmbientLightEnabled;
+    buf.brightnessOverlayEnabeld = decorator.brightnessOverlayEnabeld;
+    buf.glossinessEnabeld = decorator.glossinessEnabeld;
+    buf.buildPipelineParams(); // buf.vertUniform = this.vertUniform;
+
+    let list = buf.createTextureList(); //if(this.vertUniform != null) this.vertUniform.getTextures(buf.getShaderCodeBuilder(), list);
+
+    let vertUniform = decorator.vertUniform;
+    if (vertUniform != null) vertUniform.getTextures(buf.getShaderCodeBuilder(), list);
+    buf.getTexturesFromPipeline(list);
+    console.log(decorator, "texture list: ", list);
+    super.setTextureList(list); //buf.texturesTotal = list.length;
+  }
+
+  getCodeBuf() {
+    return Material.s_shdBufins;
+  }
+
+  setTextureList(texList) {
+    // throw Error("Illegal operations !!!");
+    console.error("Illegal operations !!!");
+  }
+
+  setDecorator(decorator) {
+    this.m_decorator = decorator;
+  }
+
+  getDecorator() {
+    return this.m_decorator;
+  }
+
+  createSelfUniformData() {
+    let sud = this.m_decorator.createUniformData(); // if(this.vertUniform != null && sud != null) {
+    //     this.vertUniform.buildShaderUniformData(sud);
+    // }
+
+    return sud;
+  }
+
+  destroy() {
+    super.destroy();
+    this.m_decorator = null;
+  }
+
+}
+
+Material.s_shdBufins = null;
+exports.Material = Material;
 
 /***/ }),
 
@@ -19573,13 +21552,16 @@ class FrameBufferObject {
   }
 
   buildColorRBO(rgl, pw, ph) {
+    if (this.m_colorRBO == null) this.m_colorRBO = rgl.createRenderbuffer();
+    rgl.bindRenderbuffer(rgl.RENDERBUFFER, this.m_colorRBO);
+
     if (this.multisampleEnabled) {
-      if (this.m_colorRBO == null) this.m_colorRBO = rgl.createRenderbuffer();
-      rgl.bindRenderbuffer(rgl.RENDERBUFFER, this.m_colorRBO);
       rgl.renderbufferStorageMultisample(rgl.RENDERBUFFER, this.multisampleLevel, rgl.RGBA8, pw, ph);
-      rgl.framebufferRenderbuffer(this.m_fboTarget, this.m_COLOR_ATTACHMENT0, rgl.RENDERBUFFER, this.m_colorRBO); //
+    } else {
+      rgl.renderbufferStorage(rgl.RENDERBUFFER, rgl.RGBA8, pw, ph);
     }
 
+    rgl.framebufferRenderbuffer(this.m_fboTarget, this.m_COLOR_ATTACHMENT0, rgl.RENDERBUFFER, this.m_colorRBO);
     console.log("FrameBufferObject create only color buf...this.multisampleEnabled: " + this.multisampleEnabled + ",this.multisampleLevel:" + this.multisampleLevel);
   }
 
@@ -19626,6 +21608,7 @@ class FrameBufferObject {
     } else if (this.writeStencilEnabled) {
       this.buildStencilRBO(rgl, pw, ph);
     } else {
+      console.log("fffrfrfrfrfrfr");
       this.buildColorRBO(rgl, pw, ph);
     }
 
@@ -19873,18 +21856,21 @@ exports.default = MathConst;
 
 /***************************************************************************/
 
+var __importDefault = this && this.__importDefault || function (mod) {
+  return mod && mod.__esModule ? mod : {
+    "default": mod
+  };
+};
+
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
-class KeyboardEvent {
+const EventBase_1 = __importDefault(__webpack_require__("a996"));
+
+class KeyboardEvent extends EventBase_1.default {
   constructor() {
-    // phase is event flow phase: 0(none phase),1(capture phase),2(bubble phase)
-    this.phase = 0; // 事件类型
-
-    this.type = KeyboardEvent.KEY_DOWN; // 事件发送者
-
-    this.target = null;
+    super();
     this.altKey = false;
     this.ctrlKey = false;
     this.shiftKey = false;
@@ -19896,10 +21882,6 @@ class KeyboardEvent {
 
   getClassType() {
     return KeyboardEvent.EventClassType;
-  }
-
-  toString() {
-    return "[KeyboardEvent]";
   }
 
 }
@@ -19942,186 +21924,47 @@ Object.defineProperty(exports, "__esModule", {
 
 const MathConst_1 = __importDefault(__webpack_require__("6e01"));
 
-const Vector3D_1 = __importDefault(__webpack_require__("8e17"));
-
 const SubStage3D_1 = __importDefault(__webpack_require__("0236"));
 
 const CameraBase_1 = __importDefault(__webpack_require__("c51d"));
 
-const EntityNodeQueue_1 = __importDefault(__webpack_require__("af68"));
-
-const Entity3DNodeLinker_1 = __importDefault(__webpack_require__("a80a"));
-
 const RendererSpace_1 = __importDefault(__webpack_require__("a446"));
-
-const RaySelector_1 = __importDefault(__webpack_require__("c711"));
-
-const RayGpuSelector_1 = __importDefault(__webpack_require__("955e"));
-
-const MouseEvt3DController_1 = __importDefault(__webpack_require__("765c"));
-
-const FBOInstance_1 = __importDefault(__webpack_require__("af29"));
 
 const RunnableQueue_1 = __importDefault(__webpack_require__("9c4d"));
 
-const Matrix4_1 = __importDefault(__webpack_require__("18c7"));
+const RendererSceneBase_1 = __importDefault(__webpack_require__("aa80"));
 
-class RendererSubScene {
+const EntityTransUpdater_1 = __importDefault(__webpack_require__("7c36"));
+
+class RendererSubScene extends RendererSceneBase_1.default {
   constructor(parent, renderer, evtFlowEnabled) {
-    this.m_uid = -1;
-    this.m_adapter = null;
-    this.m_renderProxy = null;
-    this.m_rcontext = null;
-    this.m_renderer = null;
-    this.m_parent = null;
-    this.m_processids = new Uint8Array(128);
-    this.m_processidsLen = 0;
-    this.m_rspace = null;
-    this.m_mouse_rltv = new Vector3D_1.default();
-    this.m_mouse_rlpv = new Vector3D_1.default();
-    this.m_accessor = null; // event flow control enable
-
-    this.m_evtFlowEnabled = false;
-    this.m_evt3DCtr = null;
-    this.m_mouseEvtEnabled = true;
-    this.m_camera = null;
-    this.m_viewX = 0.0;
-    this.m_viewY = 0.0;
-    this.m_viewW = 800.0;
-    this.m_viewH = 800.0;
-    this.m_nodeWaitLinker = null;
-    this.m_nodeWaitQueue = null;
+    super(1024);
     this.m_perspectiveEnabled = true;
-    this.m_rparam = null;
-    this.m_stage3D = null;
-    this.m_shader = null;
-    this.m_runFlag = -1;
-    this.m_autoRunning = true;
-    this.m_currStage3D = null;
-    this.m_enabled = true;
-    this.runnableQueue = new RunnableQueue_1.default();
-    this.textureBlock = null;
-    this.materialBlock = null;
-    this.entityBlock = null;
-    this.m_containers = [];
-    this.m_containersTotal = 0;
-    this.m_mouseTestBoo = true;
-    this.m_cullingTestBoo = true;
-    this.m_rayTestFlag = true;
-    this.m_rayTestEnabled = true;
-    this.m_prependNodes = null;
-    this.m_appendNodes = null;
+    this.m_parent = null;
     this.m_evtFlowEnabled = evtFlowEnabled;
     this.m_parent = parent;
     this.m_renderer = renderer;
     this.m_shader = renderer.getDataBuilder().getRenderShader();
-    this.m_uid = 1024 + RendererSubScene.s_uid++;
+    this.m_localRunning = true;
   }
 
-  enable() {
-    this.m_enabled = true;
-  }
-
-  disable() {
-    this.m_enabled = false;
-  }
-
-  isEnabled() {
-    return this.m_enabled;
-  }
-
-  getUid() {
-    return this.m_uid;
-  }
-
-  getRPONodeBuilder() {
-    return null;
-  }
-
-  getRenderProxy() {
-    return this.m_renderProxy;
-  } // set new view port rectangle area
-
-
-  setViewPort(px, py, pw, ph) {
-    if (this.m_renderProxy != null) {
-      this.m_viewX = px;
-      this.m_viewY = py;
-      this.m_viewW = pw;
-      this.m_viewH = ph;
-    }
-  } // apply new view port rectangle area
-
-
-  reseizeViewPort() {
-    this.m_renderProxy.reseizeRCViewPort();
-  }
-
-  getRendererAdapter() {
-    return this.m_adapter;
-  }
-
-  getRenderer() {
-    return this.m_renderer;
-  }
-
-  getRendererContext() {
-    return this.m_rcontext;
-  }
-
-  getStage3D() {
-    return this.m_renderProxy.getStage3D();
+  createSubScene(rparam = null, renderProcessesTotal = 3, createNewCamera = true) {
+    return this.m_parent.createSubScene(rparam, renderProcessesTotal, createNewCamera);
   }
 
   getCurrentStage3D() {
     return this.m_currStage3D;
   }
 
-  getViewWidth() {
-    return this.m_renderProxy.getStage3D().viewWidth;
-  }
-
-  getViewHeight() {
-    return this.m_renderProxy.getStage3D().viewHeight;
-  }
-
   getCamera() {
     return this.m_camera;
-  }
-  /**
-   * 获取渲染器可渲染对象管理器状态(版本号)
-   */
-
-
-  getRendererStatus() {
-    return this.m_renderer.getRendererStatus();
-  }
-
-  getMouseXYWorldRay(rl_position, rl_tv) {
-    this.m_camera.getWorldPickingRayByScreenXY(this.m_stage3D.mouseX, this.m_stage3D.mouseY, rl_position, rl_tv);
-  }
-
-  createCamera() {
-    return new CameraBase_1.default();
-  }
-
-  createFBOInstance() {
-    return new FBOInstance_1.default(this, this.textureBlock.getRTTStrore());
-  }
-
-  createMatrix4() {
-    return new Matrix4_1.default();
-  }
-
-  createVector3D(x = 0.0, y = 0.0, z = 0.0, w = 1.0) {
-    return new Vector3D_1.default(x, y, z, w);
   }
 
   setEvt3DController(evt3DCtr) {
     if (evt3DCtr != null) {
       if (this.m_currStage3D == null) {
-        this.m_currStage3D = new SubStage3D_1.default(this.m_renderProxy.getRCUid(), null);
-        this.m_currStage3D.uProbe = this.m_renderProxy.uniformContext.createUniformVec4Probe(1);
+        this.m_currStage3D = new SubStage3D_1.default(this.m_rproxy.getRCUid(), null);
+        this.m_currStage3D.uProbe = this.m_rproxy.uniformContext.createUniformVec4Probe(1);
       }
 
       evt3DCtr.initialize(this.getStage3D(), this.m_currStage3D);
@@ -20131,93 +21974,45 @@ class RendererSubScene {
     this.m_evt3DCtr = evt3DCtr;
   }
 
-  isRayPickSelected() {
-    return this.m_evt3DCtr != null && this.m_evt3DCtr.isSelected();
-  }
-
-  enableMouseEvent(gpuTestEnabled = true) {
-    if (this.m_evt3DCtr == null) {
-      if (gpuTestEnabled) {
-        this.m_rspace.setRaySelector(new RayGpuSelector_1.default());
-      } else {
-        this.m_rspace.setRaySelector(new RaySelector_1.default());
-      }
-
-      this.setEvt3DController(new MouseEvt3DController_1.default());
-    }
-
-    this.m_mouseEvtEnabled = true;
-  }
-
-  disableMouseEvent() {
-    this.m_mouseEvtEnabled = false;
-  }
-
-  getEvt3DController() {
-    return this.m_evt3DCtr;
-  }
-
-  getSpace() {
-    return this.m_rspace;
-  }
-
-  getDevicePixelRatio() {
-    return this.m_adapter.getDevicePixelRatio();
-  }
-
-  addEventListener(type, target, func, captureEnabled = true, bubbleEnabled = false) {
-    this.m_currStage3D.addEventListener(type, target, func, captureEnabled, bubbleEnabled);
-  }
-
-  removeEventListener(type, target, func) {
-    this.m_currStage3D.removeEventListener(type, target, func);
-  }
-
-  setAccessor(accessor) {
-    this.m_accessor = accessor;
-  }
-
   initialize(rparam, renderProcessesTotal = 3, createNewCamera = true) {
-    if (this.m_renderProxy == null) {
+    if (this.m_rproxy == null) {
       if (renderProcessesTotal < 1) {
         renderProcessesTotal = 1;
+      } else if (renderProcessesTotal > 32) {
+        renderProcessesTotal = 32;
       }
 
-      if (renderProcessesTotal > 8) {
-        renderProcessesTotal = 8;
-      }
-
+      let selfT = this;
+      selfT.runnableQueue = new RunnableQueue_1.default();
+      this.m_transUpdater = new EntityTransUpdater_1.default();
       this.m_rparam = rparam;
       this.m_perspectiveEnabled = rparam.cameraPerspectiveEnabled;
-      let process = null;
 
       for (; renderProcessesTotal >= 0;) {
-        process = this.m_renderer.appendProcess(rparam.batchEnabled, rparam.processFixedState);
+        const process = this.m_renderer.appendProcess(rparam.batchEnabled, rparam.processFixedState);
         this.m_processids[this.m_processidsLen] = process.getRPIndex();
         this.m_processidsLen++;
         --renderProcessesTotal;
       }
 
       this.m_rcontext = this.m_renderer.getRendererContext();
-      this.m_renderProxy = this.m_rcontext.getRenderProxy();
-      this.m_adapter = this.m_renderProxy.getRenderAdapter();
-      this.m_stage3D = this.m_renderProxy.getStage3D();
+      this.m_rproxy = this.m_rcontext.getRenderProxy();
+      this.m_adapter = this.m_rproxy.getRenderAdapter();
+      this.m_stage3D = this.m_rproxy.getStage3D();
       this.m_viewX = this.m_stage3D.getViewX();
       this.m_viewY = this.m_stage3D.getViewY();
       this.m_viewW = this.m_stage3D.getViewWidth();
       this.m_viewH = this.m_stage3D.getViewHeight();
-
-      if (createNewCamera) {
-        this.createMainCamera();
-      } else {
-        this.m_camera = this.m_renderProxy.getCamera();
-      }
+      this.m_camera = createNewCamera ? this.createMainCamera() : this.m_rproxy.getCamera();
 
       if (this.m_rspace == null) {
-        this.m_rspace = new RendererSpace_1.default();
-        this.m_rspace.initialize(this.m_renderer, this.m_camera);
+        let sp = new RendererSpace_1.default();
+        sp.initialize(this.m_renderer, this.m_camera);
+        this.m_rspace = sp;
       }
     }
+
+    return this;
   }
 
   createMainCamera() {
@@ -20234,6 +22029,7 @@ class RendererSubScene {
 
     this.m_camera.lookAtRH(this.m_rparam.camPosition, this.m_rparam.camLookAtPos, this.m_rparam.camUpDirect);
     this.m_camera.update();
+    return this.m_camera;
   }
 
   cameraLock() {
@@ -20242,175 +22038,6 @@ class RendererSubScene {
 
   cameraUnlock() {
     this.m_camera.unlock();
-  }
-
-  updateRenderBufferSize() {
-    this.m_adapter.updateRenderBufferSize();
-  }
-
-  setRendererProcessParam(index, batchEnabled, processFixedState) {
-    this.m_renderer.setRendererProcessParam(this.m_processids[index], batchEnabled, processFixedState);
-  }
-
-  appendARendererProcess(batchEnabled = true, processFixedState = false) {
-    let process = this.m_renderer.appendProcess(batchEnabled, processFixedState);
-    this.m_processids[this.m_processidsLen] = process.getRPIndex();
-    this.m_processidsLen++;
-  }
-  /**
-   * get the renderer process by process index
-   * @param processIndex IRenderProcess instance index in renderer scene instance
-   */
-
-
-  getRenderProcessAt(processIndex) {
-    return this.m_renderer.getProcessAt(this.m_processids[processIndex]);
-  }
-
-  addContainer(container, processIndex = 0) {
-    if (processIndex < 0) {
-      processIndex = 0;
-    }
-
-    if (container != null && container.__$wuid < 0 && container.__$contId < 1) {
-      let i = 0;
-
-      for (; i < this.m_containersTotal; ++i) {
-        if (this.m_containers[i] == container) {
-          return;
-        }
-      }
-
-      if (i >= this.m_containersTotal) {
-        container.__$wuid = this.m_uid;
-        container.wprocuid = processIndex;
-
-        container.__$setRenderer(this);
-
-        this.m_containers.push(container);
-        this.m_containersTotal++;
-      }
-    }
-  }
-
-  removeContainer(container) {
-    if (container != null && container.__$wuid == this.m_uid && container.getRenderer() == this.m_renderer) {
-      let i = 0;
-
-      for (; i < this.m_containersTotal; ++i) {
-        if (this.m_containers[i] == container) {
-          container.__$wuid = -1;
-          container.wprocuid = -1;
-
-          container.__$setRenderer(null);
-
-          this.m_containers.splice(i, 1);
-          --this.m_containersTotal;
-          break;
-        }
-      }
-    }
-  }
-
-  setAutoRunningEnabled(autoRunning) {
-    this.m_autoRunning = autoRunning;
-  }
-  /**
-   * 将已经在渲染运行时中的entity移动到指定 process uid 的 render process 中去
-   * move rendering runtime displayEntity to different renderer process
-   */
-
-
-  moveEntityTo(entity, processIndex) {
-    this.m_renderer.moveEntityToProcessAt(entity, this.m_processids[processIndex]);
-  }
-  /**
-   * 单独绘制可渲染对象, 可能是使用了 global material也可能没有。这种方式比较耗性能,只能用在特殊的地方。
-   * @param entity 需要指定绘制的 IRenderEntity 实例
-   * @param useGlobalUniform 是否使用当前 global material 所携带的 uniform, default value: false
-   * @param forceUpdateUniform 是否强制更新当前 global material 所对应的 shader program 的 uniform, default value: true
-   */
-
-
-  drawEntity(entity, useGlobalUniform = false, forceUpdateUniform = true) {
-    this.m_renderer.drawEntity(entity, useGlobalUniform, forceUpdateUniform);
-  }
-  /**
-   * add an entity to the renderer process of the renderer instance
-   * @param entity IRenderEntity instance(for example: DisplayEntity class instance)
-   * @param processid this destination renderer process id
-   * @param deferred if the value is true,the entity will not to be immediately add to the renderer process by its id
-   */
-
-
-  addEntity(entity, processIndex = 0, deferred = true) {
-    if (entity != null && entity.__$testSpaceEnabled()) {
-      if (entity.isPolyhedral()) {
-        if (entity.hasMesh()) {
-          this.m_renderer.addEntity(entity, this.m_processids[processIndex], deferred);
-
-          if (this.m_rspace != null) {
-            this.m_rspace.addEntity(entity);
-          }
-        } else {
-          // wait queue
-          if (this.m_nodeWaitLinker == null) {
-            this.m_nodeWaitLinker = new Entity3DNodeLinker_1.default();
-            this.m_nodeWaitQueue = new EntityNodeQueue_1.default();
-          }
-
-          let node = this.m_nodeWaitQueue.addEntity(entity);
-          node.rstatus = processIndex;
-          this.m_nodeWaitLinker.addNode(node);
-        }
-      } else {
-        this.m_renderer.addEntity(entity, this.m_processids[processIndex], deferred);
-
-        if (this.m_rspace != null) {
-          this.m_rspace.addEntity(entity);
-        }
-      }
-    }
-  } // 这是真正的完全将entity从world中清除
-
-
-  removeEntity(entity) {
-    if (entity != null) {
-      let node = null;
-
-      if (this.m_nodeWaitLinker != null) {
-        let node = this.m_nodeWaitQueue.getNodeByEntity(entity);
-
-        if (node != null) {
-          this.m_nodeWaitLinker.removeNode(node);
-          this.m_nodeWaitQueue.removeEntity(entity);
-        }
-      }
-
-      if (node == null) {
-        this.m_renderer.removeEntity(entity);
-
-        if (this.m_rspace != null) {
-          this.m_rspace.removeEntity(entity);
-        }
-      }
-    }
-  }
-
-  updateMaterialUniformToCurrentShd(material) {
-    this.m_renderer.updateMaterialUniformToCurrentShd(material);
-  } // 首先要锁定Material才能用这种绘制方式,再者这个entity已经完全加入渲染器了渲染资源已经准备完毕,这种方式比较耗性能，只能用在特殊的地方
-  // drawEntityByLockMaterial(entity: IRenderEntity): void {
-  //     this.m_renderer.drawEntityByLockMaterial(entity);
-  // }
-
-
-  showInfoAt(index) {
-    this.m_renderer.showInfoAt(index);
-  }
-
-  updateCameraData(camera) {
-    this.m_rcontext.updateCameraDataFromCamera(this.m_renderProxy.getCamera());
   }
   /**
    * the function only resets the renderer instance rendering status.
@@ -20423,20 +22050,25 @@ class RendererSubScene {
       this.m_rcontext.renderBegin();
     }
 
-    if (this.m_renderProxy.getCamera() != this.m_camera) {
-      //let boo: boolean = this.m_renderProxy.testViewPortChanged(this.m_viewX, this.m_viewY, this.m_viewW, this.m_viewH);
-      if (this.m_renderProxy.isAutoSynViewAndStage()) {
-        this.m_viewX = this.m_renderProxy.getViewX();
-        this.m_viewY = this.m_renderProxy.getViewY();
-        this.m_viewW = this.m_renderProxy.getViewWidth();
-        this.m_viewH = this.m_renderProxy.getViewHeight();
+    const ry = this.m_rproxy;
+
+    if (this.m_rproxy.getCamera() != this.m_camera) {
+      if (this.m_rproxy.isAutoSynViewAndStage()) {
+        this.m_viewX = ry.getViewX();
+        this.m_viewY = ry.getViewY();
+        this.m_viewW = ry.getViewWidth();
+        this.m_viewH = ry.getViewHeight();
       }
 
       this.m_camera.setViewXY(this.m_viewX, this.m_viewY);
       this.m_camera.setViewSize(this.m_viewW, this.m_viewH);
-      this.m_renderProxy.setRCViewPort(this.m_viewX, this.m_viewY, this.m_viewW, this.m_viewH, this.m_renderProxy.isAutoSynViewAndStage());
-      this.m_renderProxy.reseizeRCViewPort();
-    }
+      ry.setRCViewPort(this.m_viewX, this.m_viewY, this.m_viewW, this.m_viewH, ry.isAutoSynViewAndStage());
+      ry.reseizeRCViewPort();
+    } // if(this.m_clearColorFlag) {
+    //     // ry.setClearColor(this.m_clearColor);
+    //     // ry.adapter.clearColor(this.m_clearColor);
+    // }
+
 
     this.m_camera.update();
     this.m_rcontext.updateCameraDataFromCamera(this.m_camera);
@@ -20453,7 +22085,7 @@ class RendererSubScene {
 
 
   runBegin(autoCycle = true, contextBeginEnabled = false) {
-    if (autoCycle && this.m_autoRunning) {
+    if (autoCycle && this.m_autoRunEnabled) {
       if (this.m_runFlag >= 0) this.runEnd();
       this.m_runFlag = 0;
     }
@@ -20461,255 +22093,13 @@ class RendererSubScene {
     this.renderBegin(contextBeginEnabled);
 
     if (this.m_rspace != null) {
-      //this.m_rspace.setCamera(camFlag ? this.m_renderProxy.getCamera() : this.m_currCamera);
       this.m_rspace.setCamera(this.m_camera);
       this.m_rspace.runBegin();
     }
   }
 
-  setRayTestEanbled(enabled) {
-    this.m_rayTestEnabled = enabled;
-  }
-  /**
-   * @param evtFlowPhase  0(none phase),1(capture phase),2(bubble phase)
-   * @param status: 1(default process),1(deselect ray pick target)
-   * @requires 1 is send evt yes,0 is send evt no,-1 is event nothing
-   */
-
-
-  runMouseTest(evtFlowPhase, status) {
-    let flag = -1;
-
-    if (this.m_evt3DCtr != null && this.m_mouseEvtEnabled) {
-      if (this.m_rayTestFlag && this.m_evt3DCtr.getEvtType() > 0) {
-        // 是否对已经获得的拾取列表做进一步的gpu拾取
-        let selector = this.m_rspace.getRaySelector();
-
-        if (selector != null) {
-          if (this.m_rayTestEnabled) {
-            this.mouseRayTest();
-          } else {
-            selector.clear();
-          } // 如果有gpu拾取则进入这个管理器, 这个管理器得到最终的拾取结果再和前面的计算结果做比较
-
-
-          let total = selector.getSelectedNodesTotal();
-
-          if (total > 1) {
-            let i = 0;
-            let list = selector.getSelectedNodes();
-            let node = null;
-
-            for (; i < total; ++i) {
-              node = list[i];
-
-              if (node.entity.isPolyhedral()) {//this.m_renderer.drawEntityByLockMaterial(node.entity);
-              }
-            }
-          }
-        }
-
-        this.m_rayTestFlag = false;
-      }
-
-      flag = this.m_evt3DCtr.run(evtFlowPhase, status);
-    }
-
-    this.m_mouseTestBoo = false;
-    return flag;
-  }
-  /**
-   * update all data or status of the renderer runtime
-   * should call this function per frame
-   */
-
-
-  update(autoCycle = true, mouseEventEnabled = true) {
-    if (this.m_currStage3D != null) this.m_currStage3D.enterFrame();
-
-    if (autoCycle && this.m_autoRunning) {
-      if (this.m_runFlag != 0) this.runBegin();
-      this.m_runFlag = 1;
-    }
-
-    this.m_mouseTestBoo = true;
-    this.m_cullingTestBoo = true;
-    this.m_rayTestFlag = true; // wait mesh data ready to finish
-
-    if (this.m_nodeWaitLinker != null) {
-      let nextNode = this.m_nodeWaitLinker.getBegin();
-
-      if (nextNode != null) {
-        let pnode;
-        let entity;
-        let status;
-
-        while (nextNode != null) {
-          if (nextNode.entity.hasMesh()) {
-            pnode = nextNode;
-            nextNode = nextNode.next;
-            entity = pnode.entity;
-            status = pnode.rstatus;
-            this.m_nodeWaitLinker.removeNode(pnode);
-            this.m_nodeWaitQueue.removeEntity(pnode.entity); //console.log("RenderScene::update(), ready a mesh data that was finished.");
-
-            this.addEntity(entity, status);
-          } else {
-            nextNode = nextNode.next;
-          }
-        }
-      }
-    } //  this.m_renderer.update();
-
-
-    let i = 0;
-
-    for (; i < this.m_containersTotal; ++i) {
-      this.m_containers[i].update();
-    } // space update
-
-
-    if (this.m_rspace != null) {
-      this.m_rspace.update();
-    }
-
-    if (this.m_rspace != null && this.m_cullingTestBoo) {
-      if (this.m_evt3DCtr != null || this.m_rspace.getRaySelector() != null) {
-        this.m_rspace.run();
-      }
-    }
-
-    if (this.m_mouseTestBoo && !this.m_evtFlowEnabled) {
-      if (mouseEventEnabled) {
-        this.runMouseTest(1, 0);
-      } else if (this.m_evt3DCtr != null) {
-        this.m_evt3DCtr.mouseOutEventTarget();
-      }
-    }
-  } // 渲染可见性裁剪测试
-
-
-  cullingTest() {
-    if (this.m_rspace != null) {
-      this.m_rspace.run();
-    }
-
-    this.m_cullingTestBoo = false;
-  } // 鼠标位置的射线拾取测试
-
-
-  mouseRayTest() {
-    if (this.m_rspace != null) {
-      this.getMouseXYWorldRay(this.m_mouse_rlpv, this.m_mouse_rltv);
-      this.m_rspace.rayTest(this.m_mouse_rlpv, this.m_mouse_rltv);
-    }
-  }
-
-  runRenderNodes(nodes) {
-    if (nodes != null) {
-      // console.log("CoSC runRenderNodes(), nodes.length: ", nodes.length);
-      for (let i = 0; i < nodes.length; ++i) {
-        nodes[i].render();
-      }
-    }
-  }
-
-  addRenderNodes(node, nodes) {
-    for (let i = 0; i < nodes.length; ++i) {
-      if (node == nodes[i]) {
-        return;
-      }
-    }
-
-    nodes.push(node);
-  }
-
-  prependRenderNode(node) {
-    if (node != null && node != this) {
-      if (this.m_prependNodes == null) this.m_prependNodes = [];
-      this.addRenderNodes(node, this.m_prependNodes);
-    }
-  }
-
-  appendRenderNode(node) {
-    if (node != null && node != this) {
-      // console.log("CoSC appendRenderNode(), node: ", node);
-      if (this.m_appendNodes == null) this.m_appendNodes = [];
-      let ls = this.m_appendNodes;
-
-      for (let i = 0; i < ls.length; ++i) {
-        if (node == ls[i]) {
-          return;
-        }
-      }
-
-      ls.push(node);
-    }
-  }
-
-  removeRenderNode(node) {
-    if (node != null) {
-      let ls = this.m_prependNodes;
-
-      if (ls != null) {
-        for (let i = 0; i < ls.length; ++i) {
-          if (node == ls[i]) {
-            ls.splice(i, 1);
-            break;
-          }
-        }
-      }
-    }
-  } // rendering running
-
-
-  run(autoCycle = false) {
-    if (this.m_enabled) {
-      //console.log("rendererSubScene::run...");
-      if (autoCycle && this.m_autoRunning) {
-        if (this.m_runFlag != 1) this.update();
-        this.m_runFlag = 2;
-      }
-
-      this.runnableQueue.run();
-      this.runRenderNodes(this.m_prependNodes);
-
-      for (let i = 0; i < this.m_processidsLen; ++i) {
-        this.m_renderer.runAt(this.m_processids[i]);
-      }
-
-      this.runRenderNodes(this.m_appendNodes);
-
-      if (autoCycle) {
-        this.runEnd();
-      }
-    }
-  }
-
-  runAt(index) {
-    this.m_renderer.runAt(this.m_processids[index]);
-  }
-
-  runEnd() {
-    if (this.m_evt3DCtr != null) {
-      this.m_evt3DCtr.runEnd();
-    }
-
-    if (this.m_rspace != null) {
-      this.m_rspace.runEnd();
-    }
-
-    if (this.m_autoRunning) {
-      this.m_runFlag = -1;
-    }
-
-    if (this.m_accessor != null) {
-      this.m_accessor.renderEnd(this);
-    }
-  }
-
   render() {
-    if (this.m_renderProxy != null) {
+    if (this.m_rproxy != null) {
       this.run(true);
     }
   }
@@ -20728,33 +22118,8 @@ class RendererSubScene {
     }
   }
 
-  setClearUint24Color(colorUint24, alpha = 1.0) {
-    this.m_renderProxy.setClearUint24Color(colorUint24, alpha);
-  }
-
-  setClearRGBColor3f(pr, pg, pb) {
-    this.m_renderProxy.setClearRGBColor3f(pr, pg, pb);
-  }
-
-  setClearRGBAColor4f(pr, pg, pb, pa) {
-    this.m_renderProxy.setClearRGBAColor4f(pr, pg, pb, pa);
-  }
-
-  setClearColor(color) {
-    this.m_renderProxy.setClearRGBAColor4f(color.r, color.g, color.b, color.a);
-  }
-
-  setRenderToBackBuffer() {
-    this.m_renderProxy.setRenderToBackBuffer();
-  }
-
-  destroy() {
-    this.runnableQueue.destroy();
-  }
-
 }
 
-RendererSubScene.s_uid = 0;
 exports.default = RendererSubScene;
 
 /***/ }),
@@ -21177,6 +22542,7 @@ class ShaderGlobalUniform extends ShaderUniform_1.default {
       //  if(this.program != null && rc.getGPUProgram() != this.program) {
       //      console.warn("current gpu shader program can't match this global uniform.");
       //  }
+      // console.log("global uniform run(), names: ", this.uniformNameList);
       this.rst = this.m_slotFlags[this.slotIndex];
       let i = 0;
       let datas = this.m_slotDatas;
@@ -21210,6 +22576,41 @@ class ShaderGlobalUniform extends ShaderUniform_1.default {
 }
 
 exports.default = ShaderGlobalUniform;
+
+/***/ }),
+
+/***/ "72bb":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+/***************************************************************************/
+
+/*                                                                         */
+
+/*  Copyright 2018-2022 by                                                 */
+
+/*  Vily(vily313@126.com)                                                  */
+
+/*                                                                         */
+
+/***************************************************************************/
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+var DisplayRenderSign;
+
+(function (DisplayRenderSign) {
+  // 还没有加入 renderer
+  DisplayRenderSign[DisplayRenderSign["NOT_IN_RENDERER"] = -1] = "NOT_IN_RENDERER"; // 正在进入 renderer
+
+  DisplayRenderSign[DisplayRenderSign["GO_TO_RENDERER"] = 1] = "GO_TO_RENDERER"; // 真正存在于 renderer, 也就是直接可以在 process 中使用了
+
+  DisplayRenderSign[DisplayRenderSign["LIVE_IN_RENDERER"] = 2] = "LIVE_IN_RENDERER";
+})(DisplayRenderSign || (DisplayRenderSign = {}));
+
+exports.DisplayRenderSign = DisplayRenderSign;
 
 /***/ }),
 
@@ -21275,6 +22676,13 @@ class CTMParserListerner {
         DivLog_1.default.ShowLogOnce("ctm file loading " + k + "%");
       }, (status, url) => {
         console.error("load ctm mesh data error, url: ", url);
+        this.ctmParseFinish({
+          vertices: null,
+          uvsList: null,
+          normals: null,
+          indices: null,
+          uuid: url
+        }, url);
       });
     }
   } // 一个任务数据处理完成后的侦听器回调函数
@@ -21313,6 +22721,67 @@ class CTMParserListerner {
 }
 
 exports.CTMParserListerner = CTMParserListerner;
+
+/***/ }),
+
+/***/ "744d":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+/***************************************************************************/
+
+/*                                                                         */
+
+/*  Copyright 2018-2022 by                                                 */
+
+/*  Vily(vily313@126.com)                                                  */
+
+/*                                                                         */
+
+/***************************************************************************/
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+class EmptyVDRInfo {
+  constructor() {
+    this.rdp = null;
+  }
+
+  destroy() {
+    if (this.rdp != null) {
+      this.rdp.clear();
+      this.rdp = null;
+    }
+  }
+
+  lock() {}
+
+  unlock() {}
+
+  isUnlock() {
+    return false;
+  }
+
+  setInstanceCount(insCount) {}
+
+  setWireframe(wireframe) {}
+
+  applyIvsDataAt(index) {}
+
+  setIvsParam(ivsIndex = -1, ivsCount = -1) {}
+
+  reset() {}
+
+  __$$copyToRDP() {
+    return false;
+  }
+
+}
+
+exports.default = EmptyVDRInfo;
 
 /***/ }),
 
@@ -21906,8 +23375,11 @@ class SceneNode {
     this.m_sizeScale = 1.0;
     this.m_lossTime = 0;
     this.m_verticesTotal = 0;
+    this.m_trianglesTotal = 0;
     this.m_errModelTotal = 0;
     this.m_normalErrInfo = "";
+    this.m_vels = [];
+    this.m_uvErrTotal = 0;
     this.m_rotV = new Vector3D_1.default();
   }
 
@@ -21954,10 +23426,16 @@ class SceneNode {
         entity.update();
     }
     //*/
+    //this.m_vels
+    // console.log("XXX XXX XXX, initEntityFinish().");
+    // for(let i = 0; i < this.m_vels.length; ++i) {
+    // 	this.m_vels[i].setVisible(false);
+    // }
   }
 
   initEntity(model, transform = null, index = 0) {
     if (model != null) {
+      // console.log("initEntity(), model: ", model);
       this.m_partsTotal++;
 
       if (model.vertices == null || model.vertices.length < 3) {
@@ -21978,19 +23456,38 @@ class SceneNode {
 
       this.m_lossTime = Date.now() - this.m_time; // console.log("initEntity lossTime: ", (Date.now() - this.m_time) + " ms");
 
+      let flag = false;
+      let uvErrorCheck = false;
+      let hostUrl = window.location.href;
+
+      if (hostUrl.indexOf("uvCheck=true") > 0) {
+        uvErrorCheck = true;
+      }
+
+      if (uvErrorCheck) {
+        if (model.status != undefined && model.status > 0) {
+          console.log("Error model.status: ", model.status);
+          this.m_uvErrTotal++;
+        } else {
+          flag = true;
+        }
+      }
+
       this.m_vtxTotal += model.vertices.length;
       let vs = model.vertices;
       let ivs = model.indices;
       let trisNumber = ivs.length / 3;
+      this.m_trianglesTotal += trisNumber;
       let nvs2 = new Float32Array(vs.length);
       SurfaceNormalCalc_1.default.ClacTrisNormal(vs, vs.length, trisNumber, ivs, nvs2);
       let mb = new NormalCheckMaterial_1.NormalCheckMaterial();
       mb.applyDifference(true); // let material = new NormalViewerMaterial();
 
-      let material = mb.create();
+      let material = mb.create(flag);
       material.initializeByCodeBuf();
-      let dataMesh = new DataMesh_1.default(); // dataMesh.wireframe = true;
-
+      let dataMesh = new DataMesh_1.default();
+      dataMesh.wireframe = flag;
+      dataMesh.shape = !uvErrorCheck;
       dataMesh.vbWholeDataEnabled = false;
       dataMesh.setVS(model.vertices); // dataMesh.setUVS(model.uvsList[0]);
 
@@ -22018,6 +23515,12 @@ class SceneNode {
       this.m_entities.push(entity);
       this.m_rscene.addEntity(entity);
       entity.update();
+
+      if (model.status != undefined && model.status > 0) {
+        console.log("Error model.status: ", model.status);
+      } else {// entity.setIvsParam(0,0);
+        // this.m_vels.push( entity );
+      }
     }
   }
 
@@ -22032,11 +23535,14 @@ class SceneNode {
         this.m_frameBox = null;
       }
 
+      this.m_uvErrTotal = 0;
       this.m_normalErrInfo = "";
       this.m_verticesTotal = 0;
+      this.m_trianglesTotal = 0;
       this.m_transforms = [];
       this.m_transes = [];
       this.m_transles = [];
+      this.m_vels = [];
 
       if (this.m_entities != null) {
         let entities = this.m_entities;
@@ -22082,19 +23588,25 @@ class SceneNode {
           this.m_showTotal++;
           let info = "initialize entity loss time: " + this.m_lossTime + "ms";
           info += "</br>顶点数量: " + this.m_verticesTotal + "个";
+          info += "</br>三角面数量: " + this.m_trianglesTotal + "个";
           info += "</br>子模型数量: " + this.m_showTotal + "/" + this.m_modelsTotal + "个";
 
           if (this.isFinish()) {
             info += "</br>当前模型加载展示完成";
 
             if (this.m_errModelTotal > 0) {
-              info += "</br>注意: 有" + this.m_errModelTotal + "个子模型数据有问题";
+              info += "</br><font color='#ee00aa'>注意: 有" + this.m_errModelTotal + "个子模型法线数据有问题</font>";
+            }
+
+            if (this.m_uvErrTotal) {
+              info += "</br><font color='#ee00aa'>注意: 有" + this.m_uvErrTotal + "个子模型uv数据有问题</font>";
             }
 
             if (this.m_normalErrInfo != "") {
               info += "</br><font color='#ee00aa'>注意: " + this.m_normalErrInfo + ",当前所见的法线由此程序生成</font>";
             }
 
+            info += "</br><b><pre><font color='#eeFFaa'>printLog(info)</font></pre></b>";
             this.initEntityFinish();
           }
 
@@ -22169,15 +23681,16 @@ class MouseEvt3DController {
       this.m_mainStage = mainStage;
       this.m_currStage = currStage;
       let ME = MouseEvent_1.default;
-      mainStage.addEventListener(ME.MOUSE_DOWN, this, this.mouseDownListener, true, false);
-      mainStage.addEventListener(ME.MOUSE_UP, this, this.mouseUpListener, true, false);
-      mainStage.addEventListener(ME.MOUSE_CLICK, this, this.mouseClickListener, true, false);
-      mainStage.addEventListener(ME.MOUSE_MOVE, this, this.mouseMoveListener, true, false);
-      mainStage.addEventListener(ME.MOUSE_WHEEL, this, this.mouseWheeelListener, true, false);
-      mainStage.addEventListener(ME.MOUSE_RIGHT_DOWN, this, this.mouseDownListener, true, false);
-      mainStage.addEventListener(ME.MOUSE_RIGHT_UP, this, this.mouseUpListener, true, false);
-      mainStage.addEventListener(ME.MOUSE_MIDDLE_DOWN, this, this.mouseDownListener, true, false);
-      mainStage.addEventListener(ME.MOUSE_MIDDLE_UP, this, this.mouseUpListener, true, false);
+      mainStage.addEventListener(ME.MOUSE_DOWN, this, this.mouseListener, true, false);
+      mainStage.addEventListener(ME.MOUSE_UP, this, this.mouseListener, true, false);
+      mainStage.addEventListener(ME.MOUSE_CLICK, this, this.mouseListener, true, false);
+      mainStage.addEventListener(ME.MOUSE_DOUBLE_CLICK, this, this.mouseListener, true, false);
+      mainStage.addEventListener(ME.MOUSE_MOVE, this, this.mouseListener, true, false);
+      mainStage.addEventListener(ME.MOUSE_WHEEL, this, this.mouseListener, true, false);
+      mainStage.addEventListener(ME.MOUSE_RIGHT_DOWN, this, this.mouseListener, true, false);
+      mainStage.addEventListener(ME.MOUSE_RIGHT_UP, this, this.mouseListener, true, false);
+      mainStage.addEventListener(ME.MOUSE_MIDDLE_DOWN, this, this.mouseListener, true, false);
+      mainStage.addEventListener(ME.MOUSE_MIDDLE_UP, this, this.mouseListener, true, false);
     }
   }
 
@@ -22185,7 +23698,7 @@ class MouseEvt3DController {
     this.m_raySelector = raySelector;
   }
 
-  mouseWheeelListener(evt) {
+  mouseListener(evt) {
     if (this.m_currStage != null) {
       this.m_currStage.mouseX = this.m_mainStage.mouseX;
       this.m_currStage.mouseY = this.m_mainStage.mouseY;
@@ -22197,70 +23710,77 @@ class MouseEvt3DController {
     this.m_evtWheelDeltaYs[this.m_evtTotal] = evt.wheelDeltaY;
     this.m_mouseEvt.type = evt.type;
     this.m_evtTotal++;
-  } // 鼠标动了, 摄像机动了, 被渲染对象本身动了,都可能形成mouse move事件
-
-
-  mouseMoveListener(evt) {
-    if (this.m_currStage != null) {
-      this.m_currStage.mouseX = this.m_mainStage.mouseX;
-      this.m_currStage.mouseY = this.m_mainStage.mouseY;
-    }
-
-    this.m_evtTypes[this.m_evtTotal] = evt.type;
-    this.m_evtXList[this.m_evtTotal] = evt.mouseX;
-    this.m_evtYList[this.m_evtTotal] = evt.mouseY;
-    this.m_evtWheelDeltaYs[this.m_evtTotal] = 0;
-    this.m_mouseEvt.type = evt.type;
-    this.m_evtTotal++;
   }
-
-  mouseDownListener(evt) {
-    if (this.m_currStage != null) {
-      this.m_currStage.mouseX = this.m_mainStage.mouseX;
-      this.m_currStage.mouseY = this.m_mainStage.mouseY;
-    }
-
-    if (MouseEvt3DController.s_unlockMouseEvt) {
-      this.m_evtTypes[this.m_evtTotal] = evt.type;
-      this.m_evtXList[this.m_evtTotal] = evt.mouseX;
-      this.m_evtYList[this.m_evtTotal] = evt.mouseY;
-      this.m_evtWheelDeltaYs[this.m_evtTotal] = 0;
+  /*
+  private mouseWheelListener(evt: any): void {
+      if (this.m_currStage != null) {
+          this.m_currStage.mouseX = this.m_mainStage.mouseX;
+          this.m_currStage.mouseY = this.m_mainStage.mouseY;
+      }
+      this.m_evtTypes[this.m_evtTotal] = (evt.type);
+      this.m_evtXList[this.m_evtTotal] = (evt.mouseX);
+      this.m_evtYList[this.m_evtTotal] = (evt.mouseY);
+      this.m_evtWheelDeltaYs[this.m_evtTotal] = (evt.wheelDeltaY);
       this.m_mouseEvt.type = evt.type;
       this.m_evtTotal++;
-    }
   }
-
-  mouseUpListener(evt) {
-    if (this.m_currStage != null) {
-      this.m_currStage.mouseX = this.m_mainStage.mouseX;
-      this.m_currStage.mouseY = this.m_mainStage.mouseY;
-    }
-
-    if (MouseEvt3DController.s_unlockMouseEvt) {
-      this.m_evtTypes[this.m_evtTotal] = evt.type;
-      this.m_evtXList[this.m_evtTotal] = evt.mouseX;
-      this.m_evtYList[this.m_evtTotal] = evt.mouseY;
-      this.m_evtWheelDeltaYs[this.m_evtTotal] = 0;
+  // 鼠标动了, 摄像机动了, 被渲染对象本身动了,都可能形成mouse move事件
+  private mouseMoveListener(evt: any): void {
+      if (this.m_currStage != null) {
+          this.m_currStage.mouseX = this.m_mainStage.mouseX;
+          this.m_currStage.mouseY = this.m_mainStage.mouseY;
+      }
+      this.m_evtTypes[this.m_evtTotal] = (evt.type);
+      this.m_evtXList[this.m_evtTotal] = (evt.mouseX);
+      this.m_evtYList[this.m_evtTotal] = (evt.mouseY);
+      this.m_evtWheelDeltaYs[this.m_evtTotal] = (0);
       this.m_mouseEvt.type = evt.type;
       this.m_evtTotal++;
-    }
   }
-
-  mouseClickListener(evt) {
-    if (this.m_currStage != null) {
-      this.m_currStage.mouseX = this.m_mainStage.mouseX;
-      this.m_currStage.mouseY = this.m_mainStage.mouseY;
-    }
-
-    if (MouseEvt3DController.s_unlockMouseEvt) {
-      this.m_evtTypes[this.m_evtTotal] = evt.type;
-      this.m_evtXList[this.m_evtTotal] = evt.mouseX;
-      this.m_evtYList[this.m_evtTotal] = evt.mouseY;
-      this.m_evtWheelDeltaYs[this.m_evtTotal] = 0;
-      this.m_mouseEvt.type = evt.type;
-      this.m_evtTotal++;
-    }
+  private mouseDownListener(evt: any): void {
+      if (this.m_currStage != null) {
+          this.m_currStage.mouseX = this.m_mainStage.mouseX;
+          this.m_currStage.mouseY = this.m_mainStage.mouseY;
+      }
+      if (MouseEvt3DController.s_unlockMouseEvt) {
+          this.m_evtTypes[this.m_evtTotal] = (evt.type);
+          this.m_evtXList[this.m_evtTotal] = (evt.mouseX);
+          this.m_evtYList[this.m_evtTotal] = (evt.mouseY);
+          this.m_evtWheelDeltaYs[this.m_evtTotal] = (0);
+          this.m_mouseEvt.type = evt.type;
+          this.m_evtTotal++;
+      }
   }
+  private mouseUpListener(evt: any): void {
+      if (this.m_currStage != null) {
+          this.m_currStage.mouseX = this.m_mainStage.mouseX;
+          this.m_currStage.mouseY = this.m_mainStage.mouseY;
+      }
+      if (MouseEvt3DController.s_unlockMouseEvt) {
+          this.m_evtTypes[this.m_evtTotal] = (evt.type);
+          this.m_evtXList[this.m_evtTotal] = (evt.mouseX);
+          this.m_evtYList[this.m_evtTotal] = (evt.mouseY);
+          this.m_evtWheelDeltaYs[this.m_evtTotal] = (0);
+          this.m_mouseEvt.type = evt.type;
+          this.m_evtTotal++;
+      }
+  }
+  private mouseClickListener(evt: any): void {
+      if (this.m_currStage != null) {
+          this.m_currStage.mouseX = this.m_mainStage.mouseX;
+          this.m_currStage.mouseY = this.m_mainStage.mouseY;
+      }
+      if (MouseEvt3DController.s_unlockMouseEvt) {
+          this.m_evtTypes[this.m_evtTotal] = (evt.type);
+          this.m_evtXList[this.m_evtTotal] = (evt.mouseX);
+          this.m_evtYList[this.m_evtTotal] = (evt.mouseY);
+          this.m_evtWheelDeltaYs[this.m_evtTotal] = (0);
+          this.m_mouseEvt.type = evt.type;
+          this.m_evtTotal++;
+      }
+  }
+  //*/
+
 
   mouseOutEventTarget() {
     if (this.m_currStage != null) {
@@ -22650,9 +24170,13 @@ Object.defineProperty(exports, "__esModule", {
 
 const RenderSortBlock_1 = __importDefault(__webpack_require__("264c"));
 
-const RPOBlock_1 = __importDefault(__webpack_require__("5f3c"));
+const MaterialRPOBlock_1 = __importDefault(__webpack_require__("3420"));
 
 const ROTransPool_1 = __importDefault(__webpack_require__("9156"));
+
+const SortNodeLinker_1 = __webpack_require__("f571");
+
+const ContainerRPOBlock_1 = __importDefault(__webpack_require__("91da"));
 
 class RenderProcess {
   constructor(shader, rpoNodeBuilder, rpoUnitBuilder, vtxResource, batchEnabled, processFixedState) {
@@ -22662,13 +24186,15 @@ class RenderProcess {
     this.m_rpIndex = -1;
     this.m_nodesLen = 0;
     this.m_enabled = true;
-    this.m_blockList = []; // 记录以相同shader的node为一个集合对象(RPOBlock) 的数组
+    this.m_blockList = []; // 记录以相同shader的node为一个集合对象(MaterialRPOBlock) 的数组
 
     this.m_blockListLen = 0;
-    this.m_blockFList = new Int8Array(RenderProcess.s_max_shdTotal); // 记录以相同shader的node为一个集合对象(RPOBlock)的构建状态 的数组
+    this.m_blockFList = new Int8Array(RenderProcess.s_max_shdTotal); // 记录以相同shader的node为一个集合对象(MaterialRPOBlock)的构建状态 的数组
 
     this.m_blockFListLen = RenderProcess.s_max_shdTotal; // 假定引擎中同时存在的最多的shader 有1024种
 
+    this.m_containerBlocks = [];
+    this.m_scTotal = 0;
     this.m_shader = null;
     this.m_rpoNodeBuilder = null;
     this.m_rpoUnitBuilder = null;
@@ -22677,6 +24203,7 @@ class RenderProcess {
     this.m_fixBlock = null;
     this.m_sortBlock = null;
     this.m_sorter = null;
+    this.m_blockLinker = new SortNodeLinker_1.SortNodeLinker();
     this.m_batchEnabled = true;
     this.m_fixedState = true;
     this.m_sortEnabled = false;
@@ -22696,7 +24223,7 @@ class RenderProcess {
   }
 
   createBlock() {
-    let block = new RPOBlock_1.default(this.m_shader);
+    let block = new MaterialRPOBlock_1.default(this.m_shader);
     block.rpoNodeBuilder = this.m_rpoNodeBuilder;
     block.rpoUnitBuilder = this.m_rpoUnitBuilder;
     block.vtxResource = this.m_vtxResource;
@@ -22735,7 +24262,7 @@ class RenderProcess {
   setSorter(sorter) {
     this.m_sorter = sorter;
 
-    if (this.m_sortBlock != null) {
+    if (this.m_sortBlock) {
       this.m_sortBlock.setSorter(sorter);
     }
   }
@@ -22743,7 +24270,7 @@ class RenderProcess {
   setSortEnabled(sortEnabled) {
     if (this.m_nodesLen < 1) {
       this.m_sortEnabled = sortEnabled;
-    } else if (this.m_sortBlock != null) {
+    } else if (this.m_sortBlock) {
       this.m_sortBlock.sortEnabled = sortEnabled;
     }
   }
@@ -22785,11 +24312,12 @@ class RenderProcess {
       block.procuid = this.m_rpIndex;
       this.m_blockList.push(block);
       this.m_blockFList[node.shdUid] = this.m_blockListLen;
-      ++this.m_blockListLen; //  console.log("RenderProcess::addDisp(), this.uid: ",this.getUid());
-      //  console.log("RenderProcess::addDisp(), create a new RPOBlock instance, block: ",block);
-      //  console.log("RenderProcess::addDisp(), create a new RPOBlock instance, this.m_blockList: ",this.m_blockList);
+      ++this.m_blockListLen;
+      this.m_blockLinker.addNode(block); //  console.log("RenderProcess::addDisp(), this.uid: ",this.getUid());
+      //  console.log("RenderProcess::addDisp(), create a new MaterialRPOBlock instance, block: ",block);
+      //  console.log("RenderProcess::addDisp(), create a new MaterialRPOBlock instance, this.m_blockList: ",this.m_blockList);
     } else {
-      //console.log("RenderProcess::addDisp(), use old RPOBlock instance, m_blockFList["+node.shdUid+"]: "+this.m_blockFList[node.shdUid]);
+      //console.log("RenderProcess::addDisp(), use old MaterialRPOBlock instance, m_blockFList["+node.shdUid+"]: "+this.m_blockFList[node.shdUid]);
       block = this.m_blockList[this.m_blockFList[node.shdUid]];
     }
 
@@ -22798,58 +24326,140 @@ class RenderProcess {
   }
 
   rejoinRunitForTro(runit) {
-    let node = this.m_rpoNodeBuilder.getNodeByUid(runit.__$rpuid);
+    if (!this.m_sortBlock) {
+      let node = this.m_rpoNodeBuilder.getNodeByUid(runit.__$rpuid);
 
-    if (node != null) {
-      node.tro = runit.tro;
-      node.texMid = node.unit.texMid;
-      this.m_blockList[node.index].rejoinNode(node);
+      if (node) {
+        node.tro = runit.tro;
+        node.texMid = node.unit.texMid;
+        this.m_blockList[node.index].rejoinNode(node);
+      }
     }
   }
 
   rejoinRunitForVro(runit) {
-    let node = this.m_rpoNodeBuilder.getNodeByUid(runit.__$rpuid);
+    if (!this.m_sortBlock) {
+      let node = this.m_rpoNodeBuilder.getNodeByUid(runit.__$rpuid);
 
-    if (node != null) {
-      node.drawMode = runit.drawMode;
-      node.ivsIndex = runit.ivsIndex;
-      node.ivsCount = runit.ivsCount;
-      node.insCount = runit.insCount;
-      runit.drawOffset = runit.ivsIndex * runit.ibufStep;
-      node.vtxUid = runit.vtxUid;
-      node.vro = runit.vro;
-      this.m_blockList[node.index].rejoinNode(node);
-      this.m_version++;
+      if (node) {
+        node.vtxUid = runit.vtxUid;
+        node.vro = runit.vro;
+        this.m_blockList[node.index].rejoinNode(node);
+        this.m_version++;
+      }
     }
+  }
+
+  addContainer(container) {
+    console.log("RenderProcess::addContainer() this.m_sortBlock: ", this.m_sortBlock);
+    this.createSortBlock();
+
+    if (this.m_sortBlock) {
+      if (this.m_sortBlock.addContainer(container)) {
+        this.m_scTotal++;
+      }
+    } else {
+      const ls = this.m_containerBlocks;
+      let i = ls.length - 1;
+      let flag = ls.length > 0;
+
+      for (; i >= 0; --i) {
+        if (ls[i].isEmpty() && flag) {
+          ls[i].addContainer(container);
+          flag = true;
+          break;
+        }
+
+        flag = false;
+
+        if (ls[i].hasContainer(container)) {
+          break;
+        }
+      }
+
+      if (i == -1 && !flag) {
+        let block = new ContainerRPOBlock_1.default(this.m_shader);
+        block.addContainer(container);
+        this.m_blockLinker.addNode(block);
+        ls.push(block);
+      }
+    }
+  }
+
+  removeContainer(container) {
+    if (this.m_sortBlock) {
+      if (this.m_sortBlock.removeContainer(container)) {
+        this.m_scTotal--;
+      }
+    } else {
+      const ls = this.m_containerBlocks;
+      let i = 0;
+
+      for (; i < ls.length; ++i) {
+        if (ls[i].hasContainer(container)) {
+          ls[i].removeContainer(container);
+        }
+      }
+    }
+  }
+
+  createSortBlock() {
+    if (this.m_sortEnabled && !this.m_sortBlock) {
+      this.m_sortBlock = new RenderSortBlock_1.default(this.m_shader);
+      this.m_sortBlock.setSorter(this.m_sorter);
+      this.m_blockLinker.addNode(this.m_sortBlock);
+    } // if (this.m_sortBlock) {
+    // 	this.m_sortBlock.addNode(node);
+    // } else {
+    // 	this.m_sortBlock = new RenderSortBlock(this.m_shader);
+    // 	this.m_sortBlock.setSorter(this.m_sorter);
+    // 	this.m_sortBlock.addNode(node);
+    // 	this.m_blockLinker.addNode(this.m_sortBlock);
+    // }
+
   }
 
   addDisp(disp) {
     if (disp != null) {
-      if (disp.__$$runit != null && disp.__$$runit.getRPROUid() < 0) {
+      if (disp.__$$runit && disp.__$$runit.getRPROUid() < 0) {
+        const re = disp.__$$runit.rentity;
+
+        let parent = re.__$getParent();
+
+        while (parent) {
+          if (!parent.hasParent() && parent.getREType() >= 20) {
+            // console.log("RenderProcess(" + this.uid + ")::addDisp(), 容器内驱动渲染，不需要直接加入渲染 process.");
+            return;
+            break;
+          }
+
+          parent = parent.getParent();
+        }
+
         if (disp.__$$runit.getRPROUid() != this.uid) {
-          //console.log("RenderProcess("+this.uid+"), addDisp: ",disp.ivsCount,disp,disp.drawMode);
+          // console.log("RenderProcess(" + this.uid + ")::addDisp(): ", disp.ivsCount, disp, disp.drawMode);
           let node = this.m_rpoNodeBuilder.create();
-          node.unit = this.m_rpoUnitBuilder.getNodeByUid(disp.__$ruid);
-          node.unit.shader = this.m_shader;
+          node.unit = this.m_rpoUnitBuilder.getNodeByUid(disp.__$ruid); // node.unit.shader = this.m_shader;
+
           node.unit.__$rprouid = this.uid;
           disp.__$rpuid = node.uid;
           node.__$ruid = disp.__$ruid;
           node.unit.__$rpuid = node.uid;
           node.updateData();
-          ++this.m_nodesLen; //this.m_rpoUnitBuilder.setRPNodeParam(disp.__$ruid, this.m_rpIndex, node.uid);
-
+          ++this.m_nodesLen;
           this.m_rpoUnitBuilder.setRPNodeParam(disp.__$ruid, this.getUid(), node.uid);
 
           if (this.m_sortEnabled) {
-            console.log("sort process add a disp...");
-
-            if (this.m_sortBlock != null) {
-              this.m_sortBlock.addNode(node);
-            } else {
-              this.m_sortBlock = new RenderSortBlock_1.default(this.m_shader);
-              this.m_sortBlock.setSorter(this.m_sorter);
-              this.m_sortBlock.addNode(node);
-            }
+            // console.log("sort process add a disp...");
+            this.createSortBlock();
+            this.m_sortBlock.addNode(node); // if (this.m_sortBlock) {
+            // 	this.m_sortBlock.addNode(node);
+            // } else {
+            // 	this.m_sortBlock = new RenderSortBlock(this.m_shader);
+            // 	this.m_sortBlock.setSorter(this.m_sorter);
+            // 	this.m_blockLinker.addNode(this.m_sortBlock);
+            // 	this.m_sortBlock.addNode(node);
+            // }
           } else {
             this.addNodeToBlock(node);
           }
@@ -22863,43 +24473,55 @@ class RenderProcess {
   }
 
   updateDispMateiral(disp) {
-    if (disp.__$$runit != null) {
-      let nodeUId = disp.__$$runit.getRPOUid();
+    if (disp.__$$runit) {
+      if (!this.m_sortBlock) {
+        let nodeUId = disp.__$$runit.getRPOUid();
 
-      let node = this.m_rpoNodeBuilder.getNodeByUid(nodeUId); // material info etc.
+        let node = this.m_rpoNodeBuilder.getNodeByUid(nodeUId); // material info etc.
 
-      node.shdUid = node.unit.shdUid;
-      node.texMid = node.unit.texMid;
-      node.tro = node.unit.tro;
-      let block = this.m_blockList[node.index];
-      block.removeNode(node);
-      this.addNodeToBlock(node);
+        node.shdUid = node.unit.shdUid;
+        node.texMid = node.unit.texMid;
+        node.tro = node.unit.tro;
+        let block = this.m_blockList[node.index];
+        block.removeNode(node);
+        this.addNodeToBlock(node);
+      }
     }
   }
 
   removeDisp(disp) {
-    if (disp != null) {
-      if (disp.__$$runit != null) {
+    if (disp) {
+      if (disp.__$$runit) {
+        // const re = (disp.__$$runit as RPOUnit).rentity as IRenderEntity;
+        // let parent = re.__$getParent();
+        // console.log("removeDisp() B ............");
+        // while (parent) {
+        // 	if (!parent.hasParent() && parent.getREType() >= 20) {
+        // 		console.log("RenderProcess(" + this.uid + ")::removeDisp(), 容器内驱动渲染，不需要直接从渲染 process 移除.");
+        // 		return;
+        // 		break;
+        // 	}
+        // 	parent = parent.getParent();
+        // }
         let nodeUId = disp.__$$runit.getRPOUid();
 
-        let node = this.m_rpoNodeBuilder.getNodeByUid(nodeUId); //  console.log("removeDisp(), nodeUId: ",nodeUId, ", this.uid: ",this.getUid());
-        //  console.log("removeDisp(), node != null: "+(node != null),", this.m_blockList: ",this.m_blockList);
+        let node = this.m_rpoNodeBuilder.getNodeByUid(nodeUId); // console.log("RenderProcess("+this.uid+")::removeDisp(), nodeUId: ",nodeUId,disp);
+        // console.log("removeDisp(), node != null: "+(node != null),", this.m_blockList: ",this.m_blockList);
 
-        if (node != null) {
+        if (node) {
           let runit = node.unit;
           let transU = runit.transUniform;
 
-          if (transU != null) {
+          if (transU) {
             ROTransPool_1.default.RemoveTransUniform(transU.key);
           }
 
-          if (this.m_sortBlock == null) {
+          if (this.m_sortBlock) {
+            this.m_sortBlock.removeNode(node);
+          } else {
             let block = this.m_blockList[node.index];
             block.removeNode(node);
-          } else {
-            this.m_sortBlock.removeNode(node);
-          } // this.m_rpoUnitBuilder.setRPNodeParam(disp.__$ruid, this.m_rpIndex, -1);
-
+          }
 
           this.m_rpoUnitBuilder.setRPNodeParam(disp.__$ruid, this.getUid(), -1);
           --this.m_nodesLen;
@@ -22908,7 +24530,7 @@ class RenderProcess {
             this.m_rpoUnitBuilder.restore(runit);
           }
 
-          this.m_vtxResource.__$detachRes(disp.vbuf.getUid());
+          this.m_vtxResource.__$detachRes(disp.getVtxResUid());
 
           disp.__$$runit = null;
           disp.__$ruid = -1;
@@ -22917,6 +24539,27 @@ class RenderProcess {
           console.error("There is no this display instance.");
         }
       }
+    }
+  }
+
+  forceRemoveDisp(disp) {
+    if (disp && disp.__$$runit) {
+      // console.log("RenderProcess(" + this.uid + ")::forceRemoveDisp(), 容器内驱动渲染，不需要直接从渲染 process 移除.");
+      let runit = disp.__$$runit;
+      let transU = runit.transUniform;
+
+      if (transU) {
+        ROTransPool_1.default.RemoveTransUniform(transU.key);
+      }
+
+      this.m_rpoUnitBuilder.setRPNodeParam(disp.__$ruid, this.getUid(), -1);
+      this.m_rpoUnitBuilder.restore(runit);
+
+      this.m_vtxResource.__$detachRes(disp.getVtxResUid());
+
+      disp.__$$runit = null;
+      disp.__$ruid = -1;
+      this.m_version++;
     }
   }
 
@@ -22929,18 +24572,17 @@ class RenderProcess {
 
 
   removeDispUnit(disp) {
-    if (disp != null) {
+    if (disp) {
       if (disp.__$ruid > -1) {
         let nodeUId = disp.__$$runit.getRPOUid();
 
         let node = this.m_rpoNodeBuilder.getNodeByUid(nodeUId);
 
-        if (node != null) {
-          if (this.m_sortBlock == null) {
-            let block = this.m_blockList[node.index];
-            block.removeNode(node);
-          } else {
+        if (node) {
+          if (this.m_sortBlock) {
             this.m_sortBlock.removeNode(node);
+          } else {
+            this.m_blockList[node.index].removeNode(node);
           }
 
           this.m_rpoUnitBuilder.setRPNodeParam(disp.__$ruid, this.m_rpIndex, -1);
@@ -22953,42 +24595,59 @@ class RenderProcess {
   }
 
   update() {
-    if (this.m_enabled && this.m_nodesLen > 0) {
-      if (this.m_sortBlock != null) {
+    const total = this.m_nodesLen + this.m_containerBlocks.length + this.m_scTotal;
+
+    if (this.m_enabled && total > 0) {
+      if (this.m_sortBlock) {
         this.m_sortBlock.update();
       }
     }
   }
 
   run() {
-    if (this.m_enabled && this.m_nodesLen > 0) {
-      let rc = this.m_rc;
+    const total = this.m_nodesLen + this.m_containerBlocks.length + this.m_scTotal;
 
-      if (this.m_sortBlock == null) {
-        if (this.m_shader.isUnLocked()) {
-          for (let i = 0; i < this.m_blockListLen; ++i) {
-            this.m_blockList[i].run(rc);
-          }
-        } else {
-          for (let i = 0; i < this.m_blockListLen; ++i) {
-            this.m_blockList[i].runLockMaterial(rc);
-          }
+    if (this.m_enabled && total > 0) {
+      const rc = this.m_rc;
+      const linker = this.m_blockLinker;
+      let node = linker.getBegin();
+
+      if (this.m_shader.isUnLocked()) {
+        while (node) {
+          node.run(rc);
+          node = node.next;
         }
       } else {
-        if (this.m_shader.isUnLocked()) {
-          this.m_sortBlock.run(rc);
-        } else {
-          this.m_sortBlock.runLockMaterial(rc);
+        while (node) {
+          node.runLockMaterial(rc);
+          node = node.next;
         }
-      }
+      } // if (this.m_sortBlock) {
+      // 	if (this.m_shader.isUnLocked()) {
+      // 		this.m_sortBlock.run(rc);
+      // 	} else {
+      // 		this.m_sortBlock.runLockMaterial(rc);
+      // 	}
+      // } else {
+      // 	if (this.m_shader.isUnLocked()) {
+      // 		for (let i = 0; i < this.m_blockListLen; ++i) {
+      // 			this.m_blockList[i].run(rc);
+      // 		}
+      // 	} else {
+      // 		for (let i = 0; i < this.m_blockListLen; ++i) {
+      // 			this.m_blockList[i].runLockMaterial(rc);
+      // 		}
+      // 	}
+      // }
+
     }
   }
 
   drawDisp(disp, useGlobalUniform = false, forceUpdateUniform = true) {
-    if (disp != null) {
+    if (disp) {
       let unit = disp.__$$runit;
 
-      if (unit != null) {
+      if (unit) {
         if (this.m_shader.isUnLocked()) {
           if (forceUpdateUniform) {
             this.m_shader.resetUniform();
@@ -23000,21 +24659,18 @@ class RenderProcess {
         }
       }
     }
-  }
-  /**
-   * Deprecated(不推荐使用)
-   */
+  } // /**
+  //  * Deprecated(不推荐使用)
+  //  */
+  // drawLockMaterialByDisp(disp: IRODisplay, useGlobalUniform: boolean = false, forceUpdateUniform: boolean = true): void {
+  // 	if (disp != null) {
+  // 		let unit = disp.__$$runit as RPOUnit;
+  // 		if (unit != null) {
+  // 			this.m_fixBlock.drawLockMaterialByUnit(this.m_rc, unit, disp, useGlobalUniform, forceUpdateUniform);
+  // 		}
+  // 	}
+  // }
 
-
-  drawLockMaterialByDisp(disp, useGlobalUniform = false, forceUpdateUniform = true) {
-    if (disp != null) {
-      let unit = disp.__$$runit;
-
-      if (unit != null) {
-        this.m_fixBlock.drawLockMaterialByUnit(this.m_rc, unit, disp, useGlobalUniform, forceUpdateUniform);
-      }
-    }
-  }
 
   reset() {
     this.m_sortEnabled = false;
@@ -23023,9 +24679,8 @@ class RenderProcess {
     this.m_rpIndex = -1;
     this.m_rcuid = -1;
     this.m_rpIndex = -1;
-    let i = 0;
 
-    for (; i < this.m_blockListLen; ++i) {
+    for (let i = 0; i < this.m_blockListLen; ++i) {
       this.m_blockList[i].reset();
     }
 
@@ -23043,9 +24698,7 @@ class RenderProcess {
   }
 
   showInfo() {
-    let i = 0;
-
-    for (; i < this.m_blockListLen; ++i) {
+    for (let i = 0; i < this.m_blockListLen; ++i) {
       this.m_blockList[i].showInfo();
     }
   }
@@ -23058,12 +24711,8 @@ class RenderProcess {
     this.m_enabled = boo;
   }
 
-  getEnabled() {
+  isEnabled() {
     return this.m_enabled;
-  }
-
-  toString() {
-    return "[RenderProcess(uid = " + this.m_rpIndex + ")]";
   }
 
 }
@@ -23158,17 +24807,6 @@ exports.default = UniformLine;
 
 "use strict";
 
-/***************************************************************************/
-
-/*                                                                         */
-
-/*  Copyright 2018-2022 by                                                 */
-
-/*  Vily(vily313@126.com)                                                  */
-
-/*                                                                         */
-
-/***************************************************************************/
 
 Object.defineProperty(exports, "__esModule", {
   value: true
@@ -23270,16 +24908,13 @@ const VtxBufID_1 = __importDefault(__webpack_require__("f044"));
 class VtxSeparatedBuf {
   constructor() {
     this.m_uid = -1;
-    this.m_total = 0;
-    this.layoutBit = 0x0;
-    this.m_fOffsetList = null; //private m_pOffsetList:number[] = null;
-
-    this.m_f32List = null;
-    this.m_f32SizeList = null; //private m_f32PreSizeList: number[] = null;
-
-    this.m_f32ChangedList = null;
+    this.m_ofList = null;
+    this.m_list = null;
+    this.m_dirtyList = null;
+    this.m_verList = null;
     this.m_f32Bufs = null;
     this.m_bufersTotal = 0;
+    this.layoutBit = 0x0;
     this.m_uid = VtxBufID_1.default.CreateNewID();
   }
 
@@ -23289,8 +24924,7 @@ class VtxSeparatedBuf {
 
   getType() {
     return 1;
-  } // private m_stepFloatsTotal: number = 0;
-
+  }
 
   getBuffersTotal() {
     return this.m_bufersTotal;
@@ -23301,63 +24935,74 @@ class VtxSeparatedBuf {
   }
 
   getF32DataAt(index) {
-    return this.m_f32List[index];
+    // console.log("VtxSeparatedBuf::getF32DataAt(), VVV index: ",index, ", this.m_list[index]: ", this.m_list[index]);
+    return this.m_list[index];
   }
 
   setF32DataAt(index, float32Arr, stepFloatsTotal, setpOffsets) {
     if (index < 1) this.m_bufersTotal = 1;else this.m_bufersTotal = index + 1;
 
-    if (this.m_f32List == null) {
-      this.m_f32List = [null, null, null, null, null, null, null, null];
-      this.m_f32ChangedList = [false, false, false, false, false, false, false, false];
-      this.m_f32SizeList = [0, 0, 0, 0, 0, 0, 0, 0]; //this.m_f32PreSizeList = [0, 0, 0, 0, 0, 0, 0, 0];
+    if (this.m_list == null) {
+      this.m_list = new Array(8);
+      this.m_list.fill(null);
+      this.m_dirtyList = new Array(8);
+      this.m_dirtyList.fill(false);
+      this.m_verList = new Array(8);
+      this.m_verList.fill(0);
     }
 
-    this.m_f32List[index] = float32Arr;
+    this.m_list[index] = float32Arr;
 
     if (this.m_f32Bufs != null && float32Arr != null) {
-      this.m_f32ChangedList[index] = true;
+      this.m_dirtyList[index] = true;
     }
 
-    if (setpOffsets != null) this.m_fOffsetList = setpOffsets; // console.log("VtxSeparatedBuf::setF32DataAt(), this.m_bufersTotal: ",this.m_bufersTotal);
+    if (setpOffsets != null) this.m_ofList = setpOffsets; // console.log("VtxSeparatedBuf::setF32DataAt(), this.m_bufersTotal: ",this.m_bufersTotal, setpOffsets);
+    // if (float32Arr != null) {
+    //     this.m_sizeList[index] = float32Arr.length;
+    // }
+  }
 
-    if (float32Arr != null) {
-      this.m_f32SizeList[index] = float32Arr.length;
-    }
+  getF32DataVerAt(index) {
+    // console.log("VtxSeparatedBuf::getF32DataVerAt(), VVV index: ",index, ", ver: ", this.m_verList[index]);
+    return this.m_verList[index];
+  }
+
+  setF32DataVerAt(index, ver) {
+    // console.log("VtxSeparatedBuf::setF32DataVerAt(), VVV index: ",index, ", ver: ", ver);
+    this.m_verList[index] = ver;
   }
 
   setData4fAt(vertexI, attribI, px, py, pz, pw) {
-    vertexI *= this.m_fOffsetList[attribI];
-    this.m_f32List[attribI][vertexI++] = px;
-    this.m_f32List[attribI][vertexI++] = py;
-    this.m_f32List[attribI][vertexI++] = pz;
-    this.m_f32List[attribI][vertexI++] = pw;
+    vertexI *= this.m_ofList[attribI];
+    const vs = this.m_list[attribI];
+    vs[vertexI++] = px;
+    vs[vertexI++] = py;
+    vs[vertexI++] = pz;
+    vs[vertexI++] = pw;
   }
 
   setData3fAt(vertexI, attribI, px, py, pz) {
-    vertexI *= this.m_fOffsetList[attribI];
-    this.m_f32List[attribI][vertexI++] = px;
-    this.m_f32List[attribI][vertexI++] = py;
-    this.m_f32List[attribI][vertexI++] = pz;
+    vertexI *= this.m_ofList[attribI];
+    const vs = this.m_list[attribI];
+    vs[vertexI++] = px;
+    vs[vertexI++] = py;
+    vs[vertexI++] = pz;
   }
 
   setData2fAt(vertexI, attribI, px, py) {
-    vertexI *= this.m_fOffsetList[attribI];
-    this.m_f32List[attribI][vertexI++] = px;
-    this.m_f32List[attribI][vertexI++] = py;
+    vertexI *= this.m_ofList[attribI];
+    const vs = this.m_list[attribI];
+    vs[vertexI++] = px;
+    vs[vertexI++] = py;
   }
 
   destroy() {
-    this.m_f32List = null;
-    this.m_f32ChangedList = null;
-    this.m_f32SizeList = null; //this.m_f32PreSizeList = null;
+    this.m_list = null;
+    this.m_dirtyList = null; // this.m_sizeList = null;
+    // //this.m_f32PreSizeList = null;
 
-    console.log("VtxSeparatedBuf::__$destroy()... ", this);
-    this.m_f32List = null;
-  }
-
-  toString() {
-    return "VtxSeparatedBuf(uid = " + this.m_uid + ")";
+    this.m_list = null;
   }
 
 }
@@ -23440,7 +25085,7 @@ class Entity3DNode {
     this.entity = null;
     this.bounds = null;
     this.rayTestState = 0;
-    this.rpoNode = null;
+    this.runit = null;
     this.spaceId = -1; // 记录上一次摄像机裁剪自身的状态
 
     this.camVisiSt = 0; // 记录摄像机可见状态,大于0表示不可见
@@ -23458,9 +25103,14 @@ class Entity3DNode {
     this.next = null;
     this.entity = null;
     this.bounds = null;
-    this.rpoNode = null;
+    this.runit = null;
     this.spaceId = -1;
     this.camVisi = 0;
+  }
+
+  isVisible() {
+    // console.log(this.runit.rendering, ",", this.runit.drawing);
+    return this.runit.drawing && this.entity.isDrawEnabled(); // return this.runit.rendering && this.runit.drawing;
   }
 
   static GetFreeId() {
@@ -23581,6 +25231,8 @@ class StageBase {
     this.m_baseEvt = new EventBase_1.default();
     this.uProbe = null;
     this.pixelRatio = 1.0;
+    this.stageX = 0;
+    this.stageY = 0;
     this.stageWidth = 800;
     this.stageHeight = 600; // 实际宽高, 和gpu端对齐
 
@@ -23649,6 +25301,7 @@ class StageBase {
   }
 
   mouseDoubleClick() {
+    console.log("stage apply mouseDoubleClick()...");
     this.m_mouseEvt.type = MouseEvent_1.default.MOUSE_DOUBLE_CLICK;
     this.dispatchMouseEvt(1);
   }
@@ -23936,6 +25589,68 @@ exports.OBJSceneNode = OBJSceneNode;
 
 /***/ }),
 
+/***/ "7c36":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+/***************************************************************************/
+
+/*                                                                         */
+
+/*  Copyright 2018-2022 by                                                 */
+
+/*  Vily(vily313@126.com)                                                  */
+
+/*                                                                         */
+
+/***************************************************************************/
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+class EntityTransUpdater {
+  constructor(size = 8192) {
+    this.m_index = 0;
+    this.m_list = new Array(size);
+  }
+
+  addItem(item) {
+    if (item.__$transUpdate < 1) {
+      item.__$transUpdate = 1;
+      this.m_list[this.m_index] = item;
+      this.m_index++;
+    }
+  }
+
+  update() {
+    for (let i = 0; i < this.m_index; ++i) {
+      const t = this.m_list[i];
+
+      if (t.__$transUpdate > 0) {
+        t.update();
+        t.__$transUpdate = 0;
+      }
+    }
+
+    this.m_index = 0;
+  }
+
+  destroy() {
+    this.m_index = 0;
+
+    for (let i = 0; i < this.m_list.length; ++i) {
+      this.m_list[i] = null;
+    }
+  }
+
+}
+
+exports.default = EntityTransUpdater;
+
+/***/ }),
+
 /***/ "7c58":
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -24011,232 +25726,6 @@ class DracoGeomParseTaskDataRouter extends TaskDataRouter_1.TaskDataRouter {
 }
 
 exports.DracoGeomParseTaskDataRouter = DracoGeomParseTaskDataRouter;
-
-/***/ }),
-
-/***/ "7c63":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-/***************************************************************************/
-
-/*                                                                         */
-
-/*  Copyright 2018-2022 by                                                 */
-
-/*  Vily(vily313@126.com)                                                  */
-
-/*                                                                         */
-
-/***************************************************************************/
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-const RenderConst_1 = __webpack_require__("e08e");
-
-class ROStateUnit {
-  constructor() {
-    this.stencilMask = -1;
-  }
-
-}
-
-class RODrawState {
-  constructor() {
-    this.m_units = new Array(128);
-    this.m_unit = null;
-    this.m_blendMode = RenderConst_1.RenderBlendMode.NORMAL;
-    this.m_cullMode = RenderConst_1.CullFaceMode.NONE;
-    this.m_depthTestType = RenderConst_1.DepthTestMode.DISABLE;
-    this.m_cullDisabled = true;
-    this.m_context = null;
-    this.m_gl = null;
-    this.roColorMask = -11;
-  }
-
-  reset() {
-    this.roColorMask = -11;
-  }
-
-  setRenderContext(context) {
-    this.m_context = context;
-    this.m_gl = context.getRC();
-    let rcui = this.m_gl.rcuid;
-    this.m_unit = this.m_units[rcui];
-
-    if (this.m_unit == null) {
-      this.m_unit = this.m_units[rcui] = new ROStateUnit();
-    }
-  }
-
-  setColorMask(mr, mg, mb, ma) {
-    this.m_gl.colorMask(mr, mg, mb, ma);
-  }
-
-  setStencilFunc(func, ref, mask) {
-    this.m_gl.stencilFunc(func, ref, mask);
-  }
-
-  setStencilMask(mask) {
-    if (this.m_unit.stencilMask != mask && mask >= 0) {
-      this.m_unit.stencilMask = mask;
-      this.m_gl.stencilMask(mask);
-    }
-  }
-
-  setStencilOp(fail, zfail, zpass) {
-    this.m_gl.stencilOp(fail, zfail, zpass);
-  }
-
-  setDepthTestEnable(enable) {
-    if (enable) {
-      this.m_gl.enable(this.m_gl.DEPTH_TEST);
-    } else {
-      this.m_gl.disable(this.m_gl.DEPTH_TEST);
-    }
-  }
-
-  setCullFaceEnable(enable) {
-    if (enable) {
-      this.m_gl.enable(this.m_gl.CULL_FACE);
-    } else {
-      this.m_gl.disable(this.m_gl.CULL_FACE);
-    }
-  }
-
-  setBlendEnable(enable) {
-    if (enable) {
-      this.m_gl.enable(this.m_gl.BLEND);
-    } else {
-      this.m_gl.disable(this.m_gl.BLEND);
-    }
-  }
-
-  setCullFaceMode(mode) {
-    if (this.m_cullMode != mode) {
-      this.m_cullMode = mode;
-
-      if (mode != RenderConst_1.CullFaceMode.NONE) {
-        if (this.m_cullDisabled) {
-          this.m_cullDisabled = false;
-          this.m_gl.enable(this.m_gl.CULL_FACE);
-        }
-
-        this.m_gl.cullFace(mode);
-      } else if (!this.m_cullDisabled) {
-        this.m_cullDisabled = true;
-        this.m_gl.disable(this.m_gl.CULL_FACE);
-      }
-    }
-  }
-
-  setBlendMode(mode, params) {
-    if (this.m_blendMode != mode) {
-      // if(DebugFlag.Flag_0 > 0) {
-      //     console.log("this.m_blendMode: ",this.m_blendMode,",mode: ",mode,",params: ", params);
-      // }
-      this.m_blendMode = mode;
-
-      if (mode > 0) {
-        if (params[0] < 1) {
-          //FUNC_ADD
-          // this.m_gl.blendEquation(this.m_gl.FUNC_ADD);
-          // this.m_gl.blendFunc(this.m_gl.ONE, this.m_gl.ZERO);
-          this.m_gl.blendEquation(params[1]);
-          this.m_gl.blendFunc(params[3], params[4]);
-        } else {
-          this.m_gl.blendEquationSeparate(params[1], params[2]);
-          this.m_gl.blendFuncSeparate(params[3], params[4], params[5], params[6]);
-        }
-      } else {
-        this.m_gl.disable(this.m_gl.BLEND);
-      }
-    }
-  }
-
-  getDepthTestMode() {
-    return this.m_depthTestType;
-  }
-
-  setDepthTestMode(type) {
-    if (this.m_depthTestType != type) {
-      const gl = this.m_gl;
-      const DTM = RenderConst_1.DepthTestMode;
-      this.m_depthTestType = type; //trace("RendererBase::setDepthTest(),type：",std::to_string(static_cast<int>(type)));
-
-      switch (type) {
-        case DTM.ALWAYS:
-          //console.log("ALWAYS type: ", type,gl.ALWAYS);
-          gl.depthMask(false);
-          gl.depthFunc(gl.ALWAYS);
-          break;
-
-        case DTM.SKY:
-          gl.depthMask(true);
-          gl.depthFunc(gl.LEQUAL);
-          break;
-
-        case DTM.OPAQUE:
-          //console.log("OPAQUE type: ", type,gl.LESS);
-          gl.depthMask(true);
-          gl.depthFunc(gl.LESS);
-          break;
-
-        case DTM.OPAQUE_OVERHEAD:
-          gl.depthMask(false);
-          gl.depthFunc(gl.EQUAL);
-          break;
-
-        case DTM.DECALS:
-          gl.depthMask(false);
-          gl.depthFunc(gl.LEQUAL);
-          break;
-
-        case DTM.BLEND:
-          gl.depthMask(false);
-          gl.depthFunc(gl.LESS);
-          break;
-
-        case DTM.WIRE_FRAME:
-          gl.depthMask(true);
-          gl.depthFunc(gl.LEQUAL);
-          break;
-
-        case DTM.NEXT_LAYER:
-          gl.depthMask(false);
-          gl.depthFunc(gl.ALWAYS);
-          break;
-
-        case DTM.TRUE_EQUAL:
-          gl.depthMask(true);
-          gl.depthFunc(gl.EQUAL);
-          break;
-
-        case DTM.TRUE_GREATER:
-          gl.depthMask(true);
-          gl.depthFunc(gl.GREATER);
-          break;
-
-        case DTM.TRUE_GEQUAL:
-          gl.depthMask(true);
-          gl.depthFunc(gl.GEQUAL);
-          break;
-
-        case DTM.WIRE_FRAME_NEXT:
-          break;
-
-        default:
-          break;
-      }
-    }
-  }
-
-}
-
-exports.RODrawState = RODrawState;
 
 /***/ }),
 
@@ -24935,6 +26424,142 @@ exports.ThreadBase = ThreadBase;
 
 /***/ }),
 
+/***/ "7f1c":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+/***************************************************************************/
+
+/*                                                                         */
+
+/*  Copyright 2019-2022 by                                                 */
+
+/*  Vily(vily313@126.com)                                                  */
+
+/*                                                                         */
+
+/***************************************************************************/
+
+var __importDefault = this && this.__importDefault || function (mod) {
+  return mod && mod.__esModule ? mod : {
+    "default": mod
+  };
+};
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const PassProcess_1 = __importDefault(__webpack_require__("34cd"));
+/**
+ * 渲染器渲染运行时核心关键执行显示单元,一个unit代表着一个draw call所渲染的所有数据
+ * renderer rendering runtime core executable display unit.
+ */
+
+
+class ContainerFlowRenderer {
+  constructor() {
+    this.passProc = new PassProcess_1.default();
+    this.shdUpdate = false;
+    this.shader = null;
+  }
+
+  runContainer(rc, container) {
+    const els = container.getEntities();
+    const elen = els.length;
+
+    if (elen > 0) {
+      const proc = this.passProc;
+      proc.shader = this.shader; // 可能需要排序
+
+      for (let i = 0; i < elen; ++i) {
+        const et = els[i];
+
+        if (et.isPolyhedral() && et.isVisible() && et.isInRenderer()) {
+          const unit = et.getDisplay().__$$runit;
+
+          if (unit && unit.rendering) {
+            this.shader.bindToGpu(unit.shdUid);
+            unit.updateVtx();
+
+            if (unit.drawing) {
+              if (unit.rgraph && unit.rgraph.isEnabled()) {
+                proc.units = [unit];
+                proc.rc = rc;
+                proc.vtxFlag = true;
+                proc.texFlag = true;
+                unit.rgraph.run(proc);
+                this.shdUpdate = true;
+              } else {
+                if (this.shdUpdate) {
+                  unit.applyShader(true);
+                  this.shdUpdate = false;
+                }
+
+                unit.run(rc);
+                unit.draw(rc);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    const cls = container.getContainers();
+    const clen = cls.length;
+
+    if (clen > 0) {
+      for (let i = 0; i < clen; ++i) {
+        this.runContainer(rc, cls[i]);
+      }
+    }
+  }
+
+  runContainerLock(rc, container) {
+    const els = container.getEntities();
+    const elen = els.length;
+
+    if (elen > 0) {
+      const proc = this.passProc;
+      proc.shader = this.shader; // 可能需要排序
+
+      for (let i = 0; i < elen; ++i) {
+        const et = els[i];
+
+        if (et.isPolyhedral() && et.isVisible() && et.isInRenderer()) {
+          const unit = et.getDisplay().__$$runit;
+
+          if (unit && unit.rendering) {
+            this.shader.bindToGpu(unit.shdUid);
+            unit.updateVtx();
+
+            if (unit.drawing) {
+              unit.vro.run();
+              unit.runLockMaterial2(null);
+              unit.draw(rc);
+            }
+          }
+        }
+      }
+    }
+
+    const cls = container.getContainers();
+    const clen = cls.length;
+
+    if (clen > 0) {
+      for (let i = 0; i < clen; ++i) {
+        this.runContainerLock(rc, cls[i]);
+      }
+    }
+  }
+
+}
+
+exports.default = ContainerFlowRenderer;
+
+/***/ }),
+
 /***/ "80fa":
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -25004,74 +26629,6 @@ class PNGParseTask extends ThreadTask_1.ThreadTask {
 }
 
 exports.PNGParseTask = PNGParseTask;
-
-/***/ }),
-
-/***/ "8171":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-/***************************************************************************/
-
-/*                                                                         */
-
-/*  Copyright 2018-2022 by                                                 */
-
-/*  Vily(vily313@126.com)                                                  */
-
-/*                                                                         */
-
-/***************************************************************************/
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-class Stencil {
-  constructor(rstate) {
-    this.m_rstate = null;
-    this.m_rstate = rstate;
-  }
-
-  setDepthTestEnable(enable) {
-    this.m_rstate.setDepthTestEnable(enable);
-  }
-  /**
-   * 设置 gpu stencilFunc 状态
-   * @param func Specifies the test function. Eight symbolic constants are valid: GL_NEVER, GL_LESS, GL_LEQUAL, GL_GREATER, GL_GEQUAL, GL_EQUAL, GL_NOTEQUAL, and GL_ALWAYS. The initial value is GL_ALWAYS.
-   * @param ref a GLint type number, value range: [0,2n−1];
-   * @param mask GLint type number
-   */
-
-
-  setStencilFunc(func, ref, mask) {
-    this.m_rstate.setStencilFunc(func, ref, mask);
-  }
-  /**
-   * 设置 gpu stencilMask 状态
-   * @param mask GLint type number
-   */
-
-
-  setStencilMask(mask) {
-    this.m_rstate.setStencilMask(mask);
-  }
-  /**
-   * 设置 gpu stencilOp 状态
-   * @param fail Specifies the action to take when the stencil test fails. Eight symbolic constants are accepted: GL_KEEP, GL_ZERO, GL_REPLACE, GL_INCR, GL_INCR_WRAP, GL_DECR, GL_DECR_WRAP, and GL_INVERT. The initial value is GL_KEEP.
-   * @param zfail Specifies the stencil action when the stencil test passes, but the depth test fails. dpfail accepts the same symbolic constants as sfail. The initial value is GL_KEEP.
-   * @param zpass Specifies the stencil action when both the stencil test and the depth test pass, or when the stencil test passes and either there is no depth buffer or depth testing is not enabled. dppass accepts the same symbolic constants as sfail. The initial value is GL_KEEP.
-   */
-
-
-  setStencilOp(fail, zfail, zpass) {
-    this.m_rstate.setStencilOp(fail, zfail, zpass);
-  }
-
-}
-
-exports.Stencil = Stencil;
 
 /***/ }),
 
@@ -25530,6 +27087,7 @@ class FBXBufferObject {
     this.weightsIndices = [];
     this.isEntity = false;
     this.transform = null;
+    this.errorStatus = 0;
   }
 
   toGeometryModel() {
@@ -25605,17 +27163,6 @@ exports.default = RenderMaskBitfield;
 
 "use strict";
 
-/***************************************************************************/
-
-/*                                                                         */
-
-/*  Copyright 2018-2022 by                                                 */
-
-/*  Vily(vily313@126.com)                                                  */
-
-/*                                                                         */
-
-/***************************************************************************/
 
 Object.defineProperty(exports, "__esModule", {
   value: true
@@ -25903,6 +27450,35 @@ class StageParamUniformBuilder {
 }
 
 exports.default = StageParamUniformBuilder;
+
+/***/ }),
+
+/***/ "8414":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+/***************************************************************************/
+
+/*                                                                         */
+
+/*  Copyright 2018-2022 by                                                 */
+
+/*  Vily(vily313@126.com)                                                  */
+
+/*                                                                         */
+
+/***************************************************************************/
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+class VtxNormalType {}
+
+VtxNormalType.FLAT = 210;
+VtxNormalType.GOURAND = 310;
+exports.default = VtxNormalType;
 
 /***/ }),
 
@@ -26400,8 +27976,11 @@ Object.defineProperty(exports, "__esModule", {
 
 const BitConst_1 = __importDefault(__webpack_require__("ca6c"));
 
+const VtxNormalType_1 = __importDefault(__webpack_require__("8414"));
+
+exports.VtxNormalType = VtxNormalType_1.default;
+
 class VtxBufConst {
-  //
   static ToGL(gl, param) {
     const vbc = VtxBufConst;
 
@@ -26593,7 +28172,7 @@ VtxBufConst.VBUF_VS2_INDEX = BitConst_1.default.BIT_ONE_5;
 VtxBufConst.VBUF_UVS2_INDEX = BitConst_1.default.BIT_ONE_6;
 VtxBufConst.VBUF_NVS2_INDEX = BitConst_1.default.BIT_ONE_7;
 VtxBufConst.VBUF_CVS2_INDEX = BitConst_1.default.BIT_ONE_8;
-VtxBufConst.VBUF_TVS2_INDEX = BitConst_1.default.BIT_ONE_9; // name
+VtxBufConst.VBUF_TVS2_INDEX = BitConst_1.default.BIT_ONE_9; // attributes name
 
 VtxBufConst.VBUF_VS_NS = "a_vs";
 VtxBufConst.VBUF_VS2_NS = "a_vs2";
@@ -26605,12 +28184,6 @@ VtxBufConst.VBUF_CVS_NS = "a_cvs";
 VtxBufConst.VBUF_CVS2_NS = "a_cvs2";
 VtxBufConst.VBUF_TVS_NS = "a_tvs";
 VtxBufConst.VBUF_TVS2_NS = "a_tvs2";
-
-class VtxNormalType {}
-
-VtxNormalType.FLAT = 210;
-VtxNormalType.GOURAND = 310;
-exports.VtxNormalType = VtxNormalType;
 exports.default = VtxBufConst;
 
 /***/ }),
@@ -26632,19 +28205,387 @@ exports.default = VtxBufConst;
 
 /***************************************************************************/
 
+var __importDefault = this && this.__importDefault || function (mod) {
+  return mod && mod.__esModule ? mod : {
+    "default": mod
+  };
+};
+
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
+const RenderDrawMode_1 = __importDefault(__webpack_require__("13b1"));
+
+const IROIvsRDP_1 = __webpack_require__("1f32");
+
+exports.IROIvsRDP = IROIvsRDP_1.IROIvsRDP;
+const RDM = RenderDrawMode_1.default;
+
+class BufRData {
+  constructor() {
+    this.m_uid = BufRData.s_uid++;
+    this.m_common = true;
+    this.rc = null;
+    this.buf = null;
+    this.ivsSize = 0;
+    this.ivsInitSize = 0;
+    this.ivsIndex = 0;
+    /**
+     * ivs buffer stride
+     */
+
+    this.stride = 2;
+    this.initDrawMode = RDM.ELEMENTS_TRIANGLES;
+    this.drawMode = RDM.ELEMENTS_TRIANGLES;
+    this.bufType = 0;
+    this.ivsOffset = 0;
+    this.rdpIndex = 0;
+    this.trisNumber = 0;
+    this.insCount = 0;
+    this.bytesSize = 0;
+    /**
+     * gl draw mode
+     */
+
+    this.gldm = 0; // console.log("bufRData this.m_uid: ", this.m_uid);
+  }
+
+  getUid() {
+    return this.m_uid;
+  }
+
+  clone() {
+    let rd = new BufRData();
+    rd.buf = this.buf;
+    rd.ivsIndex = this.ivsIndex;
+    rd.ivsSize = this.ivsSize;
+    rd.ivsInitSize = this.ivsInitSize;
+    rd.stride = this.stride;
+    rd.drawMode = this.drawMode;
+    rd.gldm = this.gldm;
+    rd.ivsOffset = this.ivsOffset;
+    rd.trisNumber = this.trisNumber;
+    rd.insCount = this.insCount;
+    rd.m_common = this.m_common;
+    rd.bufType = this.bufType;
+    rd.rdpIndex = this.rdpIndex;
+    rd.bytesSize = this.bytesSize;
+    return rd;
+  }
+
+  hasIvs() {
+    return this.ivsInitSize > 0;
+  }
+
+  isCommon() {
+    return this.m_common;
+  }
+
+  updateDrawMode() {
+    if (this.hasIvs()) {
+      const im = this.initDrawMode;
+      const flag = im == RDM.ELEMENTS_TRIANGLES || im == RDM.ELEMENTS_LINES;
+      const strip = im == RDM.ELEMENTS_TRIANGLE_STRIP || im == RDM.ELEMENTS_LINES_STRIP;
+
+      if (flag || strip) {
+        const rc = this.rc;
+
+        if (rc == null) {
+          throw Error("illegal operations ...");
+        }
+
+        const cm = this.m_common;
+
+        if (strip) {
+          this.gldm = cm ? rc.TRIANGLE_STRIP : rc.LINE_STRIP;
+        } else {
+          this.gldm = cm ? rc.TRIANGLES : rc.LINES;
+        }
+
+        if (this.insCount < 1) {
+          if (strip) {
+            this.drawMode = cm ? RDM.ELEMENTS_TRIANGLES : RDM.ELEMENTS_LINES;
+          } else {
+            this.drawMode = cm ? RDM.ELEMENTS_TRIANGLE_STRIP : RDM.ELEMENTS_LINES_STRIP;
+          }
+        } else {
+          if (strip) {
+            this.drawMode = cm ? RDM.ELEMENTS_INSTANCED_TRIANGLES_STRIP : RDM.ELEMENTS_INSTANCED_LINES_STRIP;
+          } else {
+            this.drawMode = cm ? RDM.ELEMENTS_INSTANCED_TRIANGLES : RDM.ELEMENTS_INSTANCED_LINES;
+          }
+        }
+      }
+    }
+  }
+
+  setCommon(common) {
+    this.m_common = common;
+    this.updateDrawMode();
+  }
+
+  setInsCount(insCount) {
+    if (this.insCount != insCount) {
+      this.insCount = insCount;
+      this.updateDrawMode();
+    }
+  }
+
+  setIvsParam(ivsIndex, ivsSize) {
+    let pI = this.ivsIndex;
+    let pS = this.ivsSize;
+
+    if (ivsIndex >= 0) {
+      pI = ivsIndex;
+    }
+
+    if (ivsSize >= 0) {
+      pS = ivsSize;
+    }
+
+    ivsIndex = pI;
+    ivsSize = pS;
+    const rd = this;
+    rd.ivsIndex = rd.isCommon() ? ivsIndex : ivsIndex * 2;
+    if (rd.ivsIndex < 0) rd.ivsIndex = 0;else if (rd.ivsIndex >= this.ivsInitSize) rd.ivsIndex = this.ivsInitSize - 1;
+    rd.ivsOffset = rd.ivsIndex * rd.stride; // console.log(" >>> #### !rd.common: ", !rd.common, ", uid: ",this.getUid());
+    // console.log("!rd.isCommon(): ", !rd.isCommon(), pI, pS, ", ivsInitSize: ", this.ivsInitSize);
+
+    if (!rd.isCommon()) {
+      ivsSize *= 2;
+    }
+
+    if (ivsSize + rd.ivsIndex >= this.ivsInitSize) {
+      ivsSize = this.ivsInitSize - rd.ivsIndex;
+    }
+
+    this.ivsSize = ivsSize;
+    this.trisNumber = Math.floor(ivsSize / 3); // console.log("OOOO BufRData !rd.common #####: ", !rd.common, rd.ivsIndex, this.ivsSize, ", uid: ",this.getUid());
+  }
+
+  destroy(vrc) {
+    this.rc = null;
+
+    if (this.buf != null) {
+      vrc.deleteBuf(this.buf);
+      this.buf = null;
+    }
+  }
+
+  clear() {
+    this.buf = null;
+    this.rc = null;
+  }
+
+}
+
+BufRData.s_uid = 0;
+
+class BufRDataPair {
+  constructor(index) {
+    this.m_uid = BufRDataPair.s_uid++;
+    this.m_rdpVer = 0;
+    this.m_st = 101;
+    this.m_tst = 0;
+    this.m_rdpIndex = 0;
+    this.r0 = null;
+    this.r1 = null;
+    this.rd = null;
+    this.buf = null;
+    this.roiRes = null;
+    this.ivdVer = 0;
+    this.ver = 0;
+    this.lifeTime = 0;
+    this.m_rdpIndex = index;
+  }
+
+  getRDPIndex() {
+    return this.m_rdpIndex;
+  }
+
+  getUid() {
+    return this.m_uid;
+  }
+
+  destroy(vrc) {
+    // if (this.r0 != null) this.r0.destroy(vrc);
+    // if (this.r1 != null) this.r1.destroy(vrc);
+    this.r0 = null;
+    this.r1 = null;
+    this.rd = null;
+    this.buf = null;
+    this.roiRes = null;
+  }
+
+  clearBuf() {
+    if (this.lifeTime == 0) {
+      throw Error("illegal operation!!!");
+    }
+
+    if (this.r0 != null) {
+      this.r0.clear();
+      this.r1.clear();
+      this.roiRes = null;
+      this.r0 = null;
+      this.r1 = null;
+      this.rd = null;
+      this.buf = null;
+    }
+  }
+
+  clear() {
+    this.clearBuf();
+  }
+
+  updateStatus() {
+    this.m_st++;
+    this.m_tst = (this.m_st * 131 + this.m_rdpVer) * 131 + this.m_uid;
+  }
+
+  setIvsParam(ivsIndex, ivsSize) {
+    // console.log(">>> >>>>>>>>>>>> #### BufRDataPair::setIvsParam(), uid: ", this.getUid());
+    // console.log("				A0 ivsIndex: ", ivsIndex,", ivsSize: ", ivsSize);
+    // console.log("				this.r0 != this.r1: ", this.r0 != this.r1);
+    this.updateStatus();
+    let rdp = this.roiRes.getRDPDataAt(this.m_rdpIndex);
+    this.r0.ivsInitSize = rdp.r0.ivsInitSize;
+    this.r0.setIvsParam(ivsIndex, ivsSize);
+
+    if (this.r0 != this.r1) {
+      this.r1.ivsInitSize = rdp.r1.ivsInitSize;
+      this.r1.setIvsParam(ivsIndex, ivsSize);
+    } // console.log("				A1 ivsIndex: ", this.rd.ivsIndex,", ivsSize: ", this.rd.ivsSize);
+    // let rd = this.rd;
+    // console.log("BufRDataPair::setIvsParam(), ivsIndex, ivsSize: ", ivsIndex, ivsSize);
+    // console.log("****** ###### !rd.common: ", !rd.common, ", rd.getUid(): ",rd.getUid());
+    // console.log("BufRDataPair::setIvsParam(), rd.ivsIndex, rd.ivsSize: ", rd.ivsIndex, rd.ivsSize);
+
+  }
+
+  applyRDPAt(index) {
+    if (this.roiRes != null && this.m_rdpIndex != index) {
+      let rd = this.rd; // console.log("AAAA index: ",index);
+      // console.log("AAAA 0 rd.getUid(): ",rd.getUid(), ", r0.getUid(): ",this.r0.getUid(), ", r0.ivsSize: ", this.r0.ivsSize, ", r0.rdpIndex: ", this.r0.rdpIndex);
+
+      let rdp = this.roiRes.getRDPDataAt(index);
+
+      if (rdp) {
+        this.updateStatus();
+        this.clearBuf();
+        this.m_rdpIndex = rdp.getRDPIndex(); // console.log("ROInidcesRes::applyRDPAt(), index: ", index);
+
+        this.copyFrom(rdp, true, false);
+        rd = this.rd; // console.log("AAAA 1 rd.getUid(): ",rd.getUid(), ", r0.getUid(): ",this.r0.getUid(), ", r0.ivsSize: ",  this.r0.ivsSize, ", r0.rdpIndex: ", this.r0.rdpIndex);
+      }
+    }
+  }
+
+  setInsCount(insCount) {
+    this.rd.setInsCount(insCount);
+  }
+
+  getVersion() {
+    return this.m_tst;
+  }
+
+  toWireframe() {
+    this.m_rdpVer = 1;
+    this.rd = this.r1;
+    this.buf = this.rd.buf;
+    this.roiRes.rdp = this;
+    this.updateStatus(); // console.log("BufRDataPair::toWireframe()............, uid: ", this.m_uid);
+  }
+
+  toShape() {
+    this.m_rdpVer = 0;
+    this.rd = this.r0;
+    this.buf = this.rd.buf;
+    this.roiRes.rdp = this;
+    this.updateStatus(); // console.log("BufRDataPair::toShape()............, uid: ", this.m_uid);
+  }
+
+  toCommon() {
+    this.toShape();
+  }
+
+  isCommon() {
+    return this.m_rdpVer == 0;
+  }
+
+  test() {
+    // console.log("AAA this.getType(): ", this.getType(), this.getUid());
+    this.roiRes.rdp = this;
+    return this.roiRes.test();
+  }
+
+  copyFrom(rdp, auto = true, force = true) {
+    // console.log("AAAA 0 copyFrom(), rdp.r0.getUid(): ",rdp.r0.getUid(), ", r0.ivsSize: ", rdp.r0.ivsSize, ", r0.rdpIndex: ", rdp.r0.rdpIndex);
+    this.roiRes = rdp.roiRes;
+    if (force) this.m_rdpVer = rdp.m_rdpVer;
+    this.r0 = rdp.r0.clone();
+
+    if (rdp.r0 != rdp.r1) {
+      this.r1 = rdp.r1.clone();
+    } else {
+      this.r1 = this.r0;
+    }
+
+    if (auto) {
+      if (this.isCommon()) {
+        this.toCommon();
+      } else {
+        this.toWireframe();
+      }
+    }
+  }
+
+  copyTo(rdp, auto = true, force = true) {
+    rdp.roiRes = this.roiRes;
+    if (force) rdp.m_rdpVer = this.m_rdpVer;
+    rdp.r0 = this.r0.clone();
+
+    if (this.r0 != this.r1) {
+      rdp.r1 = this.r1.clone();
+    } else {
+      rdp.r1 = rdp.r0;
+    }
+
+    if (auto) {
+      if (rdp.isCommon()) {
+        rdp.toCommon();
+      } else {
+        rdp.toWireframe();
+      }
+    }
+  }
+
+  clone() {
+    let rdp = new BufRDataPair(this.getRDPIndex());
+    rdp.lifeTime = this.lifeTime + 1;
+    this.copyTo(rdp);
+    return rdp;
+  }
+
+}
+
+BufRDataPair.s_uid = 0;
+exports.BufRDataPair = BufRDataPair;
+
 class ROIndicesRes {
   constructor() {
-    this.m_uid = 0;
+    this.m_uid = ROIndicesRes.s_uid++;
     this.m_vtx = null;
     this.m_vtxUid = 0;
-    this.m_gpuBuf = null;
-    this.m_ivsSize = 0;
-    this.ibufStep = 0;
-    this.m_uid = ROIndicesRes.s_uid + 1;
+    this.m_disp = null; // private m_index = 0;
+
+    this.m_ivsData = null;
+    this.m_rdps = [];
+    this.m_rdpVer = -2;
+    this.rdp = null;
+    this.initRdp = null;
+    this.version = -1;
+    this.m_rdps.fill(null);
   }
 
   getUid() {
@@ -26655,72 +28596,307 @@ class ROIndicesRes {
     return this.m_vtxUid;
   }
 
-  getGpuBuf() {
-    return this.m_gpuBuf;
+  getRDPDataAt(index) {
+    if (index >= 0 && index < this.m_rdps.length) {
+      return this.m_rdps[index];
+    }
+
+    return null;
   }
 
-  getVTCount() {
-    return this.m_ivsSize;
+  test() {
+    return this.m_rdpVer != this.rdp.getVersion();
   }
+  /**
+   * @param force the default value is false
+   */
 
-  updateToGpu(rc) {
-    if (this.m_gpuBuf != null && this.m_ivsSize > 0) {
-      let vtx = this.m_vtx; // console.log("indeces updateToGpu vtx.getUId(): ",vtx.getUid(), ", this.version != vtx.indicesVer: ", this.version != vtx.indicesVer);
 
-      if (this.version != vtx.indicesVer) {
-        this.m_ivs = vtx.getIvsData();
-        rc.bindEleBuf(this.m_gpuBuf);
+  bindToGPU(force = false) {
+    force = force || this.m_rdpVer != this.rdp.getVersion(); // console.log("B this.rdp.getType(): ", this.rdp.getType(), this.rdp.getUid());
 
-        if (this.m_ivsSize >= this.m_ivs.length) {
-          //console.log("A indeces updateToGpu vtx.getUId(): ",vtx.getUid(), ", ivs.length", this.m_ivs.length);
-          rc.eleBufSubData(this.m_ivs, vtx.getBufDataUsage());
-        } else {
-          //console.log("B indeces updateToGpu vtx.getUId(): ",vtx.getUid(), ", ivs.length", this.m_ivs.length);
-          rc.eleBufData(this.m_ivs, vtx.getBufDataUsage());
-        }
-
-        this.m_ivsSize = this.m_ivs.length;
-        this.version = vtx.indicesVer;
-      }
+    if (this.m_vrc.testRIOUid(this.m_vtxUid) || force) {
+      // if(DebugFlag.Flag_0 > 0) {
+      //     console.log("ROIndicesRes::bindToGPU(), rdp: ", this.rdp);
+      // }
+      // console.log(this.rdp.buf.wireframe);
+      this.m_vrc.bindEleBuf(this.rdp.buf);
+      this.m_rdpVer = this.rdp.getVersion();
     }
   }
 
-  initialize(rc, vtx) {
-    if (this.m_gpuBuf == null && vtx.getIvsData() != null) {
-      this.version = vtx.indicesVer;
-      this.m_vtx = vtx;
-      this.m_vtxUid = vtx.getUid();
-      this.m_ivs = vtx.getIvsData();
-      this.m_gpuBuf = rc.createBuf();
-      rc.bindEleBuf(this.m_gpuBuf);
+  updateToGpu(vrc) {
+    const rdp = this.initRdp; // console.log("ROIndicesRes::updateToGpu(), this.getUId(): ", this.getUid());
 
-      if (vtx.bufData == null) {
-        rc.eleBufData(this.m_ivs, vtx.getBufDataUsage());
-        this.m_ivsSize = this.m_ivs.length;
+    if (vrc != null) {
+      if (rdp.buf != null) {
+        const vtx = this.m_vtx;
+        const rc = this.m_rc; // console.log("ROIndicesRes::updateToGpu(), vtx.getUId(): ",vtx.getUid(), ", this.version != vtx.indicesVer: ", this.version != vtx.indicesVer,", rc!=null: ", rc!=null);
+
+        if (this.version != vtx.indicesVer && rc) {
+          let disp = this.m_disp;
+
+          for (let i = 0; i < vtx.getIvsDataTotal(); ++i) {
+            const ird = vtx.getIvsDataAt(i);
+            const rdp = this.m_rdps[i];
+
+            if (rdp.ivdVer != ird.version) {
+              if (rdp.r0 == rdp.r1) {
+                rdp.r0 = this.createBuf(rdp.r0, rdp.getRDPIndex(), rc, vrc, vtx, disp, !rdp.r0.isCommon());
+              } else {
+                rdp.r0 = this.createBuf(rdp.r0, rdp.getRDPIndex(), rc, vrc, vtx, disp, !rdp.r0.isCommon());
+                rdp.r1 = this.createBuf(rdp.r1, rdp.getRDPIndex(), rc, vrc, vtx, disp, !rdp.r1.isCommon());
+              }
+
+              rdp.ivdVer = ird.version;
+            }
+          }
+
+          this.version = vtx.indicesVer;
+        }
       } else {
-        rc.eleBufDataMem(vtx.bufData.getIndexDataTotalBytes(), vtx.getBufDataUsage());
-        let uintArr = null;
-        let offset = 0;
-        this.m_ivsSize = 0;
+        const rd = rdp.rd; // console.log("ROIndicesRes::updateToGpu(), this.getUId(): ",this.getUid(), ", rdp.buf == null: ", rdp.buf == null, "ivsCount: ",this.m_disp.ivsCount);
 
-        for (let i = 0, len = vtx.bufData.getIndexDataTotal(); i < len; ++i) {
-          uintArr = vtx.bufData.getIndexDataAt(i);
-          rc.eleBufSubData(uintArr, offset);
-          offset += uintArr.byteLength;
-          this.m_ivsSize += uintArr.length;
-        }
+        rd.ivsSize = this.m_disp.ivsCount;
+        rd.ivsInitSize = rd.ivsSize;
       }
     }
   }
 
-  destroy(rc) {
-    if (this.m_gpuBuf != null) {
-      this.m_vtx = null;
-      rc.deleteBuf(this.m_gpuBuf);
-      this.m_gpuBuf = null;
-      this.m_ivs = null;
-      this.m_ivsSize = 0;
+  initialize(rc, vrc, ivtx, disp) {
+    this.m_vrc = vrc;
+    this.m_rc = rc; // console.log("ROIndicesRes::initialize(), this.getUId(): ", this.getUid());
+
+    let rdp = null;
+
+    if (this.m_rdps.length < 1 && ivtx.getIvsDataAt() != null) {
+      this.version = ivtx.indicesVer;
+      this.m_vtx = ivtx;
+      this.m_vtxUid = ivtx.getUid();
+      rdp = this.createRDPAt(0, rc, vrc, disp);
+    } else {
+      rdp = new BufRDataPair(0);
+      let rd = new BufRData();
+      rd.buf = null;
+      rd.rc = rc;
+      rd.ivsSize = disp.ivsCount;
+      rd.ivsInitSize = rd.ivsSize;
+      rd.ivsIndex = disp.ivsIndex;
+      rd.stride = 2;
+      rd.drawMode = disp.drawMode;
+      rd.initDrawMode = disp.drawMode;
+      rdp.r0 = rd;
+      rdp.r1 = rd; // console.log("RoIndicesRes::initialize(), XXXXXXXX rd.ivsSize: ", rd.ivsSize);
     }
+
+    this.m_disp = disp;
+    this.rdp = this.m_rdps[0] = rdp;
+    this.initRdp = rdp;
+    rdp.roiRes = this;
+    rdp.toShape();
+    let total = ivtx.getIvsDataTotal(); // console.log("ROIndicesRes::initialize(), total: ", total);
+
+    for (let i = 1; i < total; ++i) {
+      rdp = this.createRDPAt(i, rc, vrc, disp);
+      this.m_rdps.push(rdp);
+    }
+  }
+
+  createRDPAt(rdpIndex, rc, vrc, disp) {
+    let rdp = new BufRDataPair(rdpIndex);
+    rdp.roiRes = this;
+    const ivtx = this.m_vtx;
+    let ird = ivtx.getIvsDataAt(rdpIndex); // console.log("ird: ", ird);
+
+    this.m_ivsData = ird;
+    let wireframe = ird.wireframe;
+    let shape = ird.shape;
+    let r0 = null;
+    let r1 = null;
+
+    if (shape) {
+      r0 = this.createBuf(null, rdpIndex, rc, vrc, ivtx, disp, false);
+    }
+
+    if (wireframe) {
+      r1 = this.createBuf(null, rdpIndex, rc, vrc, ivtx, disp, wireframe);
+    } // console.log("createRDPAt(), r0: ", r0, ", r1: ", r1);
+
+
+    if (r0 == null && r1 == null) {
+      r0 = this.createBuf(null, rdpIndex, rc, vrc, ivtx, disp, false);
+    }
+
+    if (r0 == null) {
+      r0 = r1;
+    } else if (r1 == null) {
+      r1 = r0;
+    }
+
+    rdp.r0 = r0;
+    rdp.r1 = r1;
+    rdp.ivdVer = ird.version; // console.log("createRDPAt(), rdpIndex: ", rdpIndex, ", wireframe: ", wireframe,", rdp.r0.getUid(): ", rdp.r0.getUid());
+    // console.log("       rdp.r0.ivsSize: ", rdp.r0.ivsSize, ", r0.rdpIndex: ",rdp.r0.rdpIndex);
+
+    return rdp;
+  }
+
+  createBuf(rd, rdpIndex, rc, vrc, ivtx, disp, wireframe = false) {
+    // console.log("createBuf(), rdpIndex:", rdpIndex, "ivtx.getUid(): ", ivtx.getUid());
+    let ird = ivtx.getIvsDataAt(rdpIndex);
+    let ivs = ird.ivs;
+    let size = 0;
+    let newBytesSize = ivs.byteLength;
+    let bytesSize = 0;
+    let newBuild = rd == null;
+
+    if (!newBuild) {
+      bytesSize = rd.bytesSize;
+    }
+
+    let ivsIndex = disp.ivsIndex;
+    let stride = 2;
+    let gbuf = rd != null ? rd.buf : null;
+    if (gbuf == null) gbuf = vrc.createBuf();
+    vrc.bindEleBuf(gbuf);
+
+    if (ivtx.bufData == null) {
+      if (wireframe) {
+        ivs = this.createWireframeIvs(ivs);
+      }
+
+      if (newBytesSize > bytesSize) {
+        vrc.eleBufData(ivs, ivtx.getBufDataUsage());
+      } else {
+        vrc.eleBufSubData(ivs, ivtx.getBufDataUsage());
+      }
+
+      size = ivs.length;
+      stride = size > 65536 ? 4 : 2;
+      bytesSize = newBytesSize;
+    } else {
+      let offset = 0;
+      let list = [];
+
+      for (let i = 0, len = ivtx.bufData.getIndexDataTotal(); i < len; ++i) {
+        const rd = ivtx.bufData.getIndexDataAt(i);
+        ivs = rd.ivs;
+
+        if (wireframe) {
+          ivs = this.createWireframeIvs(ivs);
+        }
+
+        list[i] = ivs;
+        size += ivs.length;
+      }
+
+      if (size > 65536) {
+        stride = 4;
+
+        for (let i = 0, len = list.length; i < len; ++i) {
+          ivs = list[i];
+          list[i] = ivs instanceof Uint32Array ? ivs : new Uint32Array(ivs);
+        }
+      } else {
+        stride = 2;
+
+        for (let i = 0, len = list.length; i < len; ++i) {
+          ivs = list[i];
+          list[i] = ivs instanceof Uint16Array ? ivs : new Uint16Array(ivs);
+        }
+      }
+
+      size = 0;
+
+      for (let i = 0, len = list.length; i < len; ++i) {
+        size += list[i].byteLength;
+      }
+
+      bytesSize = size;
+      vrc.eleBufDataMem(size, ivtx.getBufDataUsage());
+      offset = 0;
+      size = 0;
+
+      for (let i = 0, len = list.length; i < len; ++i) {
+        ivs = list[i];
+        vrc.eleBufSubData(ivs, offset);
+        offset += ivs.byteLength;
+        size += ivs.length;
+      }
+    } // gbuf.rdpIndex = rdpIndex;
+    // gbuf.wireframe = wireframe;
+
+
+    rd = rd == null ? new BufRData() : rd;
+    rd.rc = rc;
+
+    if (rc == null) {
+      throw Error("illegal operations !!!");
+    }
+
+    rd.buf = gbuf;
+    rd.rdpIndex = rdpIndex;
+    rd.ivsSize = size;
+    rd.ivsInitSize = size;
+    rd.stride = stride;
+    rd.trisNumber = Math.floor(size / 3);
+    rd.initDrawMode = disp.drawMode;
+    rd.setCommon(!wireframe);
+    rd.ivsIndex = rd.isCommon() ? ivsIndex : ivsIndex * 2;
+    rd.ivsOffset = rd.ivsIndex * rd.stride;
+    rd.bytesSize = bytesSize;
+    rd.bufType = stride != 4 ? rc.UNSIGNED_SHORT : rc.UNSIGNED_INT; // console.log("RoIndicesRes::createBuf(), XXXXXXXX rd.ivsSize: ", rd.ivsSize);
+    // console.log("RoIndicesRes::createBuf(), XXXXXXXX rd.ivsSize: ", rd.ivsSize, ", rd.getUid(): ", rd.getUid());
+
+    return rd;
+  }
+
+  destroy(vrc) {
+    this.m_rc = null;
+    this.m_vrc = null;
+    this.m_disp = null;
+
+    if (this.m_rdps.length > 0) {
+      this.m_vtx = null;
+
+      for (let i = 0; i < this.m_rdps.length; ++i) {
+        this.m_rdps[i].destroy(vrc);
+      }
+
+      this.m_ivsData = null;
+      this.initRdp = null;
+      this.rdp = null;
+      console.log("ROIndicesRes::destroy() this.m_uid: ", this.m_uid);
+    }
+  }
+
+  createWireframeIvs(ivs) {
+    if (ivs !== null) {
+      const len = ivs.length * 2;
+      const wivs = len > 65536 ? new Uint32Array(len) : new Uint16Array(len);
+      let a;
+      let b;
+      let c;
+      let k = 0;
+
+      for (let i = 0, l = ivs.length; i < l; i += 3) {
+        a = ivs[i + 0];
+        b = ivs[i + 1];
+        c = ivs[i + 2];
+        wivs[k] = a;
+        wivs[k + 1] = b;
+        wivs[k + 2] = b;
+        wivs[k + 3] = c;
+        wivs[k + 4] = c;
+        wivs[k + 5] = a;
+        k += 6;
+      } // console.log("createWireframeIvs(), wivs.length:", wivs.length);
+
+
+      return wivs;
+    }
+
+    return ivs;
   }
 
 }
@@ -27107,17 +29283,18 @@ class VertexRenderObj extends VROBase_1.default {
   }
 
   run() {
-    if (this.m_rc.testVROUid(this.m_uid)) {
+    if (this.m_rc.testVROUid(this.m_uid) || this.indicesRes.test()) {
       //console.log("VertexRenderObj::run(), B:",rc.getUid(),this.m_vtxUid,this.m_uid);
       if (this.vbuf != null) {
         this.m_rc.useVtxAttribsPtrTypeFloat(this.shdp, this.vbuf, this.attribTypes, this.attribTypesLen, this.wholeOffsetList, this.wholeStride);
       } else {
         this.m_rc.useVtxAttribsPtrTypeFloatMulti(this.shdp, this.vbufs, this.attribTypes, this.attribTypesLen, this.wholeOffsetList, this.wholeStride);
-      }
+      } // if (this.m_rc.testRIOUid(this.m_vtxUid)) {
+      //     this.m_rc.bindEleBuf(this.ibuf);
+      // }
 
-      if (this.m_rc.testRIOUid(this.m_vtxUid)) {
-        this.m_rc.bindEleBuf(this.ibuf);
-      }
+
+      this.indicesRes.bindToGPU();
     }
   }
 
@@ -27129,8 +29306,9 @@ class VertexRenderObj extends VROBase_1.default {
     this.m_rc = null;
     this.shdp = null;
     this.vbufs = null;
-    this.vbuf = null;
-    this.ibuf = null;
+    this.vbuf = null; // this.ibuf = null;
+
+    this.indicesRes = null;
     this.attribTypes = null;
     this.attribTypesLen = 0;
     this.wholeStride = 0;
@@ -27243,6 +29421,13 @@ class Vector3D {
 
   clone() {
     return new Vector3D(this.x, this.y, this.z, this.w);
+  }
+
+  abs() {
+    this.x = Math.abs(this.x);
+    this.y = Math.abs(this.y);
+    this.z = Math.abs(this.z);
+    return this;
   }
 
   setTo(px, py, pz, pw = 1.0) {
@@ -27687,6 +29872,12 @@ class FBXParserListerner {
         DivLog_1.default.ShowLogOnce("fbx file loading " + k + "%");
       }, (status, url) => {
         console.error("load fbx mesh data error, url: ", url);
+        this.fbxParseFinish([{
+          vertices: null,
+          uvsList: null,
+          normals: null,
+          indices: null
+        }], null, url, 0, 0);
       });
     }
   } // 一个任务数据处理完成后的侦听器回调函数
@@ -27854,18 +30045,7 @@ class VROBase {
     this.m_vtxUid = 0;
     this.m_rc = null;
     this.indicesRes = null;
-    this.ibuf = null;
-    /**
-     * be used by the renderer runtime, the value is 2 or 4.
-     */
-
-    this.ibufStep = 2;
     this.m_attachCount = 0;
-  }
-
-  getVTCount() {
-    if (this.indicesRes != null) return this.indicesRes.getVTCount();
-    return 0;
   }
 
   setRC(rc) {
@@ -27897,23 +30077,25 @@ class VROBase {
   run() {}
 
   __$attachThis() {
-    ++this.m_attachCount;
+    ++this.m_attachCount; // console.log("VROBase::__$attachThis() this.m_attachCount: ", this.m_attachCount, ", uid: ", this.m_uid);
   }
 
   __$detachThis() {
     --this.m_attachCount;
 
     if (this.m_attachCount < 1) {
-      this.m_attachCount = 0; //console.log("VROBase::__$detachThis() this.m_attachCount value is 0.");
-    }
+      this.m_attachCount = 0;
+      console.log("VROBase::__$detachThis() this.m_attachCount value is 0.");
+    } // console.log("VROBase::__$detachThis() this.m_attachCount: ", this.m_attachCount, ", uid: ", this.m_uid);
+
   }
 
   __$destroy() {
     //console.log("VROBase::__$destroy()..., ("+this.m_uid+")this.m_attachCount: "+this.m_attachCount);
     VROBase.s_midMap.delete(this.m_mid);
     this.m_mid = 0;
-    this.m_vtxUid = -1;
-    this.ibuf = null;
+    this.m_vtxUid = -1; // this.ibuf = null;
+
     this.m_rc = null;
     this.indicesRes = null;
   }
@@ -27940,6 +30122,122 @@ class VROBase {
 VROBase.s_mid = 0;
 VROBase.s_midMap = new Map();
 exports.default = VROBase;
+
+/***/ }),
+
+/***/ "91da":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+/***************************************************************************/
+
+/*                                                                         */
+
+/*  Copyright 2018-2022 by                                                 */
+
+/*  Vily(vily313@126.com)                                                  */
+
+/*                                                                         */
+
+/***************************************************************************/
+
+var __importDefault = this && this.__importDefault || function (mod) {
+  return mod && mod.__esModule ? mod : {
+    "default": mod
+  };
+};
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const RPOBlock_1 = __importDefault(__webpack_require__("5f3c"));
+
+const PassProcess_1 = __importDefault(__webpack_require__("34cd"));
+
+const ContainerFlowRenderer_1 = __importDefault(__webpack_require__("7f1c"));
+
+class ContainerRPOBlock extends RPOBlock_1.default {
+  constructor(shader) {
+    super(shader);
+    this.m_unitsTotal = 0;
+    this.m_container = null;
+    this.m_cr = new ContainerFlowRenderer_1.default();
+    this.m_passProc = new PassProcess_1.default();
+  }
+
+  resetCR() {
+    const cr = this.m_cr;
+    cr.passProc = this.m_passProc;
+    cr.shdUpdate = false;
+    cr.shader = this.m_shader;
+  }
+
+  showInfo() {}
+
+  clear() {
+    if (this.m_shader) {
+      this.m_shader = null;
+      this.m_container = null;
+    }
+  }
+
+  update() {
+    if (this.sortEnabled) {
+      this.sort();
+    }
+  }
+
+  addContainer(container) {
+    this.m_container = container;
+  }
+
+  removeContainer(container) {
+    if (container == this.m_container) {
+      this.m_container = null;
+    }
+  }
+
+  hasContainer(container) {
+    return this.m_container == container;
+  }
+
+  isEmpty() {
+    return this.m_container == null;
+  }
+
+  run(rc) {
+    // this.m_shader.resetUniform();
+    const c = this.m_container;
+
+    if (c && c.isVisible()) {
+      this.resetCR();
+      this.m_cr.runContainer(rc, c);
+    }
+  }
+
+  runLockMaterial(rc) {
+    // this.m_shader.resetUniform();
+    const c = this.m_container;
+
+    if (c && c.isVisible()) {
+      this.resetCR();
+      this.m_cr.runContainerLock(rc, c);
+    }
+  }
+
+  getNodesTotal() {
+    return this.m_unitsTotal;
+  }
+
+  addNode(node) {}
+
+  removeNode(node) {}
+
+}
+
+exports.default = ContainerRPOBlock;
 
 /***/ }),
 
@@ -28817,17 +31115,29 @@ const PixelPickIndexMaterial_1 = __importDefault(__webpack_require__("e7ce"));
 
 const AABBCalc_1 = __webpack_require__("e160");
 
+class QueryUnit {
+  constructor() {
+    this.ets = null;
+    this.total = 0;
+  }
+
+  query(ets, total) {
+    this.ets = ets;
+    this.total = total;
+  }
+
+}
+
 class RayGpuSelector {
   constructor() {
     this.m_initColor = new Color4_1.default();
     this.m_indexMaterial = new PixelPickIndexMaterial_1.default();
     this.m_renderer = null;
     this.m_camera = null;
-    this.m_headNode = null;
     this.m_rsn = null; // 最多检测256个对象
 
     this.m_hitList = new Uint8Array(256);
-    this.m_rsnList = null;
+    this.m_rsnList = new Array(256);
     this.m_selectedNode = null;
     this.m_selectedTotal = 0;
     this.m_testMode = 0;
@@ -28840,13 +31150,15 @@ class RayGpuSelector {
     this.m_outv = new Vector3D_1.default();
     this.m_vecs = [null, null];
     this.m_gpuTestEnabled = true;
+    this.m_qu = new QueryUnit();
+    this.etset = null;
     this.m_uintArray = new Uint8Array(4);
     this.m_uintList = new Uint8Array(256);
-  } //  setGPUTestEnabled(enabled:boolean):void
-  //  {
-  //      this.m_gpuTestEnabled = enabled;
-  //  }
 
+    for (let i = 0; i < 256; ++i) {
+      this.m_rsnList[i] = new RaySelectedNode_1.default();
+    }
+  }
 
   setRenderer(renderer) {
     this.m_renderer = renderer;
@@ -28868,19 +31180,6 @@ class RayGpuSelector {
 
   setCamera(cam) {
     this.m_camera = cam;
-  }
-
-  setCullingNodeHead(headNode) {
-    this.m_headNode = headNode;
-
-    if (this.m_rsnList == null) {
-      this.m_rsnList = [];
-      let i = 0;
-
-      for (; i < 256; ++i) {
-        this.m_rsnList.push(new RaySelectedNode_1.default());
-      }
-    }
   }
 
   getSelectedNode() {
@@ -28929,77 +31228,75 @@ class RayGpuSelector {
   }
 
   run() {
-    let nextNode = this.m_headNode; //console.log("RaySelect run() nextNode != null: "+(nextNode != null));
-
-    if (nextNode != null) {
+    if (this.etset.getTotal() > 0) {
       let dis = 0.0;
       let rtv = this.m_rltv;
       let rpv = this.m_rlpv;
       let outv = this.m_outv;
       let node = null;
       let total = 0;
+      let minv = MathConst_1.default.MATH_MIN_POSITIVE;
+      let maxv = MathConst_1.default.MATH_MAX_POSITIVE;
 
-      if (Math.abs(rtv.x) > MathConst_1.default.MATH_MIN_POSITIVE) {
+      if (Math.abs(rtv.x) > minv) {
         this.m_rlinvtv.x = 1.0 / rtv.x;
       } else {
-        this.m_rlinvtv.x = MathConst_1.default.MATH_MAX_POSITIVE;
+        this.m_rlinvtv.x = maxv;
       }
 
-      if (Math.abs(rtv.y) > MathConst_1.default.MATH_MIN_POSITIVE) {
+      if (Math.abs(rtv.y) > minv) {
         this.m_rlinvtv.y = 1.0 / rtv.y;
       } else {
-        this.m_rlinvtv.y = MathConst_1.default.MATH_MAX_POSITIVE;
+        this.m_rlinvtv.y = maxv;
       }
 
-      if (Math.abs(rtv.z) > MathConst_1.default.MATH_MIN_POSITIVE) {
+      if (Math.abs(rtv.z) > minv) {
         this.m_rlinvtv.z = 1.0 / rtv.z;
       } else {
-        this.m_rlinvtv.z = MathConst_1.default.MATH_MAX_POSITIVE;
+        this.m_rlinvtv.z = maxv;
       }
 
-      if (this.m_rlinvtv.x < 0) this.m_rlsiv[0] = 1;else this.m_rlsiv[0] = 0;
-      if (this.m_rlinvtv.y < 0) this.m_rlsiv[1] = 1;else this.m_rlsiv[1] = 0;
-      if (this.m_rlinvtv.z < 0) this.m_rlsiv[2] = 1;else this.m_rlsiv[2] = 0;
+      let rivs = this.m_rlsiv;
+      let rtvs = this.m_rlinvtv;
+      rivs[0] = rtvs.x < 0 ? 1 : 0;
+      rivs[1] = rtvs.y < 0 ? 1 : 0;
+      rivs[2] = rtvs.z < 0 ? 1 : 0;
+      let qu = this.m_qu;
+      this.etset.query(qu);
+      let ets = qu.ets;
+      let tot = qu.total;
+      let vecs = this.m_vecs;
 
-      while (nextNode != null) {
-        if (nextNode.drawEnabled && nextNode.entity.mouseEnabled) {
-          // outv.x = nextNode.bounds.center.x - rpv.x;
-          // outv.y = nextNode.bounds.center.y - rpv.y;
-          // outv.z = nextNode.bounds.center.z - rpv.z;
-          outv.subVecsTo(nextNode.bounds.center, rpv);
+      for (let i = 0; i < tot; ++i) {
+        let et = ets[i];
+
+        if (et.mouseEnabled) {
+          const bounds = et.getGlobalBounds();
+          outv.subVecsTo(bounds.center, rpv);
           dis = outv.dot(rtv);
           outv.x -= dis * rtv.x;
           outv.y -= dis * rtv.y;
           outv.z -= dis * rtv.z;
 
-          if (outv.getLengthSquared() <= nextNode.bounds.radius2) {
+          if (outv.getLengthSquared() <= bounds.radius2) {
             // 如果只是几何检测(例如球体包围体的检测)就不需要在进入后续的aabb检测
-            if (nextNode.rayTestState < 1) {
-              this.m_vecs[0] = nextNode.bounds.min;
-              this.m_vecs[1] = nextNode.bounds.max;
+            vecs[0] = bounds.min;
+            vecs[1] = bounds.max;
 
-              if (AABBCalc_1.AABBCalc.IntersectionRL3(this.m_vecs, this.m_rlsiv, this.m_rlinvtv, rtv, rpv, outv)) {
-                node = this.m_rsnList[total];
-                node.entity = nextNode.entity;
-                node.dis = this.m_rlinvtv.w;
-                node.wpv.copyFrom(outv); //  console.log("H Hit Dis: "+rtv.dot(outv));
-                //console.log("Ray hit test a renderNode.");
+            if (AABBCalc_1.AABBCalc.IntersectionRL3(vecs, rivs, rtvs, rtv, rpv, outv)) {
+              node = this.m_rsnList[total];
+              node.entity = et;
+              node.dis = this.m_rlinvtv.w;
+              node.wpv.copyFrom(outv); //  console.log("H Hit Dis: "+rtv.dot(outv));
 
-                ++total;
-              }
-            } //  else
-            //  {
-            //      //其他检测方式
-            //  }
-
+              ++total;
+            }
           }
         }
-
-        nextNode = nextNode.next;
       }
 
       this.m_selectedNode = null;
-      let i = 0;
+      let i = 0; // 需要支持容器操作，也相当于是容器可控制渲染
 
       if (total > 0) {
         let invpv = this.m_invpv;
@@ -29200,7 +31497,8 @@ class RayGpuSelector {
     rcontext.unlockRenderState();
     RendererState_1.default.UnlockBlendMode();
     RendererState_1.default.UnlockDepthTestMode();
-    rcontext.setClearRGBAColor4f(this.m_initColor.r, this.m_initColor.g, this.m_initColor.b, this.m_initColor.a);
+    const c = this.m_initColor;
+    rcontext.setClearRGBAColor4f(c.r, c.g, c.b, c.a);
     rcontext.resetState();
   }
 
@@ -29210,12 +31508,9 @@ class RayGpuSelector {
 
 
   getWorldPosByRayDistance(cameraDistance, tv, camPv, resultV) {
-    resultV.x = tv.x * cameraDistance + camPv.x;
-    resultV.y = tv.y * cameraDistance + camPv.y;
-    resultV.z = tv.z * cameraDistance + camPv.z; //console.log("### cameraDistance: "+cameraDistance);
-    //  console.log("tv: "+tv.toString());
-    //  console.log("camPv: "+camPv.toString());
-    //  console.log("resultV: "+resultV.toString());
+    resultV.copyFrom(tv).scaleBy(cameraDistance).addBy(camPv); // resultV.x = tv.x * cameraDistance + camPv.x;
+    // resultV.y = tv.y * cameraDistance + camPv.y;
+    // resultV.z = tv.z * cameraDistance + camPv.z;
   }
 
 }
@@ -29364,7 +31659,6 @@ class GpuTexObect {
 
 
 class ROTextureResource {
-  //readonly updater:ROTexDataUpdater = null;
   constructor(rcuid, gl) {
     this.m_resMap = new Map();
     this.m_freeMap = new Map(); // 显存的纹理buffer的总数
@@ -29378,8 +31672,7 @@ class ROTextureResource {
     this.texMid = -1;
     this.unlocked = true;
     this.m_rcuid = rcuid;
-    this.m_gl = gl; //  let selfT:any = this;
-    //  selfT.updater = new ROTexDataUpdater(rcuid, gl, this.m_resMap);
+    this.m_gl = gl;
   }
 
   createBuf() {
@@ -29620,6 +31913,8 @@ const RenderConst_1 = __webpack_require__("e08e");
 class DashedLineMesh extends MeshBase_1.default {
   constructor(bufDataUsage = VtxBufConst_1.default.VTX_STATIC_DRAW) {
     super(bufDataUsage);
+    this.m_vsVer = 0;
+    this.m_cvsVer = 0;
     this.m_vs = null;
     this.m_cvs = null;
     this.m_lsTotal = 0; // 用于射线检测
@@ -29631,8 +31926,16 @@ class DashedLineMesh extends MeshBase_1.default {
     return this.m_vs;
   }
 
+  setVSData(data, offset = 0) {
+    if (data && this.m_vs != null && data.length + offset <= this.m_vs.length) {
+      this.m_vs.set(data, offset);
+      this.m_vsVer++;
+    }
+  }
+
   setVS(vs) {
     this.m_vs = vs;
+    this.m_vsVer++;
   }
 
   getCVS() {
@@ -29641,12 +31944,38 @@ class DashedLineMesh extends MeshBase_1.default {
 
   setCVS(cvs) {
     this.m_cvs = cvs;
+    this.m_cvsVer++;
   }
 
-  initialize(posarr, colors) {
+  updateData() {
+    if (this.m_vbuf != null) {
+      const rvb = ROVertexBuffer_1.default;
+      rvb.Reset();
+      rvb.AddFloat32DataVer(this.m_vsVer);
+      rvb.AddFloat32Data(this.m_vs, 3);
+
+      if (this.m_cvs == null) {
+        rvb.AddFloat32DataVer(this.m_cvsVer);
+        rvb.AddFloat32Data(this.m_cvs, 3);
+      }
+
+      rvb.UpdateBufData(this.m_vbuf);
+      this.buildEnd();
+    }
+  }
+
+  initialize(posarr, colors = null) {
     if (this.m_vs != null || posarr.length >= 6) {
-      if (this.m_vs == null) {
+      if (this.m_vs == null || this.m_vs.length != posarr.length) {
         this.m_vs = new Float32Array(posarr);
+      } else {
+        if (posarr) {
+          if (posarr.length <= this.m_vs.length) {
+            this.m_vs.set(posarr);
+          } else {
+            this.m_vs = new Float32Array(posarr);
+          }
+        }
       }
 
       this.vtCount = Math.floor(this.m_vs.length / 3);
@@ -29656,23 +31985,42 @@ class DashedLineMesh extends MeshBase_1.default {
         this.bounds = new AABB_1.default();
       }
 
-      this.bounds.addXYZFloat32Arr(this.m_vs);
+      this.bounds.addFloat32Arr(this.m_vs);
       this.bounds.updateFast();
-      ROVertexBuffer_1.default.Reset();
-      ROVertexBuffer_1.default.AddFloat32Data(this.m_vs, 3); // console.log("this.m_vs: ",this.m_vs);
+      const rvb = ROVertexBuffer_1.default;
+      rvb.Reset();
+      rvb.AddFloat32DataVer(++this.m_vsVer);
+      rvb.AddFloat32Data(this.m_vs, 3); // console.log("this.m_vs: ",this.m_vs);
       // console.log("colors: ",colors);
 
       if (this.isVBufEnabledAt(VtxBufConst_1.default.VBUF_CVS_INDEX)) {
-        if (this.m_cvs == null) this.m_cvs = new Float32Array(colors);
-        ROVertexBuffer_1.default.AddFloat32Data(this.m_cvs, 3);
+        if (this.m_cvs == null) {
+          this.m_cvs = colors ? new Float32Array(colors) : new Float32Array(this.m_vs.length);
+          rvb.AddFloat32DataVer(++this.m_vsVer);
+        } else {
+          if (colors) {
+            rvb.AddFloat32DataVer(++this.m_cvsVer);
+          } else {
+            rvb.AddFloat32DataVer(this.m_cvsVer);
+          }
+        }
+
+        rvb.AddFloat32Data(this.m_cvs, 3);
       }
 
-      ROVertexBuffer_1.default.vbWholeDataEnabled = this.vbWholeDataEnabled;
+      rvb.vbWholeDataEnabled = this.vbWholeDataEnabled;
 
       if (this.m_vbuf != null) {
-        ROVertexBuffer_1.default.UpdateBufData(this.m_vbuf);
+        rvb.UpdateBufData(this.m_vbuf);
       } else {
-        this.m_vbuf = ROVertexBuffer_1.default.CreateBySaveData(this.getBufDataUsage());
+        let u = this.getBufDataUsage();
+        let f = this.getBufSortFormat();
+
+        if (this.vbWholeDataEnabled) {
+          this.m_vbuf = rvb.CreateBySaveData(u, f);
+        } else {
+          this.m_vbuf = rvb.CreateBySaveDataSeparate(u);
+        }
       }
 
       this.drawMode = RenderConst_1.RenderDrawMode.ARRAYS_LINES;
@@ -29681,23 +32029,24 @@ class DashedLineMesh extends MeshBase_1.default {
   }
 
   setVSXYZAt(i, px, py, pz) {
-    if (this.m_vbuf != null) {
+    if (this.m_vbuf) {
+      // ++this.m_vsVer;
       this.m_vbuf.setData3fAt(i, 0, px, py, pz);
+      this.m_vbuf.updateF32DataVerAt(0);
     }
-  }
-
-  toString() {
-    return "DashedLineMesh()";
   }
 
   isPolyhedral() {
     return false;
-  } // @boundsHit       表示是否包围盒体已经和射线相交了
-  // @rlpv            表示物体坐标空间的射线起点
-  // @rltv            表示物体坐标空间的射线朝向
-  // @outV            如果检测相交存放物体坐标空间的交点
-  // @return          返回值 -1 表示不会进行检测,1表示相交,0表示不相交
-  //
+  }
+  /**
+   * 射线和自身的相交检测(多面体或几何函数(例如球体))
+   * @rlpv            表示物体坐标空间的射线起点
+   * @rltv            表示物体坐标空间的射线朝向
+   * @outV            如果检测相交存放物体坐标空间的交点
+   * @boundsHit       表示是否包围盒体已经和射线相交了
+   * @return          返回值 -1 表示不会进行检测,1表示相交,0表示不相交
+   */
 
 
   testRay(rlpv, rltv, outV, boundsHit) {
@@ -33692,74 +36041,6 @@ exports.ShaderProgramBuilder = ShaderProgramBuilder;
 
 /***/ }),
 
-/***/ "a176":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
- // import {DemoThread as Demo} from "./cospace/modules/thread/example/DemoThread";
-// import {DemoThread as Demo} from "./cospace/demo/DemoThread";
-// import {DemoThreadLoadJS as Demo} from "./cospace/demo/DemoThreadLoadJS";
-// import { DemoCTMLoadAndParser as Demo } from "./cospace/demo/DemoCTMLoadAndParser";
-// import { DemoFBXFastParser as Demo } from "./cospace/demo/DemoFBXFastParser";
-// import { DemoOBJParser as Demo } from "./cospace/demo/DemoOBJParser";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-}); // import { DemoCTMLoad as Demo } from "./cospace/demo/DemoCTMLoad";
-// import { DemoCTMParser as Demo } from "./cospace/demo/DemoCTMParser";
-// import { DemoDracoParser as Demo } from "./cospace/demo/DemoDracoParser";
-// import { DemoShowCTMAndDraco as Demo } from "./cospace/demo/DemoShowCTMAndDraco";
-// import { DemoCTMToDraco as Demo } from "./cospace/demo/DemoCTMToDraco";
-// import { DemoDracoEncode as Demo } from "./cospace/demo/DemoDracoEncode";
-// import { DemoDracoParser2 as Demo } from "./cospace/demo/DemoDracoParser2";
-// import { DemoFBXParser as Demo } from "./cospace/demo/DemoFBXParser";
-// import { DemoGLBParser as Demo } from "./cospace/demo/DemoGLBParser";
-// import { DemoPNGParser as Demo } from "./cospace/demo/DemoPNGParser";
-// import { DemoMixParser as Demo } from "./cospace/demo/DemoMixParser";
-// import { DemoCospace as Demo } from "./cospace/demo/DemoCospace";
-// import { DemoCospaceDeferredInit as Demo } from "./cospace/demo/DemoCospaceDeferredInit";
-// import { DemoDependenceGraph as Demo } from "./cospace/demo/DemoDependenceGraph";
-// import { DemoCTMViewer as Demo } from "./cospace/demo/DemoCTMViewer";
-// import { DemoNormalViewer as Demo } from "./cospace/demo/DemoNormalViewer";
-
-const RenderingVerifier_1 = __webpack_require__("d35a"); // import { DemoCoApp as Demo } from "./cospace/demo/DemoCoApp";
-// import { DemoCoAppDeferredInit as Demo } from "./cospace/demo/DemoCoAppDeferredInit";
-// import { DemoCoRenderer as Demo } from "./cospace/demo/DemoCoRenderer";
-// import { DemoCoRendererScene as Demo } from "./cospace/demo/DemoCoRendererScene";
-// import { DemoCoRendererSubScene as Demo } from "./cospace/demo/DemoCoRendererSubScene";
-// import { DemoCoSimpleRendereScene as Demo } from "./cospace/demo/DemoCoSimpleRendereScene";
-// import { DemoCoViewer as Demo } from "./cospace/demo/DemoCoViewer";
-// import { DemoVox3DEditor as Demo } from "./cospace/demo/DemoVox3DEditor";
-// import { DemoOutline as Demo } from "./cospace/demo/DemoOutline";
-// import { DemoPostOutline as Demo } from "./cospace/demo/DemoPostOutline";
-// import { DemoCoParticle as Demo } from "./cospace/demo/DemoCoParticle";
-// import { DemoCoParticleFlow as Demo } from "./cospace/demo/DemoCoParticleFlow";
-// import { DemoCoParticleModule as Demo } from "./cospace/demo/DemoCoParticleModule";
-// import { DemoCoEdit as Demo } from "./cospace/demo/DemoCoEdit";
-// import { DemoInputText as Demo } from "./cospace/demo/DemoInputText";
-// import { DemoCORS as Demo } from "./cospace/demo/DemoCORS";
-
-
-let demoIns = new RenderingVerifier_1.RenderingVerifier();
-let ins = demoIns;
-
-function main() {
-  console.log("------ demo --- init ------");
-  ins.initialize();
-
-  function mainLoop(now) {
-    ins.run();
-    window.requestAnimationFrame(mainLoop);
-  }
-
-  window.requestAnimationFrame(mainLoop);
-  console.log("------ demo --- running ------");
-}
-
-main();
-
-/***/ }),
-
 /***/ "a401":
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -33824,7 +36105,7 @@ class RendererSpace {
     this.m_renderer = null;
     this.m_camera = null;
     this.m_stage3d = null;
-    this.m_emptyRPONode = null;
+    this.m_emptyRPOUnit = null;
     this.m_rpoNodeBuilder = null;
     this.m_nodeQueue = new EntityNodeQueue_1.default();
     this.m_nodeWLinker = new Entity3DNodeLinker_1.default();
@@ -33847,7 +36128,7 @@ class RendererSpace {
       this.m_stage3d = renderer.getStage3D();
       this.m_camera = camera;
       this.m_rpoNodeBuilder = renderer.getRPONodeBuilder();
-      this.m_emptyRPONode = this.m_rpoNodeBuilder.createRPONode();
+      this.m_emptyRPOUnit = this.m_rpoNodeBuilder.createRPOUnit();
     }
   }
 
@@ -33881,41 +36162,54 @@ class RendererSpace {
   }
 
   getPOVNumber() {
-    return this.m_cullingor != null ? this.m_cullingor.getPOVNumber() : 0;
+    return this.m_cullingor ? this.m_cullingor.getPOVNumber() : 0;
   } // 可以添加真正被渲染的实体也可以添加只是为了做检测的实体(不允许有material)
 
 
-  addEntity(entity) {
-    if (entity.getGlobalBounds() != null && entity.spaceCullMask > SpaceCullingMask_1.SpaceCullingMask.NONE) {
-      if (RSEntityFlag_1.default.TestSpaceEnabled(entity.__$rseFlag)) {
-        entity.update();
+  addEntity(et) {
+    const SCM = SpaceCullingMask_1.SpaceCullingMask;
+
+    if (et.getGlobalBounds() != null && et.spaceCullMask > SCM.NONE) {
+      if (RSEntityFlag_1.default.TestSpaceEnabled(et.__$rseFlag)) {
+        et.update();
         ++this.m_entitysTotal;
-        let node = this.m_nodeQueue.addEntity(entity);
-        node.bounds = entity.getGlobalBounds();
-        node.pcoEnabled = (entity.spaceCullMask & SpaceCullingMask_1.SpaceCullingMask.POV) == SpaceCullingMask_1.SpaceCullingMask.POV;
-        let boo = entity.isInRendererProcess() || entity.getMaterial() == null;
+        let node = this.m_nodeQueue.addEntity(et);
+        node.bounds = et.getGlobalBounds();
+        node.pcoEnabled = (et.spaceCullMask & SCM.POV) == SCM.POV;
 
-        if (boo && (entity.spaceCullMask & SpaceCullingMask_1.SpaceCullingMask.POV) == SpaceCullingMask_1.SpaceCullingMask.POV) {
-          node.rstatus = 1;
+        if (et.getREType() < 12) {
+          const entity = et; // let boo = entity.isInRendererProcess() || entity.getMaterial() == null;
 
-          if (entity.getMaterial() == null) {
-            node.rpoNode = this.m_emptyRPONode;
-          }
+          let boo = entity.isInRendererProcess() || !entity.isPolyhedral();
 
-          if (node.rpoNode == null) {
-            node.rpoNode = this.m_rpoNodeBuilder.getNodeByUid(entity.getDisplay().__$rpuid);
-          }
+          if (boo && (entity.spaceCullMask & SCM.POV) == SCM.POV) {
+            node.rstatus = 1; // if (entity.getMaterial() == null) {
 
-          this.m_nodeSLinker.addNode(node);
-        } else {
-          if (entity.getMaterial() == null) {
-            node.rstatus = 1;
-            node.rpoNode = this.m_emptyRPONode;
+            if (!entity.isPolyhedral()) {
+              node.runit = this.m_emptyRPOUnit;
+            }
+
+            if (node.runit == null) {
+              node.runit = entity.getDisplay().__$$runit;
+            }
+
             this.m_nodeSLinker.addNode(node);
           } else {
-            node.rstatus = 0;
-            this.m_nodeWLinker.addNode(node);
+            // if (entity.getMaterial() == null) {
+            if (!entity.isPolyhedral()) {
+              node.rstatus = 1;
+              node.runit = this.m_emptyRPOUnit;
+              this.m_nodeSLinker.addNode(node);
+            } else {
+              node.rstatus = 0;
+              this.m_nodeWLinker.addNode(node);
+            }
           }
+        } else {
+          console.log("add a container into the renderer space.");
+          node.rstatus = 1;
+          node.runit = this.m_emptyRPOUnit;
+          this.m_nodeSLinker.addNode(node);
         }
       }
     }
@@ -33932,20 +36226,11 @@ class RendererSpace {
           this.m_nodeWLinker.removeNode(node);
         }
 
-        this.m_nodeQueue.removeEntity(entity);
+        this.m_nodeQueue.removeEntity(entity); // node.reset();
+
         --this.m_entitysTotal;
       }
     }
-  }
-
-  updateEntity(entity) {//  if(RSEntityFlag.TestSpaceContains( entity.__$rseFlag ))
-    //  {
-    //      let node:Entity3DNode = this.m_nodeQueue.getNodeByEntity(entity);
-    //      //  if(node != null)
-    //      //  {
-    //      //      node.distanceFlag = RSEntityFlag.TestSortEnabled(entity.__$rseFlag);
-    //      //  }
-    //  }
   }
 
   update() {}
@@ -33955,19 +36240,27 @@ class RendererSpace {
   run() {
     let nextNode = this.m_nodeWLinker.getBegin();
 
-    if (nextNode != null) {
+    if (nextNode) {
       let pnode = null;
 
-      while (nextNode != null) {
-        if (nextNode.entity.isInRendererProcess()) {
-          pnode = nextNode;
-          pnode.rstatus = 1;
-          nextNode = nextNode.next;
-          this.m_nodeWLinker.removeNode(pnode);
-          this.m_nodeSLinker.addNode(pnode);
+      while (nextNode) {
+        const entity = nextNode.entity;
 
-          if (pnode.rpoNode == null) {
-            pnode.rpoNode = this.m_rpoNodeBuilder.getNodeByUid(pnode.entity.getDisplay().__$rpuid);
+        if (entity.getREType() < 12) {
+          const rentity = entity;
+
+          if (rentity.isInRendererProcess()) {
+            pnode = nextNode;
+            pnode.rstatus = 1;
+            nextNode = nextNode.next;
+            this.m_nodeWLinker.removeNode(pnode);
+            this.m_nodeSLinker.addNode(pnode);
+
+            if (pnode.runit == null) {
+              pnode.runit = rentity.getDisplay().__$$runit;
+            }
+          } else {
+            nextNode = nextNode.next;
           }
         } else {
           nextNode = nextNode.next;
@@ -33976,39 +36269,63 @@ class RendererSpace {
     }
 
     nextNode = this.m_nodeSLinker.getBegin();
+    const cam = this.m_camera;
 
-    if (nextNode != null) {
+    if (nextNode) {
       let total = 0;
+      const cor = this.m_cullingor;
 
-      if (this.m_cullingor != null) {
-        this.m_cullingor.setCamera(this.m_camera);
-        this.m_cullingor.setCullingNodeHead(nextNode);
-        this.m_cullingor.run();
+      if (cor) {
+        cor.setCamera(this.m_camera);
+        cor.setCullingNodeHead(nextNode);
+        cor.run();
         total = this.m_cullingor.total;
       } else {
         let ab = null;
-        let cam = this.m_camera; //let camPos:Vector3D = cam.getPosition();
+        let vboo = false;
+        let entity = nextNode.entity;
+        let ty = entity.getREType();
 
-        while (nextNode != null) {
-          if (nextNode.rpoNode.isVsible() && nextNode.entity.isDrawEnabled()) {
+        while (nextNode) {
+          vboo = false;
+          entity = nextNode.entity;
+          ty = entity.getREType();
+
+          if (nextNode.isVisible()) {
             ab = nextNode.bounds;
-            const boo = cam.visiTestSphere2(ab.center, ab.radius);
-            nextNode.drawEnabled = boo;
-            nextNode.entity.drawEnabled = boo;
-            nextNode.rpoNode.drawEnabled = boo;
-            total += boo ? 1 : 0; //  if(nextNode.drawEnabled && nextNode.distanceFlag)
-            //  {
-            //      nextNode.rpoNode.setValue(-Vector3D.DistanceSquared(camPos,ab.center));
-            //      //console.log((nextNode.entity as any).name,",a runit.value: ",nextNode.rpoNode.unit.value);
-            //  }
-          } else {
-            nextNode.drawEnabled = false;
-            nextNode.entity.drawEnabled = false;
-            nextNode.rpoNode.drawEnabled = false;
-          } // if(DebugFlag.Flag_0 > 0) console.log("nextNode.rpoNode.isVsible(): ",nextNode.rpoNode.isVsible(), nextNode.entity.isDrawEnabled(), nextNode.drawEnabled);
+            vboo = cam.visiTestSphere2(ab.center, ab.radius); // if (vboo) {
+            // 	total += 1;
+            // 	if (ty >= 12) {
+            // 		const c = entity as IDisplayEntityContainer;
+            // 		c.__$setRendering(vboo);
+            // 		this.camVisiContainer(c, cam);
+            // 	}
+            // } else {
+            // 	entity.setRendering(vboo);
+            // }
+          }
 
+          nextNode.drawEnabled = vboo; // if (ty < 12) {
+          // 	entity.setRendering(vboo);
+          // }
 
           nextNode = nextNode.next;
+
+          if (vboo) {
+            total += 1;
+
+            if (ty >= 12) {
+              const c = entity;
+
+              c.__$setRendering(vboo);
+
+              this.camVisiContainer(c, cam);
+            } else {
+              entity.setRendering(vboo);
+            }
+          } else {
+            entity.setRendering(vboo);
+          }
         }
       }
 
@@ -34018,9 +36335,13 @@ class RendererSpace {
         etset.reset(total);
         nextNode = this.m_nodeSLinker.getBegin();
 
-        while (nextNode != null) {
+        while (nextNode) {
           if (nextNode.drawEnabled) {
-            etset.addEntity(nextNode.entity);
+            const entity = nextNode.entity;
+
+            if (entity.getREType() < 12) {
+              etset.addEntity(entity);
+            }
           }
 
           nextNode = nextNode.next;
@@ -34031,10 +36352,40 @@ class RendererSpace {
     }
   }
 
+  camVisiContainer(c, cam) {
+    const etotal = c.getEntitiesTotal();
+    const ets = c.getEntities();
+
+    for (let i = 0; i < etotal; ++i) {
+      const et = ets[i];
+      const ab = et.getGlobalBounds(); // const vboo = ab ? cam.visiTestSphere2(ab.center, ab.radius) : true;
+
+      const vboo = cam.visiTestSphere2(ab.center, ab.radius);
+      et.setRendering(vboo);
+    }
+
+    const ctotal = c.getChildrenTotal();
+    const ecs = c.getContainers();
+
+    for (let i = 0; i < ctotal; ++i) {
+      const ec = ecs[i];
+      const ab = ec.getGlobalBounds();
+      const vboo = cam.visiTestSphere2(ab.center, ab.radius);
+
+      if (vboo) {
+        ec.__$setRendering(vboo);
+
+        this.camVisiContainer(ec, cam);
+      } else {
+        ec.setRendering(vboo);
+      }
+    }
+  }
+
   rayTest(rlpv, rltv) {
     if (this.m_raySelector != null) {
+      this.m_raySelector.etset = this.renderingEntitySet;
       this.m_raySelector.setCamera(this.m_camera);
-      this.m_raySelector.setCullingNodeHead(this.m_nodeSLinker.getBegin());
       this.m_raySelector.setRay(rlpv, rltv);
       this.m_raySelector.run();
     }
@@ -34044,10 +36395,6 @@ class RendererSpace {
 
   getCullingNodeHead() {
     return this.m_nodeSLinker.getBegin();
-  }
-
-  toString() {
-    return "[RendererSpace(uid = " + this.m_uid + ")]";
   }
 
 }
@@ -34141,6 +36488,11 @@ class CameraZoomController {
 
   bindCamera(camera) {
     this.m_camera = camera;
+  }
+
+  initWithRScene(sc) {
+    this.bindCamera(sc.getCamera());
+    this.initialize(sc.getStage3D());
   }
 
   initialize(stage3D) {
@@ -34279,6 +36631,85 @@ class CameraZoomController {
 }
 
 exports.default = CameraZoomController;
+
+/***/ }),
+
+/***/ "a4f8":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+/***************************************************************************/
+
+/*                                                                         */
+
+/*  Copyright 2018-2022 by                                                 */
+
+/*  Vily(vily313@126.com)                                                  */
+
+/*                                                                         */
+
+/***************************************************************************/
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+class RenderingStencil {
+  constructor(rstate) {
+    this.m_rstate = null;
+    this.m_rstate = rstate;
+  } // getRDST(): IRODrawState {
+  // 	return this.m_rstate;
+  // }
+
+
+  isEnabled() {
+    return true;
+  }
+
+  setDepthTestEnable(enable) {
+    if (this.m_rstate) this.m_rstate.setDepthTestEnable(enable);
+    return this;
+  }
+  /**
+   * 设置 gpu stencilFunc 状态
+   * @param func Specifies the test function. Eight symbolic constants are valid: GL_NEVER, GL_LESS, GL_LEQUAL, GL_GREATER, GL_GEQUAL, GL_EQUAL, GL_NOTEQUAL, and GL_ALWAYS. The initial value is GL_ALWAYS.
+   * @param ref a GLint type number, value range: [0,2n−1];
+   * @param mask GLint type number
+   */
+
+
+  setStencilFunc(func, ref, mask) {
+    this.m_rstate.setStencilFunc(func, ref, mask);
+    return this;
+  }
+  /**
+   * 设置 gpu stencilMask 状态
+   * @param mask GLint type number
+   */
+
+
+  setStencilMask(mask) {
+    this.m_rstate.setStencilMask(mask);
+    return this;
+  }
+  /**
+   * 设置 gpu stencilOp 状态
+   * @param fail Specifies the action to take when the stencil test fails. Eight symbolic constants are accepted: GL_KEEP, GL_ZERO, GL_REPLACE, GL_INCR, GL_INCR_WRAP, GL_DECR, GL_DECR_WRAP, and GL_INVERT. The initial value is GL_KEEP.
+   * @param zfail Specifies the stencil action when the stencil test passes, but the depth test fails. dpfail accepts the same symbolic constants as sfail. The initial value is GL_KEEP.
+   * @param zpass Specifies the stencil action when both the stencil test and the depth test pass, or when the stencil test passes and either there is no depth buffer or depth testing is not enabled. dppass accepts the same symbolic constants as sfail. The initial value is GL_KEEP.
+   */
+
+
+  setStencilOp(fail, zfail, zpass) {
+    this.m_rstate.setStencilOp(fail, zfail, zpass);
+    return this;
+  }
+
+}
+
+exports.RenderingStencil = RenderingStencil;
 
 /***/ }),
 
@@ -34729,6 +37160,82 @@ exports.default = Entity3DNodeLinker;
 
 /***/ }),
 
+/***/ "a889":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+ // import {DemoThread as Demo} from "./cospace/modules/thread/example/DemoThread";
+// import {DemoThread as Demo} from "./cospace/demo/DemoThread";
+// import {DemoThreadLoadJS as Demo} from "./cospace/demo/DemoThreadLoadJS";
+// import { DemoCTMLoadAndParser as Demo } from "./cospace/demo/DemoCTMLoadAndParser";
+// import { DemoFBXFastParser as Demo } from "./cospace/demo/DemoFBXFastParser";
+// import { DemoOBJParser as Demo } from "./cospace/demo/DemoOBJParser";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+}); // import { DemoCTMLoad as Demo } from "./cospace/demo/DemoCTMLoad";
+// import { DemoCTMParser as Demo } from "./cospace/demo/DemoCTMParser";
+// import { DemoDracoParser as Demo } from "./cospace/demo/DemoDracoParser";
+// import { DemoShowCTMAndDraco as Demo } from "./cospace/demo/DemoShowCTMAndDraco";
+// import { DemoCTMToDraco as Demo } from "./cospace/demo/DemoCTMToDraco";
+// import { DemoDracoEncode as Demo } from "./cospace/demo/DemoDracoEncode";
+// import { DemoDracoParser2 as Demo } from "./cospace/demo/DemoDracoParser2";
+// import { DemoFBXParser as Demo } from "./cospace/demo/DemoFBXParser";
+// import { DemoGLBParser as Demo } from "./cospace/demo/DemoGLBParser";
+// import { DemoPNGParser as Demo } from "./cospace/demo/DemoPNGParser";
+// import { DemoMixParser as Demo } from "./cospace/demo/DemoMixParser";
+// import { DemoCospace as Demo } from "./cospace/demo/DemoCospace";
+// import { DemoCospaceDeferredInit as Demo } from "./cospace/demo/DemoCospaceDeferredInit";
+// import { DemoDependenceGraph as Demo } from "./cospace/demo/DemoDependenceGraph";
+// import { DemoCTMViewer as Demo } from "./cospace/demo/DemoCTMViewer";
+// import { DemoNormalViewer as Demo } from "./cospace/demo/DemoNormalViewer";
+
+const RenderingVerifier_1 = __webpack_require__("d35a"); // import { DemoCoApp as Demo } from "./cospace/demo/DemoCoApp";
+// import { DemoCoAppDeferredInit as Demo } from "./cospace/demo/DemoCoAppDeferredInit";
+// import { DemoCoRenderer as Demo } from "./cospace/demo/DemoCoRenderer";
+// import { DemoCoRendererScene as Demo } from "./cospace/demo/DemoCoRendererScene";
+// import { DemoCoRendererSubScene as Demo } from "./cospace/demo/DemoCoRendererSubScene";
+// import { DemoCoRendererSceneGraph as Demo } from "./cospace/demo/DemoCoRendererSceneGraph";
+// import { DemoCoSimpleRendereScene as Demo } from "./cospace/demo/DemoCoSimpleRendereScene";
+// import { DemoDisplayModel as Demo } from "./cospace/demo/DemoDisplayModel";
+// import { DemoShaderMaterial as Demo } from "./cospace/demo/DemoShaderMaterial";
+// import { DemoPrimitives as Demo } from "./cospace/demo/DemoPrimitives";
+// import { DemoVtxDrawingInfo as Demo } from "./cospace/demo/DemoVtxDrawingInfo";
+// import { DemoCoViewer as Demo } from "./cospace/demo/DemoCoViewer";
+// import { DemoVox3DEditor as Demo } from "./cospace/demo/DemoVox3DEditor";
+// import { DemoOutline as Demo } from "./cospace/demo/DemoOutline";
+// import { DemoPostOutline as Demo } from "./cospace/demo/DemoPostOutline";
+// import { DemoCoParticle as Demo } from "./cospace/demo/DemoCoParticle";
+// import { DemoCoParticleFlow as Demo } from "./cospace/demo/DemoCoParticleFlow";
+// import { DemoCoParticleModule as Demo } from "./cospace/demo/DemoCoParticleModule";
+// import { DemoCoEdit as Demo } from "./cospace/demo/DemoCoEdit";
+// import { DemoInputText as Demo } from "./cospace/demo/DemoInputText";
+// import { DemoCORS as Demo } from "./cospace/demo/DemoCORS";
+
+
+let demoIns = new RenderingVerifier_1.RenderingVerifier();
+let ins = demoIns;
+
+function main() {
+  console.log("------ demo --- init ------");
+  ins.initialize();
+
+  if (ins.run) {
+    function mainLoop(now) {
+      ins.run();
+      window.requestAnimationFrame(mainLoop);
+    }
+
+    window.requestAnimationFrame(mainLoop);
+  }
+
+  console.log("------ demo --- running ------");
+}
+
+main();
+
+/***/ }),
+
 /***/ "a996":
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -34785,17 +37292,6 @@ exports.default = EventBase;
 
 "use strict";
 
-/***************************************************************************/
-
-/*                                                                         */
-
-/*  Copyright 2018-2022 by                                                 */
-
-/*  Vily(vily313@126.com)                                                  */
-
-/*                                                                         */
-
-/***************************************************************************/
 
 Object.defineProperty(exports, "__esModule", {
   value: true
@@ -34815,6 +37311,1101 @@ var ShadowMode;
 })(ShadowMode || (ShadowMode = {}));
 
 exports.ShadowMode = ShadowMode;
+
+/***/ }),
+
+/***/ "aa80":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+/***************************************************************************/
+
+/*                                                                         */
+
+/*  Copyright 2018-2022 by                                                 */
+
+/*  Vily(vily313@126.com)                                                  */
+
+/*                                                                         */
+
+/***************************************************************************/
+// 整个渲染场景的入口类
+
+var __importDefault = this && this.__importDefault || function (mod) {
+  return mod && mod.__esModule ? mod : {
+    "default": mod
+  };
+};
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const Vector3D_1 = __importDefault(__webpack_require__("8e17"));
+
+const Stage3D_1 = __importDefault(__webpack_require__("3806"));
+
+const CameraBase_1 = __importDefault(__webpack_require__("c51d"));
+
+const RendererParam_1 = __importDefault(__webpack_require__("c497"));
+
+const RunnableQueue_1 = __importDefault(__webpack_require__("9c4d"));
+
+const TextureBlock_1 = __webpack_require__("5d04");
+
+const RendererSpace_1 = __importDefault(__webpack_require__("a446"));
+
+const RaySelector_1 = __importDefault(__webpack_require__("c711"));
+
+const RayGpuSelector_1 = __importDefault(__webpack_require__("955e"));
+
+const MouseEvt3DController_1 = __importDefault(__webpack_require__("765c"));
+
+const FBOInstance_1 = __importDefault(__webpack_require__("af29"));
+
+const CameraDsistanceSorter_1 = __importDefault(__webpack_require__("d7e2"));
+
+const Matrix4Pool_1 = __importDefault(__webpack_require__("2139"));
+
+const ShaderProgramBuilder_1 = __webpack_require__("a156");
+
+const Matrix4_1 = __importDefault(__webpack_require__("18c7"));
+
+const EntityTransUpdater_1 = __importDefault(__webpack_require__("7c36"));
+
+const EntityFence_1 = __importDefault(__webpack_require__("20d6"));
+
+class RendererSceneBase {
+  constructor(uidBase = 0) {
+    this.___$$$$$$$Author = "VilyLei(vily313@126.com)";
+    this.m_uid = -1;
+    this.m_adapter = null;
+    this.m_rproxy = null;
+    this.m_shader = null;
+    this.m_rcontext = null;
+    this.m_renderer = null;
+    this.m_processids = new Uint8Array(128);
+    this.m_penableds = new Array(128);
+    this.m_processidsLen = 0;
+    this.m_rspace = null;
+    this.m_mouse_rltv = new Vector3D_1.default();
+    this.m_mouse_rlpv = new Vector3D_1.default();
+    this.m_accessor = null; // event flow control enable
+
+    this.m_evtFlowEnabled = false;
+    this.m_evt3DCtr = null;
+    this.m_mouseEvtEnabled = true;
+    this.m_viewX = 0.0;
+    this.m_viewY = 0.0;
+    this.m_viewW = 800.0;
+    this.m_viewH = 800.0;
+    this.m_camera = null;
+    this.m_currCamera = null;
+    this.m_camDisSorter = null;
+    this.m_subscListLen = 0;
+    this.m_localRunning = false;
+    this.m_containers = [];
+    this.m_containersTotal = 0;
+    this.m_runFlag = -1;
+    this.m_autoRunEnabled = true;
+    this.m_processUpdate = false;
+    this.m_enabled = true;
+    this.m_rparam = null;
+    this.m_currStage3D = null;
+    this.m_stage3D = null;
+    this.runnableQueue = null;
+    this.textureBlock = null;
+    this.stage3D = null;
+    this.materialBlock = null;
+    this.entityBlock = null;
+    this.m_mouseTestBoo = true;
+    this.m_cullingTestBoo = true;
+    this.m_rayTestFlag = true;
+    this.m_rayTestEnabled = true;
+    this.m_prependNodes = null;
+    this.m_appendNodes = null;
+    this.m_uid = uidBase + RendererSceneBase.s_uid++;
+    this.m_penableds.fill(true);
+    this.m_entityFence = new EntityFence_1.default(this);
+  }
+
+  createRendererParam() {
+    return new RendererParam_1.default();
+  }
+
+  createSubScene(rparam = null, renderProcessesTotal = 3, createNewCamera = true) {
+    return null;
+  }
+
+  enable() {
+    this.m_enabled = true;
+  }
+
+  disable() {
+    this.m_enabled = false;
+  }
+
+  isEnabled() {
+    return this.m_enabled;
+  }
+
+  getUid() {
+    return this.m_uid;
+  }
+
+  getDiv() {
+    return this.m_rproxy.getDiv();
+  }
+
+  getCanvas() {
+    return this.m_rproxy.getCanvas();
+  }
+
+  getRPONodeBuilder() {
+    return null;
+  }
+
+  getRenderProxy() {
+    return this.m_rproxy;
+  } // set new view port rectangle area
+
+
+  setViewPort(px, py, pw, ph) {
+    if (this.m_rproxy != null) {
+      this.m_viewX = px;
+      this.m_viewY = py;
+      this.m_viewW = pw;
+      this.m_viewH = ph;
+      this.m_rproxy.setViewPort(px, py, pw, ph);
+    }
+  }
+
+  setViewPortFromCamera(camera) {
+    if (this.m_rproxy != null && camera != null) {
+      this.m_viewX = camera.getViewX();
+      this.m_viewY = camera.getViewY();
+      this.m_viewW = camera.getViewWidth();
+      this.m_viewH = camera.getViewHeight();
+      this.m_rproxy.setViewPort(this.m_viewX, this.m_viewY, this.m_viewW, this.m_viewH);
+    }
+  } // apply new view port rectangle area
+
+
+  reseizeViewPort() {
+    this.m_rproxy.reseizeRCViewPort();
+  }
+
+  lockViewport() {
+    this.m_adapter.lockViewport();
+  }
+
+  unlockViewport() {
+    this.m_adapter.unlockViewport();
+  }
+
+  getRendererAdapter() {
+    return this.m_adapter;
+  }
+
+  getRenderer() {
+    return this.m_renderer;
+  }
+
+  getRendererContext() {
+    return this.m_rcontext;
+  }
+
+  getStage3D() {
+    return this.m_rproxy.getStage3D();
+  }
+  /**
+   * 获取渲染器可渲染对象管理器状态(版本号)
+   */
+
+
+  getRendererStatus() {
+    return this.m_renderer.getRendererStatus();
+  }
+
+  getViewWidth() {
+    return this.m_rproxy.getStage3D().viewWidth;
+  }
+
+  getViewHeight() {
+    return this.m_rproxy.getStage3D().viewHeight;
+  }
+
+  getCamera() {
+    return this.m_rproxy.getCamera();
+  }
+
+  asynFBOSizeWithViewport() {
+    this.m_rcontext.asynFBOSizeWithViewport();
+  }
+
+  synFBOSizeWithViewport() {
+    this.m_rcontext.synFBOSizeWithViewport();
+  }
+
+  cameraLock() {
+    this.m_rproxy.cameraLock();
+  }
+
+  cameraUnlock() {
+    this.m_rproxy.cameraUnlock();
+  }
+
+  getMouseXYWorldRay(rl_position, rl_tv) {
+    // this.m_rproxy.getMouseXYWorldRay(rl_position, rl_tv);
+    this.m_camera.getWorldPickingRayByScreenXY(this.m_stage3D.mouseX, this.m_stage3D.mouseY, rl_position, rl_tv);
+  }
+
+  createCamera() {
+    return new CameraBase_1.default();
+  }
+
+  createFBOInstance() {
+    return new FBOInstance_1.default(this);
+  }
+
+  createMatrix4() {
+    return new Matrix4_1.default();
+  }
+
+  createVector3(x = 0.0, y = 0.0, z = 0.0, w = 1.0) {
+    return new Vector3D_1.default(x, y, z, w);
+  }
+
+  setClearUint24Color(colorUint24, alpha = 1.0) {
+    this.m_rproxy.setClearUint24Color(colorUint24, alpha);
+  }
+
+  setClearRGBColor3f(pr, pg, pb) {
+    this.m_rproxy.setClearRGBColor3f(pr, pg, pb);
+  }
+
+  setClearRGBAColor4f(pr, pg, pb, pa) {
+    this.m_rproxy.setClearRGBAColor4f(pr, pg, pb, pa);
+  }
+
+  setClearColor(color) {
+    this.m_rproxy.setClearRGBAColor4f(color.r, color.g, color.b, color.a);
+  }
+
+  setRenderToBackBuffer() {
+    this.m_rcontext.setRenderToBackBuffer();
+  }
+
+  drawBackBufferToCanvas(dstCanvasCtx, px, py, width, height) {
+    let srcCanvas = this.getCanvas();
+    dstCanvasCtx.drawImage(srcCanvas, px, py, width, height);
+  }
+
+  updateRenderBufferSize() {
+    this.m_adapter.updateRenderBufferSize();
+  }
+
+  setEvt3DController(evt3DCtr) {
+    if (evt3DCtr != null) {
+      evt3DCtr.initialize(this.getStage3D(), this.getStage3D());
+      evt3DCtr.setRaySelector(this.m_rspace.getRaySelector());
+    }
+
+    this.m_evt3DCtr = evt3DCtr;
+  }
+
+  isRayPickSelected() {
+    return this.m_evt3DCtr != null && this.m_evt3DCtr.isSelected();
+  }
+
+  enableMouseEvent(gpuTestEnabled = true) {
+    if (this.m_evt3DCtr == null) {
+      if (gpuTestEnabled) {
+        this.m_rspace.setRaySelector(new RayGpuSelector_1.default());
+      } else {
+        this.m_rspace.setRaySelector(new RaySelector_1.default());
+      }
+
+      this.setEvt3DController(new MouseEvt3DController_1.default());
+    }
+
+    this.m_mouseEvtEnabled = true;
+  }
+
+  disableMouseEvent() {
+    this.m_mouseEvtEnabled = false;
+  }
+
+  getEvt3DController() {
+    return this.m_evt3DCtr;
+  }
+
+  getSpace() {
+    return this.m_rspace;
+  }
+
+  getDevicePixelRatio() {
+    return this.m_adapter.getDevicePixelRatio();
+  }
+
+  addEventListener(type, target, func, captureEnabled = true, bubbleEnabled = false) {
+    this.m_currStage3D.addEventListener(type, target, func, captureEnabled, bubbleEnabled);
+  }
+
+  removeEventListener(type, target, func) {
+    this.m_currStage3D.removeEventListener(type, target, func);
+  }
+
+  setAccessor(accessor) {
+    this.m_accessor = accessor;
+  } // for overriding by sub class
+
+
+  createRendererIns() {
+    // return new RendererInstance();
+    return null;
+  }
+
+  rendererInsInited() {} // for overriding by sub class
+
+
+  initThis() {// this.tickUpdate();
+  }
+
+  initialize(rparam = null, renderProcessesTotal = 3, createNewCamera = true) {
+    if (this.m_renderer == null) {
+      if (rparam == null) rparam = new RendererParam_1.default();
+      this.m_rparam = rparam;
+      let selfT = this;
+      selfT.stage3D = new Stage3D_1.default(this.getUid(), document);
+      selfT.runnableQueue = new RunnableQueue_1.default();
+      selfT.textureBlock = new TextureBlock_1.TextureBlock();
+
+      if (renderProcessesTotal < 1) {
+        renderProcessesTotal = 1;
+      }
+
+      if (renderProcessesTotal > 128) {
+        renderProcessesTotal = 128;
+      }
+
+      this.m_evtFlowEnabled = rparam.evtFlowEnabled;
+      let rins = this.createRendererIns();
+
+      rins.__$setStage3D(this.stage3D);
+
+      Matrix4Pool_1.default.Allocate(rparam.getMatrix4AllocateSize());
+      let camera = new CameraBase_1.default();
+      rins.initialize(rparam, camera, new ShaderProgramBuilder_1.ShaderProgramBuilder(rins.getRCUid()));
+      this.m_renderer = rins;
+      this.m_transUpdater = new EntityTransUpdater_1.default();
+      this.m_processids[0] = 0;
+      this.m_processidsLen++;
+
+      for (; renderProcessesTotal >= 0;) {
+        const process = this.m_renderer.appendProcess(rparam.batchEnabled, rparam.processFixedState);
+        this.m_processids[this.m_processidsLen] = process.getRPIndex();
+        this.m_processidsLen++;
+        --renderProcessesTotal;
+      }
+
+      this.m_rcontext = this.m_renderer.getRendererContext();
+      this.m_rproxy = this.m_rcontext.getRenderProxy();
+      this.m_adapter = this.m_rproxy.getRenderAdapter();
+      let stage3D = this.m_rproxy.getStage3D();
+      this.m_viewW = stage3D.stageWidth;
+      this.m_viewH = stage3D.stageHeight;
+      this.m_shader = this.m_renderer.getDataBuilder().getRenderShader();
+      this.textureBlock.setRenderer(this.m_rproxy);
+      this.rendererInsInited();
+      this.m_camDisSorter = new CameraDsistanceSorter_1.default(this.m_rproxy);
+
+      if (this.m_rspace == null) {
+        let space = new RendererSpace_1.default();
+        space.initialize(this.m_renderer, this.m_rproxy.getCamera());
+        this.m_rspace = space;
+      }
+
+      this.initThis();
+    }
+
+    return this;
+  }
+  /**
+   * @param index renderer process index in the renderer scene
+   * @param batchEnabled the value is true or false
+   * @param processFixedState the value is true or false
+   */
+
+
+  setRendererProcessParam(index, batchEnabled, processFixedState) {
+    this.m_renderer.setRendererProcessParam(this.m_processids[index], batchEnabled, processFixedState);
+  }
+  /**
+   * @param batchEnabled the default value true
+   * @param processFixedState the default value false
+   */
+
+
+  appendARendererProcess(batchEnabled = true, processFixedState = false) {
+    let process = this.m_renderer.appendProcess(batchEnabled, processFixedState);
+    this.m_processids[this.m_processidsLen] = process.getRPIndex();
+    this.m_processidsLen++;
+  }
+  /**
+   * get the renderer process by process index
+   * @param processid IRenderProcess instance index in renderer scene instance
+   */
+
+
+  getRenderProcessAt(processid) {
+    return this.m_renderer.getProcessAt(this.m_processids[processid]);
+  }
+
+  addContainer(container, processid = 0) {
+    if (container.getREType() < 12) {
+      throw Error("illegal operation !!!");
+    }
+
+    if (processid < 0) {
+      processid = 0;
+    }
+
+    if (container != null && container.__$wuid < 0 && container.__$contId < 1) {
+      let i = 0;
+
+      for (; i < this.m_containersTotal; ++i) {
+        if (this.m_containers[i] == container) {
+          break;
+        }
+      }
+
+      if (i >= this.m_containersTotal) {
+        container.__$wuid = this.m_uid;
+        container.__$wprocuid = processid;
+
+        container.__$setRenderer(this);
+
+        this.m_containers.push(container);
+        this.m_containersTotal++;
+
+        if (container.isSpaceEnabled()) {
+          this.m_rspace.addEntity(container);
+        }
+
+        if (container.getREType() >= 20) {
+          this.m_renderer.addContainer(container, this.m_processids[processid]);
+        }
+      }
+    }
+  }
+
+  removeContainer(container) {
+    // if (container != null && container.__$wuid == this.m_uid && container.getRenderer() == this.m_renderer) {
+    if (container != null && container.__$wuid == this.m_uid && container.getRenderer() == this) {
+      let i = 0;
+
+      for (; i < this.m_containersTotal; ++i) {
+        if (this.m_containers[i] == container) {
+          const wprocuid = container.__$wprocuid;
+          this.m_rspace.removeEntity(container);
+
+          container.__$setRenderer(null);
+
+          container.__$wuid = -1;
+          container.__$wprocuid = -1;
+          this.m_containers.splice(i, 1);
+          --this.m_containersTotal;
+
+          if (container.getREType() >= 20) {
+            this.m_renderer.removeContainer(container, wprocuid);
+          }
+
+          break;
+        }
+      }
+    }
+  }
+
+  setAutoRunningEnabled(autoRunning) {
+    this.m_autoRunEnabled = autoRunning;
+  }
+
+  setAutoRenderingSort(sortEnabled) {
+    this.m_processUpdate = sortEnabled;
+  }
+
+  setProcessSortEnabledAt(processIndex, sortEnabled, sorter = null) {
+    this.m_renderer.setProcessSortEnabledAt(processIndex, sortEnabled);
+
+    if (sortEnabled) {
+      let process = this.m_renderer.getProcessAt(processIndex);
+      sorter = sorter != null ? sorter : this.m_camDisSorter;
+
+      if (process != null) {
+        process.setSorter(sorter);
+      }
+    }
+  }
+
+  setProcessSortEnabled(process, sortEnabled, sorter = null) {
+    this.m_renderer.setProcessSortEnabled(process, sortEnabled);
+
+    if (sortEnabled && process != null && !process.hasSorter()) {
+      sorter = sorter ? sorter : this.m_camDisSorter;
+      process.setSorter(sorter);
+    }
+  }
+  /**
+   * 将已经在渲染运行时中的entity移动到指定 process uid 的 render process 中去
+   * move rendering runtime displayEntity to different renderer process
+   */
+
+
+  moveEntityTo(entity, processindex) {
+    this.m_renderer.moveEntityToProcessAt(entity, this.m_processids[processindex]);
+  }
+  /**
+   * 单独绘制可渲染对象, 可能是使用了 global material也可能没有。这种方式比较耗性能,只能用在特殊的地方。
+   * @param entity 需要指定绘制的 IRenderEntity 实例
+   * @param useGlobalUniform 是否使用当前 global material 所携带的 uniform, default value: false
+   * @param forceUpdateUniform 是否强制更新当前 global material 所对应的 shader program 的 uniform, default value: true
+   */
+
+
+  drawEntity(entity, useGlobalUniform = false, forceUpdateUniform = true) {
+    this.m_renderer.drawEntity(entity, useGlobalUniform, forceUpdateUniform);
+  }
+
+  addEntityToSpace(re) {
+    const sp = this.m_rspace;
+
+    if (sp) {
+      let flag = true;
+
+      let parent = re.__$getParent(); // console.log("parent: ", parent);
+
+
+      while (parent) {
+        // console.log("parent.isSpaceEnabled(): ", parent.isSpaceEnabled());
+        if (!parent.hasParent() && parent.isSpaceEnabled()) {
+          flag = false;
+        }
+
+        parent = parent.getParent();
+      } // console.log("addEntityToSpace(), flag: ", flag);
+
+
+      if (flag) {
+        sp.addEntity(re);
+      }
+    }
+  }
+  /**
+   * add an entity to the renderer process of the renderer instance
+   * @param entity IRenderEntityBase instance(for example: DisplayEntity class instance)
+   * @param processid this destination renderer process id
+   * @param deferred if the value is true,the entity will not to be immediately add to the renderer process by its id
+   */
+
+
+  addEntity(entity, processid = 0, deferred = true) {
+    if (entity) {
+      // console.log("add entity into the renderer scene A0.");
+      if (entity.getREType() < 12) {
+        let re = entity;
+
+        if (re != null && re.__$testSpaceEnabled()) {
+          // console.log("add entity into the renderer scene A1.");
+          if (re.isPolyhedral()) {
+            // console.log("add entity into the renderer scene A2.");
+            if (re.hasMesh()) {
+              // console.log("add entity into the renderer scene.");
+              re.getTransform().setUpdater(this.m_transUpdater);
+              this.m_renderer.addEntity(re, this.m_processids[processid], deferred);
+              this.addEntityToSpace(re);
+            } else {
+              this.m_entityFence.addEntity(re, processid);
+            }
+          } else {
+            // console.log("add entity into the renderer scene A3.");
+            re.getTransform().setUpdater(this.m_transUpdater);
+            this.m_renderer.addEntity(re, this.m_processids[processid], deferred);
+            this.addEntityToSpace(re);
+          }
+        }
+      } else {
+        let re = entity;
+        this.addContainer(re, processid);
+      }
+    }
+  }
+  /**
+   * remove an entity from the rendererinstance
+   * @param entity IRenderEntityBase instance(for example: DisplayEntity class instance)
+   */
+
+
+  removeEntity(entity) {
+    if (entity) {
+      if (entity.getREType() < 12) {
+        let re = entity;
+        const flag = this.m_entityFence.removeEntity(re); // console.log("removeEntity(), flag: ", flag);
+
+        if (!flag) {
+          this.m_renderer.removeEntity(re);
+          re.getTransform().setUpdater(null);
+
+          if (this.m_rspace != null) {
+            this.m_rspace.removeEntity(re);
+          }
+        }
+      } else {
+        let re = entity;
+        this.removeContainer(re);
+      }
+    }
+  }
+
+  updateMaterialUniformToCurrentShd(material) {
+    this.m_renderer.updateMaterialUniformToCurrentShd(material);
+  }
+
+  showInfoAt(index) {
+    this.m_renderer.showInfoAt(index);
+  }
+
+  getRenderUnitsTotal() {
+    return this.m_renderer.getRenderUnitsTotal();
+  }
+
+  useCamera(camera, syncCamView = false) {
+    this.m_currCamera = camera;
+
+    if (syncCamView) {
+      this.m_rproxy.setRCViewPort(camera.getViewX(), camera.getViewY(), camera.getViewWidth(), camera.getViewHeight(), true);
+      this.m_rproxy.reseizeRCViewPort();
+    }
+
+    camera.update();
+    this.m_rcontext.resetUniform();
+    this.m_rproxy.updateCameraDataFromCamera(camera);
+  }
+
+  useMainCamera() {
+    this.m_currCamera = null;
+    let camera = this.m_rproxy.getCamera();
+    this.m_rproxy.setRCViewPort(camera.getViewX(), camera.getViewY(), camera.getViewWidth(), camera.getViewHeight(), true);
+    this.m_rproxy.reseizeRCViewPort();
+    this.m_rproxy.updateCamera();
+    this.m_rcontext.resetUniform();
+    this.m_rproxy.updateCameraDataFromCamera(this.m_rproxy.getCamera());
+  }
+
+  updateCameraDataFromCamera(camera) {
+    this.m_rproxy.updateCameraDataFromCamera(camera);
+  }
+  /**
+   * reset renderer rendering state
+   */
+
+
+  resetState() {
+    this.m_rcontext.resetState();
+  }
+  /**
+   * reset render shader uniform location
+   */
+
+
+  resetUniform() {
+    this.m_rcontext.resetUniform();
+  }
+
+  enableSynViewAndStage() {
+    this.m_rproxy.enableSynViewAndStage();
+  }
+  /**
+   * the function only resets the renderer instance rendering status.
+   * you should use it before the run or runAt function is called.
+   */
+
+
+  renderBegin(contextBeginEnabled = true) {
+    const ry = this.m_rproxy;
+
+    if (this.m_currCamera == null) {
+      this.m_adapter.unlockViewport();
+
+      if (ry.isAutoSynViewAndStage()) {
+        let boo = ry.testViewPortChanged(this.m_viewX, this.m_viewY, this.m_viewW, this.m_viewH);
+        this.m_viewX = ry.getViewX();
+        this.m_viewY = ry.getViewY();
+        this.m_viewW = ry.getViewWidth();
+        this.m_viewH = ry.getViewHeight();
+
+        if (boo) {
+          ry.setRCViewPort(this.m_viewX, this.m_viewY, this.m_viewW, this.m_viewH, true);
+          ry.reseizeRCViewPort();
+        }
+      } else {
+        ry.setViewPort(this.m_viewX, this.m_viewY, this.m_viewW, this.m_viewH);
+      }
+
+      ry.updateCamera();
+      ry.updateCameraDataFromCamera(ry.getCamera());
+    }
+
+    this.m_shader.renderBegin();
+
+    if (contextBeginEnabled) {
+      this.m_rcontext.renderBegin(this.m_currCamera == null);
+    }
+
+    this.m_currCamera = null;
+
+    if (this.m_accessor != null) {
+      this.m_accessor.renderBegin(this);
+    }
+  }
+  /**
+   * the function resets the renderer scene status.
+   * you should use it on the frame starting time.
+   * @param autoCycle the default value is true
+   * @param contextBeginEnabled the default value is true
+   */
+
+
+  runBegin(autoCycle = true, contextBeginEnabled = true) {
+    if (autoCycle && this.m_autoRunEnabled) {
+      if (this.m_runFlag >= 0) this.runEnd();
+      this.m_runFlag = 0;
+    }
+
+    let cam = this.m_currCamera;
+    let camFlag = cam == null;
+    this.renderBegin(contextBeginEnabled);
+
+    if (this.m_rspace) {
+      this.m_rspace.setCamera(camFlag ? this.m_rproxy.getCamera() : cam);
+      this.m_rspace.runBegin();
+    }
+  }
+
+  renderContextBegin() {
+    this.m_rcontext.renderBegin();
+  }
+
+  setRayTestEnabled(enabled) {
+    this.m_rayTestEnabled = enabled;
+  }
+  /**
+   *
+   * @param evtFlowPhase its value is 0(none phase),1(capture phase),2(bubble phase)
+   * @param status its vaule is 1(default process),1(deselect ray pick target)
+   * @returns 1 is send evt yes,0 is send evt no,-1 is event nothing
+   */
+
+
+  runMouseTest(evtFlowPhase, status) {
+    let flag = -1;
+
+    if (this.m_evt3DCtr != null && this.m_mouseEvtEnabled) {
+      if (this.m_rayTestFlag && this.m_evt3DCtr.getEvtType() > 0) {
+        // 是否对已经获得的拾取列表做进一步的gpu拾取
+        let selector = this.m_rspace.getRaySelector();
+
+        if (selector) {
+          if (this.m_rayTestEnabled) {
+            this.mouseRayTest();
+          } else {
+            selector.clear();
+          } // 如果有gpu拾取则进入这个管理器, 这个管理器得到最终的拾取结果再和前面的计算结果做比较
+
+
+          let total = selector.getSelectedNodesTotal();
+
+          if (total > 1) {
+            let i = 0;
+            let list = selector.getSelectedNodes();
+            let node = null;
+
+            for (; i < total; ++i) {
+              node = list[i];
+
+              if (node.entity.isPolyhedral()) {//this.m_renderer.drawEntityByLockMaterial(node.entity);
+              }
+            }
+          }
+        }
+
+        this.m_rayTestFlag = false;
+      }
+
+      flag = this.m_evt3DCtr.run(evtFlowPhase, status);
+    }
+
+    this.m_mouseTestBoo = false;
+    return flag;
+  }
+  /**
+   * update all data or status of the renderer runtime
+   * should call this function per frame
+   */
+
+
+  update(autoCycle = true, mouseEventEnabled = true) {
+    const st = this.m_currStage3D;
+
+    if (st != null) {
+      st.enterFrame();
+      this.updateCamera();
+    }
+
+    if (autoCycle && this.m_autoRunEnabled) {
+      if (this.m_runFlag != 0) this.runBegin();
+      this.m_runFlag = 1;
+    } // camera visible test, ray cast test, Occlusion Culling test
+
+
+    this.m_mouseTestBoo = true;
+    this.m_cullingTestBoo = true;
+    this.m_rayTestFlag = true;
+    this.m_transUpdater.update();
+    let i = 0;
+
+    for (; i < this.m_containersTotal; ++i) {
+      this.m_containers[i].update();
+    }
+
+    this.m_renderer.update(); // space update
+
+    if (this.m_rspace != null) {
+      this.m_rspace.update();
+
+      if (this.m_cullingTestBoo) {
+        if (this.m_evt3DCtr != null || this.m_processUpdate || this.m_rspace.getRaySelector() != null) {
+          this.m_rspace.run();
+          this.m_rproxy.status.povNumber = this.m_rspace.getPOVNumber();
+        }
+      }
+    }
+
+    if (this.m_processUpdate) {
+      // this.m_renderer.updateAllProcess();
+      if (this.m_localRunning) {
+        for (let i = 0; i < this.m_processidsLen; ++i) {
+          this.m_renderer.updateProcessAt(this.m_processids[i]);
+        }
+      } else {
+        this.m_renderer.updateAllProcess();
+      }
+    }
+
+    if (this.m_mouseTestBoo && !this.m_evtFlowEnabled) {
+      if (mouseEventEnabled) {
+        this.runMouseTest(1, 0);
+      } else if (this.m_evt3DCtr != null) {
+        this.m_evt3DCtr.mouseOutEventTarget();
+      }
+    }
+
+    this.runnableQueue.run();
+  } // 运行渲染可见性裁剪测试，射线检测等空间管理机制
+
+
+  cullingTest() {
+    if (this.m_rspace != null) {
+      this.m_rspace.run();
+      this.m_rproxy.status.povNumber = this.m_rspace.getPOVNumber();
+    }
+
+    this.m_cullingTestBoo = false;
+  } // 鼠标位置的射线拾取测试
+
+
+  mouseRayTest() {
+    if (this.m_rspace != null) {
+      // this.m_rproxy.getMouseXYWorldRay(this.m_mouse_rlpv, this.m_mouse_rltv);
+      this.getMouseXYWorldRay(this.m_mouse_rlpv, this.m_mouse_rltv);
+      this.m_rspace.rayTest(this.m_mouse_rlpv, this.m_mouse_rltv);
+    }
+  }
+
+  runRenderNodes(nodes) {
+    if (nodes != null) {
+      // console.log("CoSC runRenderNodes(), nodes.length: ", nodes.length);
+      for (let i = 0; i < nodes.length; ++i) {
+        nodes[i].render();
+      }
+    }
+  }
+
+  addRenderNodes(node, nodes) {
+    for (let i = 0; i < nodes.length; ++i) {
+      if (node == nodes[i]) {
+        return;
+      }
+    }
+
+    nodes.push(node);
+  }
+
+  prependRenderNode(node) {
+    if (node != null && node != this) {
+      if (this.m_prependNodes == null) this.m_prependNodes = [];
+      this.addRenderNodes(node, this.m_prependNodes);
+    }
+  }
+
+  appendRenderNode(node) {
+    if (node != null && node != this) {
+      if (this.m_appendNodes == null) this.m_appendNodes = [];
+      const ls = this.m_appendNodes;
+
+      for (let i = 0; i < ls.length; ++i) {
+        if (node == ls[i]) {
+          return;
+        }
+      }
+
+      ls.push(node);
+    }
+  }
+
+  removeRenderNode(node) {
+    if (node != null) {
+      const ls = this.m_prependNodes;
+
+      if (ls != null) {
+        for (let i = 0; i < ls.length; ++i) {
+          if (node == ls[i]) {
+            ls.splice(i, 1);
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  setProcessEnabledAt(i, enabled) {
+    if (i >= 0 && i < this.m_processids.length) {
+      this.m_renderer.setProcessEnabledAt(this.m_processids[i], enabled);
+      this.m_penableds[i] = enabled;
+    }
+  }
+  /**
+   * run all renderer processes in the renderer instance
+   * @param autoCycle the default value is true
+   */
+
+
+  run(autoCycle = true) {
+    if (this.m_enabled) {
+      let runFlag = autoCycle;
+
+      if (autoCycle && this.m_autoRunEnabled) {
+        if (this.m_runFlag != 1) {
+          this.update();
+          runFlag = false;
+        }
+
+        this.m_runFlag = 2;
+      }
+
+      if (runFlag) {
+        this.runnableQueue.run();
+      }
+
+      this.runRenderNodes(this.m_prependNodes);
+
+      if (this.m_adapter.isFBORunning()) {
+        this.setRenderToBackBuffer();
+      }
+
+      for (let i = 0; i < this.m_processidsLen; ++i) {
+        if (this.m_penableds[i]) {
+          this.m_renderer.runAt(this.m_processids[i]);
+        }
+      }
+
+      this.runRenderNodes(this.m_appendNodes);
+
+      if (autoCycle) {
+        this.runEnd();
+      }
+    }
+  }
+  /**
+   * run the specific renderer process by its index in the renderer instance
+   * @param index the renderer process index in the renderer instance
+   */
+
+
+  runAt(index) {
+    if (this.m_enabled) {
+      this.m_renderer.runAt(this.m_processids[index]);
+    }
+  }
+
+  contextRunEnd() {//this.m_rcontext.runEnd();
+  }
+
+  runEnd() {
+    if (this.m_evt3DCtr != null) {
+      this.m_evt3DCtr.runEnd();
+    } // if(this.m_localRunning) {
+    // this.m_rcontext.runEnd();
+    // }
+
+
+    this.contextRunEnd();
+
+    if (this.m_rspace != null) {
+      this.m_rspace.runEnd();
+    }
+
+    if (this.m_autoRunEnabled) {
+      this.m_runFlag = -1;
+    }
+
+    if (this.m_accessor != null) {
+      this.m_accessor.renderEnd(this);
+    }
+  }
+
+  render() {}
+
+  renderFlush() {
+    if (this.m_rproxy != null) {
+      this.m_rproxy.flush();
+    }
+  }
+
+  updateCamera() {
+    if (this.m_rproxy != null) {
+      this.m_rproxy.updateCamera();
+    }
+  }
+
+  destroy() {
+    this.runnableQueue.destroy();
+    this.m_transUpdater.destroy();
+  }
+
+  setAutoRunning(auto) {
+    return this;
+  }
+
+  isAutoRunning() {
+    return false;
+  }
+
+}
+
+RendererSceneBase.s_uid = 0;
+exports.default = RendererSceneBase;
 
 /***/ }),
 
@@ -35868,10 +39459,6 @@ class DepthTextureProxy extends RTTTextureProxy_1.default {
     gl.texImage2D(this.m_sampler, 0, TextureFormat_1.default.ToGL(gl, this.internalFormat), this.m_texWidth, this.m_texHeight, 0, TextureFormat_1.default.ToGL(gl, this.srcFormat), TextureDataType_1.default.ToGL(gl, this.dataType), null);
   }
 
-  toString() {
-    return "[DepthTextureProxy(name:" + this.name + ",uid=" + this.getUid() + ",width=" + this.getWidth() + ",height=" + this.getHeight() + ")]";
-  }
-
 }
 
 exports.default = DepthTextureProxy;
@@ -35904,8 +39491,6 @@ var __importDefault = this && this.__importDefault || function (mod) {
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-
-const BitConst_1 = __importDefault(__webpack_require__("ca6c"));
 
 const VtxBufConst_1 = __importDefault(__webpack_require__("8a0a"));
 
@@ -35983,12 +39568,16 @@ class ShaderData {
         vshdsrc = GLSLConverter_1.default.Es3VtxShaderToES2(vshdsrc);
         fshdSrc = GLSLConverter_1.default.Es3FragShaderToES2(fshdSrc);
       }
-    } // 直接使用 preCompileInfo 中的 uniform / attribute 等等关键信息
+    }
 
+    this.parseCode(vshdsrc, fshdSrc); // 直接使用 preCompileInfo 中的 uniform / attribute 等等关键信息
 
-    if (this.preCompileInfo != null) {}
+    const scp = this.preCompileInfo;
 
-    this.parseCode(vshdsrc, fshdSrc);
+    if (scp && !this.adaptationShaderVersion) {
+      if (scp.fragOutputTotal > 0) this.m_fragOutputTotal = scp.fragOutputTotal; // console.log("shd unique_ns: ", unique_ns, ", fragOutputTotal: ", this.m_fragOutputTotal);
+    }
+
     let pattributes = ShaderData.s_codeParser.attributes;
     let i = 0;
     let len = pattributes.length;
@@ -36008,62 +39597,61 @@ class ShaderData {
         locationsTotal += 1;
         let vbufType = VtxBufConst_1.default.GetVBufTypeByNS(attri.name);
 
-        switch (vbufType) {
-          case VtxBufConst_1.default.VBUF_VS:
-            //mid += mid * 131 + 1;
-            this.m_layoutBit |= BitConst_1.default.BIT_ONE_0;
-            break;
-
-          case VtxBufConst_1.default.VBUF_UVS:
-            //mid += mid * 131 + 2;
-            this.m_layoutBit |= BitConst_1.default.BIT_ONE_1;
-            break;
-
-          case VtxBufConst_1.default.VBUF_NVS:
-            //mid += mid * 131 + 3;
-            this.m_layoutBit |= BitConst_1.default.BIT_ONE_2;
-            break;
-
-          case VtxBufConst_1.default.VBUF_CVS:
-            //mid += mid * 131 + 4;
-            this.m_layoutBit |= BitConst_1.default.BIT_ONE_3;
-            break;
-
-          case VtxBufConst_1.default.VBUF_TVS:
-            //mid += mid * 131 + 5;
-            this.m_layoutBit |= BitConst_1.default.BIT_ONE_4;
-            break;
-
-          case VtxBufConst_1.default.VBUF_VS2:
-            //mid += mid * 131 + 6;
-            this.m_layoutBit |= BitConst_1.default.BIT_ONE_5;
-            break;
-
-          case VtxBufConst_1.default.VBUF_UVS2:
-            //mid += mid * 131 + 7;
-            this.m_layoutBit |= BitConst_1.default.BIT_ONE_6;
-            break;
-
-          case VtxBufConst_1.default.VBUF_NVS2:
-            //mid += mid * 131 + 8;
-            this.m_layoutBit |= BitConst_1.default.BIT_ONE_7;
-            break;
-
-          case VtxBufConst_1.default.VBUF_CVS2:
-            //mid += mid * 131 + 9;
-            this.m_layoutBit |= BitConst_1.default.BIT_ONE_8;
-            break;
-
-          case VtxBufConst_1.default.VBUF_TVS2:
-            //mid += mid * 131 + 11;
-            this.m_layoutBit |= BitConst_1.default.BIT_ONE_9;
-            break;
-
-          default:
-            locationsTotal -= 1;
-            vbufType = 0;
-            break;
+        if (vbufType >= 3001 && vbufType <= 3010) {
+          this.m_layoutBit |= 1 << vbufType - 3001; //BitConst.BIT_ONE_0;
+        } else {
+          locationsTotal -= 1;
+          vbufType = 0;
         }
+        /*
+        switch (vbufType) {
+            case VtxBufConst.VBUF_VS:
+                //mid += mid * 131 + 1;
+                this.m_layoutBit |= BitConst.BIT_ONE_0;
+                break;
+            case VtxBufConst.VBUF_UVS:
+                //mid += mid * 131 + 2;
+                this.m_layoutBit |= BitConst.BIT_ONE_1;
+                break;
+            case VtxBufConst.VBUF_NVS:
+                //mid += mid * 131 + 3;
+                this.m_layoutBit |= BitConst.BIT_ONE_2;
+                break;
+            case VtxBufConst.VBUF_CVS:
+                //mid += mid * 131 + 4;
+                this.m_layoutBit |= BitConst.BIT_ONE_3;
+                break;
+            case VtxBufConst.VBUF_TVS:
+                //mid += mid * 131 + 5;
+                this.m_layoutBit |= BitConst.BIT_ONE_4;
+                break;
+              case VtxBufConst.VBUF_VS2:
+                //mid += mid * 131 + 6;
+                this.m_layoutBit |= BitConst.BIT_ONE_5;
+                break;
+            case VtxBufConst.VBUF_UVS2:
+                //mid += mid * 131 + 7;
+                this.m_layoutBit |= BitConst.BIT_ONE_6;
+                break;
+            case VtxBufConst.VBUF_NVS2:
+                //mid += mid * 131 + 8;
+                this.m_layoutBit |= BitConst.BIT_ONE_7;
+                break;
+            case VtxBufConst.VBUF_CVS2:
+                //mid += mid * 131 + 9;
+                this.m_layoutBit |= BitConst.BIT_ONE_8;
+                break;
+            case VtxBufConst.VBUF_TVS2:
+                //mid += mid * 131 + 11;
+                this.m_layoutBit |= BitConst.BIT_ONE_9;
+                break;
+            default:
+                locationsTotal -= 1;
+                vbufType = 0;
+                break;
+        }
+        //*/
+
 
         if (vbufType > 0) {
           layoutTypes.push(VtxBufConst_1.default.GetVBufAttributeTypeByVBufType(vbufType));
@@ -36308,10 +39896,10 @@ const FrameBufferType_1 = __importDefault(__webpack_require__("baae"));
 const RendererState_1 = __importDefault(__webpack_require__("29ef"));
 
 class FBOInstance {
-  constructor(renderer, texStroe) {
+  constructor(renderer) {
     this.m_backBufferColor = new Color4_1.default();
     this.m_adapter = null;
-    this.m_renderProxy = null;
+    this.m_rproxy = null;
     this.m_rcontext = null;
     this.m_bgColor = new Color4_1.default();
     this.m_renderer = null;
@@ -36326,6 +39914,7 @@ class FBOInstance {
     this.m_gMateiral = null;
     this.m_gRState = -1;
     this.m_gRColorMask = -1;
+    this.m_processShared = true;
     this.m_rindexs = [];
     this.m_texs = [null, null, null, null, null, null, null, null];
     this.m_texStore = null;
@@ -36344,10 +39933,15 @@ class FBOInstance {
      */
 
     this.uns = "FBOInstance";
+    this.m_lockRenderState = false;
+    this.m_lockMaterial = false;
+    this.m_autoEnd = true;
+    this.m_autoRunBegin = true;
+    this.m_autoRRun = false;
     this.m_renderer = renderer;
-    this.m_texStore = texStroe;
-    this.m_renderProxy = renderer.getRenderProxy();
-    this.m_adapter = this.m_renderProxy.getRenderAdapter();
+    this.m_texStore = renderer.textureBlock.getRTTStrore();
+    this.m_rproxy = renderer.getRenderProxy();
+    this.m_adapter = this.m_rproxy.getRenderAdapter();
     this.m_rcontext = renderer.getRendererContext();
   }
   /**
@@ -36360,16 +39954,26 @@ class FBOInstance {
   }
   /**
    * 设置当前 FBO控制的渲染过程中所需要的 renderer process 序号(id)列表
+   * @param processIDlist 当前渲染器场景中渲染process的序号列表
+   * @param processShared 是否共享process，默认值为true，则表示fbo和renderer scene都会绘制调用
    */
 
 
-  setRProcessIDList(processIDlist) {
+  setRProcessIDList(processIDlist, processShared = true) {
+    this.m_processShared = processShared;
+
     if (processIDlist != null) {
       if (processIDlist.length < 1) {
         throw Error("processIDlist.length < 1, but it must: processIDlist.length >= 1");
       }
 
       this.m_rindexs = processIDlist.slice(0);
+
+      if (!processShared) {
+        for (let i = 0; i < this.m_rindexs.length; ++i) {
+          this.m_renderer.setProcessEnabledAt(i, processShared);
+        }
+      }
     }
   }
   /**
@@ -36394,12 +39998,12 @@ class FBOInstance {
   }
 
   getStage3D() {
-    return this.m_renderProxy.getStage3D();
+    return this.m_rproxy.getStage3D();
   }
 
   getCamera() {
-    if (this.m_renderProxy != null) {
-      return this.m_renderProxy.getCamera();
+    if (this.m_rproxy != null) {
+      return this.m_rproxy.getCamera();
     }
 
     return null;
@@ -36414,14 +40018,14 @@ class FBOInstance {
   }
 
   updateCamera() {
-    if (this.m_renderProxy != null) {
-      this.m_renderProxy.updateCamera();
+    if (this.m_rproxy != null) {
+      this.m_rproxy.updateCamera();
     }
   }
 
   updateCameraDataFromCamera(cam) {
-    if (this.m_renderProxy != null) {
-      this.m_renderProxy.updateCameraDataFromCamera(cam);
+    if (this.m_rproxy != null) {
+      this.m_rproxy.updateCameraDataFromCamera(cam);
     }
   } ////////////////////////////////////////////////////// render state conctrl
 
@@ -36446,12 +40050,12 @@ class FBOInstance {
     if (this.m_gRState >= 0 || state >= 0) {
       this.m_rcontext.useGlobalRenderState(state < 0 ? this.m_gRState : state);
     } else {
-      this.m_renderProxy.lockRenderState();
+      this.m_rproxy.lockRenderState();
     }
   }
 
   unlockRenderState() {
-    this.m_renderProxy.unlockRenderState();
+    this.m_rproxy.unlockRenderState();
   } ////////////////////////////////////////////////////// render color mask conctrl
 
 
@@ -36475,13 +40079,13 @@ class FBOInstance {
     if (this.m_gRColorMask >= 0 || colorMask >= 0) {
       this.m_rcontext.useGlobalRenderColorMask(colorMask < 0 ? this.m_gRColorMask : colorMask);
     } else {
-      this.m_renderProxy.lockRenderColorMask();
+      this.m_rproxy.lockRenderColorMask();
     }
   }
 
   unlockRenderColorMask() {
     this.m_rcontext.useGlobalRenderColorMask(RendererState_1.default.COLOR_MASK_ALL_TRUE);
-    this.m_renderProxy.unlockRenderColorMask();
+    this.m_rproxy.unlockRenderColorMask();
   } ////////////////////////////////////////////////////// material conctrl
 
 
@@ -36591,13 +40195,13 @@ class FBOInstance {
    * @param fboIndex FBO 对象的序号
    * @param width FBO 对象的viewport width, if width < 1, viewport width is stage width;
    * @param height FBO 对象的viewport height, if height < 1, viewport width is stage height;
-   * @param enableDepth FBO 对象的depth读写是否开启
-   * @param enableStencil FBO 对象的stencil读写是否开启
-   * @param multisampleLevel FBO 对象的multisample level
+   * @param enableDepth FBO 对象的depth读写是否开启, the default value is true
+   * @param enableStencil FBO 对象的stencil读写是否开启, the default value is false
+   * @param multisampleLevel FBO 对象的multisample level, the default value is 0
    */
 
 
-  createFBOAt(fboIndex, width, height, enableDepth = false, enableStencil = false, multisampleLevel = 0) {
+  createFBOAt(fboIndex, width, height, enableDepth = true, enableStencil = false, multisampleLevel = 0) {
     if (fboIndex >= 0 && this.m_fboIndex < 0) {
       this.m_fboType = FrameBufferType_1.default.FRAMEBUFFER;
       this.m_initW = width;
@@ -36614,9 +40218,9 @@ class FBOInstance {
    * @param fboIndex FBO 对象的序号
    * @param width FBO 对象的viewport width, if width < 1, viewport width is stage width;
    * @param height FBO 对象的viewport height, if height < 1, viewport width is stage height;
-   * @param enableDepth FBO 对象的depth读写是否开启
-   * @param enableStencil FBO 对象的stencil读写是否开启
-   * @param multisampleLevel FBO 对象的multisample level
+   * @param enableDepth FBO 对象的depth读写是否开启, the default value is true
+   * @param enableStencil FBO 对象的stencil读写是否开启, the default value is false
+   * @param multisampleLevel FBO 对象的multisample level, the default value is 0
    */
 
 
@@ -36637,9 +40241,9 @@ class FBOInstance {
    * @param fboIndex FBO 对象的序号
    * @param width FBO 对象的viewport width, if width < 1, viewport width is stage width;
    * @param height FBO 对象的viewport height, if height < 1, viewport width is stage height;
-   * @param enableDepth FBO 对象的depth读写是否开启
-   * @param enableStencil FBO 对象的stencil读写是否开启
-   * @param multisampleLevel FBO 对象的multisample level
+   * @param enableDepth FBO 对象的depth读写是否开启, the default value is true
+   * @param enableStencil FBO 对象的stencil读写是否开启, the default value is false
+   * @param multisampleLevel FBO 对象的multisample level, the default value is 0
    */
 
 
@@ -36670,13 +40274,21 @@ class FBOInstance {
   getRTTAt(i) {
     return this.m_texs[i];
   }
+  /**
+   * @returns 当前fbo正在使用的额rtt数量
+   */
+
+
+  getRTTTotal() {
+    return this.m_texsTot;
+  }
 
   enableMipmapRTTAt(i) {
     this.m_texs[i].enableMipmap();
   }
 
   generateMipmapTextureAt(i) {
-    this.m_texs[i].generateMipmap(this.m_renderProxy.Texture);
+    this.m_texs[i].generateMipmap(this.m_rproxy.Texture);
   }
   /**
    * 设置渲染到纹理的目标纹理对象(可由用自行创建)和framebuffer output attachment index
@@ -36698,12 +40310,24 @@ class FBOInstance {
   /**
    * 设置渲染到纹理的目标纹理对象(普通 RTT 纹理类型的目标纹理)和framebuffer output attachment index
    * @param systemRTTTexIndex 作为渲染到目标的目标纹理对象在系统普通rtt 纹理中的序号(0 -> 15)
-   * @param outputIndex framebuffer output attachment index
+   * @param outputIndex framebuffer output attachment index, the default value is 0
    */
 
 
   setRenderToRTTTextureAt(systemRTTTexIndex, outputIndex = 0) {
     this.setRenderToTexture(this.m_texStore.getRTTTextureAt(systemRTTTexIndex), outputIndex);
+  }
+  /**
+   * 设置渲染到纹理的目标纹理对象(cube RTT 纹理类型的目标纹理)和framebuffer output attachment index
+   * @param systemCubeRTTTexIndex 作为渲染到目标的目标纹理对象在系统cube rtt 纹理中的序号(0 -> 15)
+   * @param outputIndex framebuffer output attachment index, the default value is 0
+   */
+
+
+  setRenderToCubeRTTTextureAt(systemCubeRTTTexIndex, outputIndex = 0) {
+    this.asynFBOSizeWithViewport();
+    const cubeMap = this.m_texStore.getCubeRTTTextureAt(systemCubeRTTTexIndex);
+    this.setRenderToTexture(cubeMap, outputIndex);
   }
   /**
    * 设置渲染到纹理的目标纹理对象(Float RTT 纹理类型的目标纹理)和framebuffer output attachment index
@@ -36726,7 +40350,7 @@ class FBOInstance {
     if (texture == null) {
       texture = this.m_texStore.createRTTTex2D(128, 128, false);
 
-      texture.__$setRenderProxy(this.m_renderProxy);
+      texture.__$setRenderProxy(this.m_rproxy);
 
       texture.internalFormat = TextureFormat_1.default.RGBA16F;
       texture.srcFormat = TextureFormat_1.default.RGBA;
@@ -36734,7 +40358,7 @@ class FBOInstance {
       texture.minFilter = TextureConst_1.default.LINEAR;
       texture.magFilter = TextureConst_1.default.LINEAR;
 
-      texture.__$setRenderProxy(this.m_renderProxy);
+      texture.__$setRenderProxy(this.m_rproxy);
     }
 
     return this.setRenderToTexture(texture, outputIndex);
@@ -36769,7 +40393,7 @@ class FBOInstance {
     texture.minFilter = TextureConst_1.default.LINEAR;
     texture.magFilter = TextureConst_1.default.LINEAR;
 
-    texture.__$setRenderProxy(this.m_renderProxy);
+    texture.__$setRenderProxy(this.m_rproxy);
 
     return texture;
   }
@@ -36781,7 +40405,7 @@ class FBOInstance {
   }
 
   setRenderToBackBuffer() {
-    this.m_renderProxy.setClearColor(this.m_backBufferColor);
+    this.m_rproxy.setClearColor(this.m_backBufferColor);
     this.m_rcontext.setRenderToBackBuffer();
   }
 
@@ -36847,7 +40471,7 @@ class FBOInstance {
   }
 
   setClearRGBAColor4f(pr, pg, pb, pa) {
-    this.m_bgColor.setRGBA4f(pr, pb, pg, pa);
+    this.m_bgColor.setRGBA4f(pr, pg, pb, pa);
   }
   /**
    * @param			clearType, it is IRenderProxy.COLOR or IRenderProxy.DEPTH or IRenderProxy.STENCIL or IRenderProxy.DEPTH_STENCIL
@@ -36902,7 +40526,8 @@ class FBOInstance {
   runBeginDo() {
     if (this.m_runFlag) {
       this.m_runFlag = false;
-      this.m_renderProxy.getClearRGBAColor4f(this.m_backBufferColor);
+      this.m_rproxy.rshader.resetRenderState();
+      this.m_rproxy.getClearRGBAColor4f(this.m_backBufferColor);
 
       if (this.m_viewportLock) {
         this.m_adapter.lockViewport();
@@ -36923,7 +40548,7 @@ class FBOInstance {
         this.m_adapter.setClearDepth(this.m_clearDepth);
       }
 
-      this.m_renderProxy.setClearColor(this.m_bgColor);
+      this.m_rproxy.setClearColor(this.m_bgColor);
       let i = 0;
 
       for (; i < this.m_texsTot; ++i) {
@@ -36949,12 +40574,20 @@ class FBOInstance {
 
       if (this.m_rindexs != null) {
         // rendering running
-        for (let i = 0, len = this.m_rindexs.length; i < len; ++i) {
-          this.m_renderer.runAt(this.m_rindexs[i]);
+        if (this.m_processShared) {
+          for (let i = 0, len = this.m_rindexs.length; i < len; ++i) {
+            this.m_renderer.runAt(this.m_rindexs[i]);
+          }
+        } else {
+          for (let i = 0, len = this.m_rindexs.length; i < len; ++i) {
+            const proc = this.m_renderer.getRenderProcessAt(this.m_rindexs[i]);
+            proc.setEnabled(true);
+            this.m_renderer.runAt(this.m_rindexs[i]);
+            proc.setEnabled(false);
+          }
         }
       }
-    } // this.m_runFlag = true;
-
+    }
 
     if (lockRenderState) this.unlockRenderState();
 
@@ -37000,7 +40633,7 @@ class FBOInstance {
   }
 
   runEnd() {
-    this.m_renderProxy.setClearColor(this.m_backBufferColor);
+    this.m_rproxy.setClearColor(this.m_backBufferColor);
     this.m_runFlag = true;
 
     if (this.m_viewportLock) {
@@ -37031,7 +40664,7 @@ class FBOInstance {
   }
 
   clone() {
-    let ins = new FBOInstance(this.m_renderer, this.m_texStore);
+    let ins = new FBOInstance(this.m_renderer);
     ins.m_fboSizeFactor = this.m_fboSizeFactor;
     ins.m_bgColor.copyFrom(this.m_bgColor);
     ins.m_fboIndex = this.m_fboIndex;
@@ -37041,6 +40674,7 @@ class FBOInstance {
     ins.m_enableDepth = this.m_enableDepth;
     ins.m_enableStencil = this.m_enableStencil;
     ins.m_synFBOSizeWithViewport = this.m_synFBOSizeWithViewport;
+    ins.m_processShared = this.m_processShared;
     ins.m_initW = this.m_initW;
     ins.m_initH = this.m_initH;
     ins.m_multisampleLevel = this.m_multisampleLevel;
@@ -37062,6 +40696,53 @@ class FBOInstance {
     }
 
     return ins;
+  }
+
+  setRenderingState(lockRenderState = false, lockMaterial = false, autoEnd = true, autoRunBegin = true) {
+    this.m_lockRenderState = lockRenderState;
+    this.m_lockMaterial = lockMaterial;
+    this.m_autoEnd = autoEnd;
+    this.m_autoRunBegin = autoRunBegin;
+  }
+
+  render() {
+    if (!this.m_lockRenderState) {
+      this.unlockRenderState();
+    }
+
+    if (!this.m_lockMaterial) {
+      this.unlockMaterial();
+    }
+
+    this.run(this.m_lockRenderState, this.m_lockMaterial, this.m_autoEnd, this.m_autoRunBegin);
+  }
+  /**
+   * @param auto enable auto runnning this instance
+   * @param prepend perpend this into the renderer rendering process or append, the default value is true
+   * @returns instance self
+   */
+
+
+  setAutoRunning(auto, prepend = true) {
+    if (auto != this.m_autoRRun) {
+      this.m_autoRRun = auto;
+
+      if (auto) {
+        if (prepend) {
+          this.m_renderer.prependRenderNode(this);
+        } else {
+          this.m_renderer.appendRenderNode(this);
+        }
+      } else {
+        this.m_renderer.removeRenderNode(this);
+      }
+    }
+
+    return this;
+  }
+
+  isAutoRunning() {
+    return this.m_autoRRun;
   }
 
 }
@@ -37121,15 +40802,18 @@ class EntityNodeQueue {
   }
 
   createNode() {
+    let node;
     let index = this.getFreeId();
 
     if (index >= 0) {
       this.m_fs[index] = 1;
-      return this.m_list[index];
+      node = this.m_list[index];
+      node.spaceId = index;
+      return node;
     } else {
       // create a new nodeIndex
       index = this.m_listLen;
-      let node = Entity3DNode_1.default.Create();
+      node = Entity3DNode_1.default.Create();
       this.m_list.push(node);
       this.m_entieies.push(null);
       node.spaceId = index; //node.distanceFlag = false;
@@ -37319,7 +41003,7 @@ class TextureRenderObj {
   run() {
     //console.log("this.m_texRes.unlocked: ",this.m_texRes.unlocked,this.m_texRes.texMid != this.m_mid);
     if (this.m_texRes.unlocked && this.m_texRes.texMid != this.m_mid) {
-      this.m_texRes.texMid = this.m_mid; //console.log("this.m_mid: ",this.m_mid,this.m_uid, this.m_texList);
+      this.m_texRes.texMid = this.m_mid; // console.log("TextureRenderObj::run(), this.m_mid: ",this.m_mid,this.m_uid, this.m_texList);
 
       let gl = this.m_texRes.getRC();
       let texI = gl.TEXTURE0;
@@ -37374,10 +41058,6 @@ class TextureRenderObj {
     this.m_texTotal = 0;
     this.m_texList = null;
     this.m_texRes = null;
-  }
-
-  toString() {
-    return "TextureRenderObj(uid = " + this.m_uid + ", mid=" + this.m_mid + ")";
   }
 
   static Create(texRes, texList, shdTexTotal) {
@@ -37511,41 +41191,76 @@ class RViewElement {
   setDiv(div) {
     this.m_div = div;
   }
+  /**
+   * @returns for example: #350b7e
+   */
 
-  createViewEle(pdocument, autoResize) {
+
+  getCSSHEXRGB(r, g, b) {
+    let str = "#";
+    let t = Math.floor(r * 255.0);
+
+    if (t < 0xf) {
+      str += "0" + t.toString(16);
+    } else {
+      str += "" + t.toString(16);
+    }
+
+    t = Math.floor(g * 255.0);
+
+    if (t < 0xf) {
+      str += "0" + t.toString(16);
+    } else {
+      str += "" + t.toString(16);
+    }
+
+    t = Math.floor(b * 255.0);
+
+    if (t < 0xf) {
+      str += "0" + t.toString(16);
+    } else {
+      str += "" + t.toString(16);
+    }
+
+    return str;
+  }
+
+  createViewEle(pdocument, autoResize, pw, ph) {
     if (this.m_div == null) {
       this.m_div = document.getElementById("voxEngineDiv");
     }
 
     if (this.m_div == null) {
-      this.m_div = pdocument.createElement('div');
-      this.m_div.style.width = '400px';
-      this.m_div.style.height = '300px';
+      this.m_div = pdocument.createElement("div");
       document.body.appendChild(this.m_div);
     }
 
-    this.m_div.style.display = 'bolck';
-    this.m_div.style.position = 'absolute';
+    const style = this.m_div.style;
+    style.display = "bolck";
+    style.position = "absolute";
 
-    if (this.m_div.style.left == "") {
-      this.m_div.style.left = '0px';
-      this.m_div.style.top = '0px';
+    if (style.left == "") {
+      style.left = "0px";
+      style.top = "0px";
     }
 
     if (autoResize) {
-      this.m_div.style.width = '100%';
-      this.m_div.style.height = '100%';
+      style.width = "100%";
+      style.height = "100%";
+    } else {
+      this.m_div.style.width = pw + "px";
+      this.m_div.style.height = ph + "px";
     }
 
     if (this.m_canvas == null) {
-      this.m_canvas = document.createElement('canvas');
+      this.m_canvas = document.createElement("canvas");
       this.m_div.appendChild(this.m_canvas);
       this.m_canvas.width = 800;
       this.m_canvas.height = 600;
-      this.m_canvas.style.display = 'bolck';
-      this.m_canvas.style.left = '0px';
-      this.m_canvas.style.top = '0px';
-      this.m_canvas.style.position = 'absolute';
+      this.m_canvas.style.display = "bolck";
+      this.m_canvas.style.left = "0px";
+      this.m_canvas.style.top = "0px";
+      this.m_canvas.style.position = "absolute";
     }
   }
 
@@ -37604,93 +41319,44 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
-const Vector3D_1 = __importDefault(__webpack_require__("8e17"));
-
-const Stage3D_1 = __importDefault(__webpack_require__("3806"));
-
-const CameraBase_1 = __importDefault(__webpack_require__("c51d"));
-
-const RendererParam_1 = __importDefault(__webpack_require__("c497"));
-
-const EntityNodeQueue_1 = __importDefault(__webpack_require__("af68"));
-
-const Entity3DNodeLinker_1 = __importDefault(__webpack_require__("a80a"));
-
-const RunnableQueue_1 = __importDefault(__webpack_require__("9c4d"));
-
 const RendererInstance_1 = __importDefault(__webpack_require__("d958"));
-
-const TextureBlock_1 = __webpack_require__("5d04");
-
-const RendererSpace_1 = __importDefault(__webpack_require__("a446"));
-
-const RaySelector_1 = __importDefault(__webpack_require__("c711"));
-
-const RayGpuSelector_1 = __importDefault(__webpack_require__("955e"));
-
-const MouseEvt3DController_1 = __importDefault(__webpack_require__("765c"));
-
-const FBOInstance_1 = __importDefault(__webpack_require__("af29"));
-
-const CameraDsistanceSorter_1 = __importDefault(__webpack_require__("d7e2"));
 
 const RendererSubScene_1 = __importDefault(__webpack_require__("70f2"));
 
-const Matrix4Pool_1 = __importDefault(__webpack_require__("2139"));
+const RendererSceneBase_1 = __importDefault(__webpack_require__("aa80"));
 
-const ShaderProgramBuilder_1 = __webpack_require__("a156");
+const RenderableMaterialBlock_1 = __webpack_require__("1b95");
 
-const Matrix4_1 = __importDefault(__webpack_require__("18c7"));
+const RenderableEntityBlock_1 = __webpack_require__("251a");
 
-class RendererScene {
+class RendererScene extends RendererSceneBase_1.default {
   constructor() {
-    this.m_uid = -1;
-    this.m_adapter = null;
-    this.m_renderProxy = null;
-    this.m_shader = null;
-    this.m_rcontext = null;
-    this.m_renderer = null;
-    this.m_processids = new Uint8Array(128);
-    this.m_processidsLen = 0;
-    this.m_rspace = null;
-    this.m_mouse_rltv = new Vector3D_1.default();
-    this.m_mouse_rlpv = new Vector3D_1.default();
-    this.m_accessor = null; // event flow control enable
-
-    this.m_evtFlowEnabled = false;
-    this.m_evt3DCtr = null;
-    this.m_mouseEvtEnabled = true;
-    this.m_viewX = 0.0;
-    this.m_viewY = 0.0;
-    this.m_viewW = 800.0;
-    this.m_viewH = 800.0;
-    this.m_nodeWaitLinker = null;
-    this.m_nodeWaitQueue = null;
-    this.m_camDisSorter = null; // recorde renderer sub scenes
-
-    this.m_subscList = [];
-    this.m_subscListLen = 0;
-    this.m_runFlag = -1;
-    this.m_autoRunning = true;
-    this.m_processUpdate = false;
+    super();
     this.m_tickId = -1;
-    this.m_rparam = null;
-    this.m_enabled = true;
-    this.runnableQueue = new RunnableQueue_1.default();
-    this.textureBlock = new TextureBlock_1.TextureBlock();
-    this.stage3D = null;
-    this.materialBlock = null;
-    this.entityBlock = null;
-    this.m_containers = [];
-    this.m_containersTotal = 0;
-    this.m_currCamera = null;
-    this.m_mouseTestBoo = true;
-    this.m_cullingTestBoo = true;
-    this.m_rayTestFlag = true;
-    this.m_rayTestEnabled = true;
-    this.m_prependNodes = null;
-    this.m_appendNodes = null;
-    this.m_uid = RendererScene.s_uid++;
+    this.m_autoRRun = false;
+  }
+
+  createRendererIns() {
+    this.m_currStage3D = this.stage3D;
+    this.m_stage3D = this.stage3D;
+    return new RendererInstance_1.default();
+  }
+
+  rendererInsInited() {
+    this.m_camera = this.m_rproxy.getCamera();
+  }
+
+  initThis() {
+    let selfT = this;
+    selfT.materialBlock = new RenderableMaterialBlock_1.RenderableMaterialBlock();
+    selfT.entityBlock = new RenderableEntityBlock_1.RenderableEntityBlock();
+    this.materialBlock.initialize();
+    this.entityBlock.initialize();
+    this.tickUpdate();
+  }
+
+  contextRunEnd() {
+    this.m_rcontext.runEnd();
   }
 
   tickUpdate() {
@@ -37701,886 +41367,71 @@ class RendererScene {
     this.m_tickId = setTimeout(this.tickUpdate.bind(this), this.m_rparam.getTickUpdateTime());
     this.textureBlock.run();
   }
-
-  enable() {
-    this.m_enabled = true;
-  }
-
-  disable() {
-    this.m_enabled = false;
-  }
-
-  isEnabled() {
-    return this.m_enabled;
-  }
-
-  getUid() {
-    return this.m_uid;
-  }
-
-  getDiv() {
-    return this.m_renderProxy.getDiv();
-  }
-
-  getCanvas() {
-    return this.m_renderProxy.getCanvas();
-  }
-
-  getRPONodeBuilder() {
-    return null;
-  }
-
-  getRenderProxy() {
-    return this.m_renderProxy;
-  } // set new view port rectangle area
-
-
-  setViewPort(px, py, pw, ph) {
-    if (this.m_renderProxy != null) {
-      this.m_viewX = px;
-      this.m_viewY = py;
-      this.m_viewW = pw;
-      this.m_viewH = ph;
-      this.m_renderProxy.setViewPort(px, py, pw, ph);
-    }
-  }
-
-  setViewPortFromCamera(camera) {
-    if (this.m_renderProxy != null && camera != null) {
-      this.m_viewX = camera.getViewX();
-      this.m_viewY = camera.getViewY();
-      this.m_viewW = camera.getViewWidth();
-      this.m_viewH = camera.getViewHeight();
-      this.m_renderProxy.setViewPort(this.m_viewX, this.m_viewY, this.m_viewW, this.m_viewH);
-    }
-  } // apply new view port rectangle area
-
-
-  reseizeViewPort() {
-    this.m_renderProxy.reseizeRCViewPort();
-  }
-
-  lockViewport() {
-    this.m_adapter.lockViewport();
-  }
-
-  unlockViewport() {
-    this.m_adapter.unlockViewport();
-  }
-
-  getRendererAdapter() {
-    return this.m_adapter;
-  }
-
-  getRenderer() {
-    return this.m_renderer;
-  }
-
-  getRendererContext() {
-    return this.m_rcontext;
-  }
-
-  getStage3D() {
-    return this.m_renderProxy.getStage3D();
-  }
   /**
-   * 获取渲染器可渲染对象管理器状态(版本号)
+   * @param rparam IRendererParam instance, the default value is null
+   * @param renderProcessesTotal the default value is 3
+   * @param createNewCamera the default value is true
    */
 
 
-  getRendererStatus() {
-    return this.m_renderer.getRendererStatus();
-  }
-
-  getViewWidth() {
-    return this.m_renderProxy.getStage3D().viewWidth;
-  }
-
-  getViewHeight() {
-    return this.m_renderProxy.getStage3D().viewHeight;
-  }
-
-  getCamera() {
-    return this.m_renderProxy.getCamera();
-  }
-
-  asynFBOSizeWithViewport() {
-    this.m_rcontext.asynFBOSizeWithViewport();
-  }
-
-  synFBOSizeWithViewport() {
-    this.m_rcontext.synFBOSizeWithViewport();
-  }
-
-  cameraLock() {
-    this.m_renderProxy.cameraLock();
-  }
-
-  cameraUnlock() {
-    this.m_renderProxy.cameraUnlock();
-  }
-
-  getMouseXYWorldRay(rl_position, rl_tv) {
-    this.m_renderProxy.getMouseXYWorldRay(rl_position, rl_tv);
-  }
-
-  createCamera() {
-    return new CameraBase_1.default();
-  }
-
-  createFBOInstance() {
-    return new FBOInstance_1.default(this, this.textureBlock.getRTTStrore());
-  }
-
-  createMatrix4() {
-    return new Matrix4_1.default();
-  }
-
-  createVector3D(x = 0.0, y = 0.0, z = 0.0, w = 1.0) {
-    return new Vector3D_1.default(x, y, z, w);
-  }
-
-  setClearUint24Color(colorUint24, alpha = 1.0) {
-    this.m_renderProxy.setClearUint24Color(colorUint24, alpha);
-  }
-
-  setClearRGBColor3f(pr, pg, pb) {
-    this.m_renderProxy.setClearRGBColor3f(pr, pg, pb);
-  }
-
-  setClearRGBAColor4f(pr, pg, pb, pa) {
-    this.m_renderProxy.setClearRGBAColor4f(pr, pg, pb, pa);
-  }
-
-  setClearColor(color) {
-    this.m_renderProxy.setClearRGBAColor4f(color.r, color.g, color.b, color.a);
-  }
-
-  setRenderToBackBuffer() {
-    this.m_rcontext.setRenderToBackBuffer();
-  }
-
-  drawBackBufferToCanvas(dstCanvas) {
-    let srcCanvas = this.getCanvas();
-    var ctx = dstCanvas.getContext("2d");
-    ctx.drawImage(srcCanvas, 0, 0, dstCanvas.width, dstCanvas.height);
-  }
-
-  updateRenderBufferSize() {
-    this.m_adapter.updateRenderBufferSize();
-  }
-
-  setEvt3DController(evt3DCtr) {
-    if (evt3DCtr != null) {
-      evt3DCtr.initialize(this.getStage3D(), this.getStage3D());
-      evt3DCtr.setRaySelector(this.m_rspace.getRaySelector());
-    }
-
-    this.m_evt3DCtr = evt3DCtr;
-  }
-
-  isRayPickSelected() {
-    return this.m_evt3DCtr != null && this.m_evt3DCtr.isSelected();
-  }
-
-  enableMouseEvent(gpuTestEnabled = true) {
-    if (this.m_evt3DCtr == null) {
-      if (gpuTestEnabled) {
-        this.m_rspace.setRaySelector(new RayGpuSelector_1.default());
-      } else {
-        this.m_rspace.setRaySelector(new RaySelector_1.default());
-      }
-
-      this.setEvt3DController(new MouseEvt3DController_1.default());
-    }
-
-    this.m_mouseEvtEnabled = true;
-  }
-
-  disableMouseEvent() {
-    this.m_mouseEvtEnabled = false;
-  }
-
-  getEvt3DController() {
-    return this.m_evt3DCtr;
-  }
-
-  getSpace() {
-    return this.m_rspace;
-  }
-
-  getDevicePixelRatio() {
-    return this.m_adapter.getDevicePixelRatio();
-  }
-  /**
-   * very important renderer scene system function
-   */
-
-
-  createSubScene() {
-    if (this.m_renderer != null) {
+  createSubScene(rparam = null, renderProcessesTotal = 3, createNewCamera = true) {
+    if (this.m_renderer != null && this.materialBlock != null) {
+      this.m_localRunning = true;
       let subsc = new RendererSubScene_1.default(this, this.m_renderer, this.m_evtFlowEnabled);
-      this.m_subscList.push(subsc);
       this.m_subscListLen++;
       let sc = subsc;
       sc.textureBlock = this.textureBlock;
+      sc.materialBlock = this.materialBlock;
+      sc.entityBlock = this.entityBlock;
+
+      if (rparam != null) {
+        sc.initialize(rparam, renderProcessesTotal, createNewCamera);
+      }
+
       return subsc;
     }
 
+    throw Error("Illegal operation!!!");
     return null;
   }
 
-  addEventListener(type, target, func, captureEnabled = true, bubbleEnabled = false) {
-    this.stage3D.addEventListener(type, target, func, captureEnabled, bubbleEnabled);
+  fakeRun(autoCycle = true) {
+    console.log("fakeRun ...");
   }
 
-  removeEventListener(type, target, func) {
-    this.stage3D.removeEventListener(type, target, func);
-  }
-
-  setAccessor(accessor) {
-    this.m_accessor = accessor;
-  }
-
-  initialize(rparam = null, renderProcessesTotal = 3) {
-    if (this.m_renderer == null) {
-      if (rparam == null) rparam = new RendererParam_1.default();
-      this.m_rparam = rparam;
-      let selfT = this;
-      selfT.stage3D = new Stage3D_1.default(this.getUid(), document);
-
-      if (renderProcessesTotal < 1) {
-        renderProcessesTotal = 1;
-      }
-
-      if (renderProcessesTotal > 8) {
-        renderProcessesTotal = 8;
-      }
-
-      this.m_evtFlowEnabled = rparam.evtFlowEnabled;
-      this.m_renderer = new RendererInstance_1.default();
-
-      this.m_renderer.__$setStage3D(this.stage3D);
-
-      Matrix4Pool_1.default.Allocate(rparam.getMatrix4AllocateSize());
-      let camera = new CameraBase_1.default();
-      this.m_renderer.initialize(rparam, camera, new ShaderProgramBuilder_1.ShaderProgramBuilder(this.m_renderer.getRCUid()));
-      this.m_processids[0] = 0;
-      this.m_processidsLen++;
-      let process = null;
-
-      for (; renderProcessesTotal >= 0;) {
-        process = this.m_renderer.appendProcess(rparam.batchEnabled, rparam.processFixedState);
-        this.m_processids[this.m_processidsLen] = process.getRPIndex();
-        this.m_processidsLen++;
-        --renderProcessesTotal;
-      }
-
-      this.m_rcontext = this.m_renderer.getRendererContext();
-      this.m_renderProxy = this.m_rcontext.getRenderProxy();
-      this.m_adapter = this.m_renderProxy.getRenderAdapter();
-      let stage3D = this.m_renderProxy.getStage3D();
-      this.m_viewW = stage3D.stageWidth;
-      this.m_viewH = stage3D.stageHeight;
-      this.m_shader = this.m_renderer.getDataBuilder().getRenderShader();
-      this.textureBlock.setRenderer(this.m_renderProxy);
-      this.m_camDisSorter = new CameraDsistanceSorter_1.default(this.m_renderProxy);
-
-      if (this.m_rspace == null) {
-        let space = new RendererSpace_1.default();
-        space.initialize(this.m_renderer, this.m_renderProxy.getCamera());
-        this.m_rspace = space;
-      }
-
-      this.tickUpdate();
-    }
-  }
-
-  setRendererProcessParam(index, batchEnabled, processFixedState) {
-    this.m_renderer.setRendererProcessParam(this.m_processids[index], batchEnabled, processFixedState);
-  }
-
-  appendARendererProcess(batchEnabled = true, processFixedState = false) {
-    let process = this.m_renderer.appendProcess(batchEnabled, processFixedState);
-    this.m_processids[this.m_processidsLen] = process.getRPIndex();
-    this.m_processidsLen++;
-  }
-  /**
-   * get the renderer process by process index
-   * @param processIndex IRenderProcess instance index in renderer scene instance
-   */
-
-
-  getRenderProcessAt(processIndex) {
-    return this.m_renderer.getProcessAt(this.m_processids[processIndex]);
-  }
-
-  addContainer(container, processIndex = 0) {
-    if (processIndex < 0) {
-      processIndex = 0;
-    }
-
-    if (container != null && container.__$wuid < 0 && container.__$contId < 1) {
-      let i = 0;
-
-      for (; i < this.m_containersTotal; ++i) {
-        if (this.m_containers[i] == container) {
-          return;
-        }
-      }
-
-      if (i >= this.m_containersTotal) {
-        container.__$wuid = this.m_uid;
-        container.wprocuid = processIndex;
-
-        container.__$setRenderer(this);
-
-        this.m_containers.push(container);
-        this.m_containersTotal++;
-      }
-    }
-  }
-
-  removeContainer(container) {
-    if (container != null && container.__$wuid == this.m_uid && container.getRenderer() == this.m_renderer) {
-      let i = 0;
-
-      for (; i < this.m_containersTotal; ++i) {
-        if (this.m_containers[i] == container) {
-          container.__$wuid = -1;
-          container.wprocuid = -1;
-
-          container.__$setRenderer(null);
-
-          this.m_containers.splice(i, 1);
-          --this.m_containersTotal;
-          break;
-        }
-      }
-    }
-  }
-
-  setAutoRunningEnabled(autoRunning) {
-    this.m_autoRunning = autoRunning;
-  }
-
-  setAutoRenderingSort(sortEnabled) {
-    this.m_processUpdate = sortEnabled;
-  }
-
-  setProcessSortEnabledAt(processIndex, sortEnabled, sorter = null) {
-    this.m_renderer.setProcessSortEnabledAt(processIndex, sortEnabled);
-
-    if (sortEnabled) {
-      let process = this.m_renderer.getProcessAt(processIndex);
-      sorter = sorter != null ? sorter : this.m_camDisSorter;
-
-      if (process != null) {
-        process.setSorter(sorter);
-      }
-    }
-  }
-
-  setProcessSortEnabled(process, sortEnabled, sorter = null) {
-    this.m_renderer.setProcessSortEnabled(process, sortEnabled);
-
-    if (sortEnabled && process != null && !process.hasSorter()) {
-      sorter = sorter != null ? sorter : this.m_camDisSorter;
-      process.setSorter(sorter);
-    }
-  }
-  /**
-   * 将已经在渲染运行时中的entity移动到指定 process uid 的 render process 中去
-   * move rendering runtime displayEntity to different renderer process
-   */
-
-
-  moveEntityTo(entity, processindex) {
-    this.m_renderer.moveEntityToProcessAt(entity, this.m_processids[processindex]);
-  }
-  /**
-   * 单独绘制可渲染对象, 可能是使用了 global material也可能没有。这种方式比较耗性能,只能用在特殊的地方。
-   * @param entity 需要指定绘制的 IRenderEntity 实例
-   * @param useGlobalUniform 是否使用当前 global material 所携带的 uniform, default value: false
-   * @param forceUpdateUniform 是否强制更新当前 global material 所对应的 shader program 的 uniform, default value: true
-   */
-
-
-  drawEntity(entity, useGlobalUniform = false, forceUpdateUniform = true) {
-    this.m_renderer.drawEntity(entity, useGlobalUniform, forceUpdateUniform);
-  }
-  /**
-   * add an entity to the renderer process of the renderer instance
-   * @param entity IRenderEntity instance(for example: DisplayEntity class instance)
-   * @param processid this destination renderer process id
-   * @param deferred if the value is true,the entity will not to be immediately add to the renderer process by its id
-   */
-
-
-  addEntity(entity, processid = 0, deferred = true) {
-    if (entity != null && entity.__$testSpaceEnabled()) {
-      if (entity.isPolyhedral()) {
-        if (entity.hasMesh()) {
-          this.m_renderer.addEntity(entity, this.m_processids[processid], deferred);
-
-          if (this.m_rspace != null) {
-            this.m_rspace.addEntity(entity);
-          }
-        } else {
-          // 这里的等待队列可能会和加入容器的操作冲突
-          // wait queue
-          if (this.m_nodeWaitLinker == null) {
-            this.m_nodeWaitLinker = new Entity3DNodeLinker_1.default();
-            this.m_nodeWaitQueue = new EntityNodeQueue_1.default();
-          }
-
-          let node = this.m_nodeWaitQueue.addEntity(entity);
-          node.rstatus = processid;
-          this.m_nodeWaitLinker.addNode(node);
-        }
+  setAutoRunning(auto) {
+    if (this.m_autoRRun != auto) {
+      if (this.m_autoRRun) {
+        let runFunc = this.run;
+        this.run = this.fakeRun;
+        this.fakeRun = runFunc;
+        this.m_autoRRun = false;
       } else {
-        this.m_renderer.addEntity(entity, this.m_processids[processid], deferred);
+        this.m_autoRRun = true;
+        let runFunc = this.fakeRun;
+        this.fakeRun = this.run;
+        this.run = runFunc;
 
-        if (this.m_rspace != null) {
-          this.m_rspace.addEntity(entity);
-        }
-      }
-    }
-  }
-  /**
-   * remove an entity from the rendererinstance
-   * @param entity IRenderEntity instance(for example: DisplayEntity class instance)
-   */
-
-
-  removeEntity(entity) {
-    if (entity != null) {
-      let node = null;
-
-      if (this.m_nodeWaitLinker != null) {
-        let node = this.m_nodeWaitQueue.getNodeByEntity(entity);
-
-        if (node != null) {
-          this.m_nodeWaitLinker.removeNode(node);
-          this.m_nodeWaitQueue.removeEntity(entity);
-        }
-      }
-
-      if (node == null) {
-        this.m_renderer.removeEntity(entity);
-
-        if (this.m_rspace != null) {
-          this.m_rspace.removeEntity(entity);
-        }
-      }
-    }
-  }
-
-  updateMaterialUniformToCurrentShd(material) {
-    this.m_renderer.updateMaterialUniformToCurrentShd(material);
-  }
-
-  showInfoAt(index) {
-    this.m_renderer.showInfoAt(index);
-  }
-
-  getRenderUnitsTotal() {
-    return this.m_renderer.getRenderUnitsTotal();
-  }
-
-  useCamera(camera, syncCamView = false) {
-    this.m_currCamera = camera;
-
-    if (syncCamView) {
-      this.m_renderProxy.setRCViewPort(camera.getViewX(), camera.getViewY(), camera.getViewWidth(), camera.getViewHeight(), true);
-      this.m_renderProxy.reseizeRCViewPort();
-    }
-
-    camera.update();
-    this.m_rcontext.resetUniform();
-    this.m_renderProxy.updateCameraDataFromCamera(camera);
-  }
-
-  useMainCamera() {
-    this.m_currCamera = null;
-    let camera = this.m_renderProxy.getCamera();
-    this.m_renderProxy.setRCViewPort(camera.getViewX(), camera.getViewY(), camera.getViewWidth(), camera.getViewHeight(), true);
-    this.m_renderProxy.reseizeRCViewPort();
-    this.m_renderProxy.updateCamera();
-    this.m_rcontext.resetUniform();
-    this.m_renderProxy.updateCameraDataFromCamera(this.m_renderProxy.getCamera());
-  }
-
-  updateCameraDataFromCamera(camera) {
-    this.m_renderProxy.updateCameraDataFromCamera(camera);
-  }
-  /**
-   * reset renderer rendering state
-   */
-
-
-  resetState() {
-    this.m_rcontext.resetState();
-  }
-  /**
-   * reset render shader uniform location
-   */
-
-
-  resetUniform() {
-    this.m_rcontext.resetUniform();
-  }
-
-  enableSynViewAndStage() {
-    this.m_renderProxy.enableSynViewAndStage();
-  }
-  /**
-   * the function only resets the renderer instance rendering status.
-   * you should use it before the run or runAt function is called.
-   */
-
-
-  renderBegin(contextBeginEnabled = true) {
-    if (this.m_currCamera == null) {
-      this.m_adapter.unlockViewport();
-
-      if (this.m_renderProxy.isAutoSynViewAndStage()) {
-        let boo = this.m_renderProxy.testViewPortChanged(this.m_viewX, this.m_viewY, this.m_viewW, this.m_viewH);
-        this.m_viewX = this.m_renderProxy.getViewX();
-        this.m_viewY = this.m_renderProxy.getViewY();
-        this.m_viewW = this.m_renderProxy.getViewWidth();
-        this.m_viewH = this.m_renderProxy.getViewHeight();
-
-        if (boo) {
-          this.m_renderProxy.setRCViewPort(this.m_viewX, this.m_viewY, this.m_viewW, this.m_viewH, true);
-          this.m_renderProxy.reseizeRCViewPort();
-        }
-      } else {
-        this.m_renderProxy.setViewPort(this.m_viewX, this.m_viewY, this.m_viewW, this.m_viewH);
-      }
-
-      this.m_renderProxy.updateCamera();
-      this.m_renderProxy.updateCameraDataFromCamera(this.m_renderProxy.getCamera());
-    }
-
-    this.m_shader.renderBegin();
-
-    if (contextBeginEnabled) {
-      this.m_rcontext.renderBegin(this.m_currCamera == null);
-    }
-
-    this.m_currCamera = null;
-
-    if (this.m_accessor != null) {
-      this.m_accessor.renderBegin(this);
-    }
-  }
-  /**
-   * the function resets the renderer scene status.
-   * you should use it on the frame starting time.
-   */
-
-
-  runBegin(autoCycle = true, contextBeginEnabled = true) {
-    if (autoCycle && this.m_autoRunning) {
-      if (this.m_runFlag >= 0) this.runEnd();
-      this.m_runFlag = 0;
-    }
-
-    let cam = this.m_currCamera;
-    let camFlag = cam == null;
-    this.renderBegin(contextBeginEnabled);
-
-    if (this.m_rspace != null) {
-      this.m_rspace.setCamera(camFlag ? this.m_renderProxy.getCamera() : cam);
-      this.m_rspace.runBegin();
-    }
-  }
-
-  renderContextBegin() {
-    this.m_rcontext.renderBegin();
-  }
-
-  setRayTestEanbled(enabled) {
-    this.m_rayTestEnabled = enabled;
-  } // @param       evtFlowPhase: 0(none phase),1(capture phase),2(bubble phase)
-  // @param       status: 1(default process),1(deselect ray pick target)
-  // @return      1 is send evt yes,0 is send evt no,-1 is event nothing
-
-
-  runMouseTest(evtFlowPhase, status) {
-    let flag = -1;
-
-    if (this.m_evt3DCtr != null && this.m_mouseEvtEnabled) {
-      if (this.m_rayTestFlag && this.m_evt3DCtr.getEvtType() > 0) {
-        // 是否对已经获得的拾取列表做进一步的gpu拾取
-        let selector = this.m_rspace.getRaySelector();
-
-        if (selector != null) {
-          if (this.m_rayTestEnabled) {
-            this.mouseRayTest();
-          } else {
-            selector.clear();
-          } // 如果有gpu拾取则进入这个管理器, 这个管理器得到最终的拾取结果再和前面的计算结果做比较
-
-
-          let total = selector.getSelectedNodesTotal();
-
-          if (total > 1) {
-            let i = 0;
-            let list = selector.getSelectedNodes();
-            let node = null;
-
-            for (; i < total; ++i) {
-              node = list[i];
-
-              if (node.entity.isPolyhedral()) {//this.m_renderer.drawEntityByLockMaterial(node.entity);
-              }
-            }
+        const func = () => {
+          if (this.m_autoRRun) {
+            this.fakeRun();
+            window.requestAnimationFrame(func);
           }
-        }
+        };
 
-        this.m_rayTestFlag = false;
-      }
-
-      flag = this.m_evt3DCtr.run(evtFlowPhase, status);
-    }
-
-    this.m_mouseTestBoo = false;
-    return flag;
-  }
-  /**
-   * update all data or status of the renderer runtime
-   * should call this function per frame
-   */
-
-
-  update(autoCycle = true, mouseEventEnabled = true) {
-    this.stage3D.enterFrame();
-
-    if (autoCycle && this.m_autoRunning) {
-      if (this.m_runFlag != 0) this.runBegin();
-      this.m_runFlag = 1;
-    } // camera visible test, ray cast test, Occlusion Culling test
-
-
-    this.m_mouseTestBoo = true;
-    this.m_cullingTestBoo = true;
-    this.m_rayTestFlag = true; // wait mesh data ready to finish
-
-    if (this.m_nodeWaitLinker != null) {
-      let nextNode = this.m_nodeWaitLinker.getBegin();
-
-      if (nextNode != null) {
-        let pnode;
-        let entity;
-        let status;
-
-        while (nextNode != null) {
-          if (nextNode.entity.hasMesh()) {
-            pnode = nextNode;
-            nextNode = nextNode.next;
-            entity = pnode.entity;
-            status = pnode.rstatus;
-            this.m_nodeWaitLinker.removeNode(pnode);
-            this.m_nodeWaitQueue.removeEntity(pnode.entity); //console.log("RenderScene::update(), ready a mesh data that was finished.");
-
-            this.addEntity(entity, status);
-          } else {
-            nextNode = nextNode.next;
-          }
-        }
+        window.requestAnimationFrame(func);
       }
     }
 
-    let i = 0;
-
-    for (; i < this.m_containersTotal; ++i) {
-      this.m_containers[i].update();
-    }
-
-    this.m_renderer.update(); // space update
-
-    if (this.m_rspace != null) {
-      this.m_rspace.update();
-
-      if (this.m_cullingTestBoo) {
-        if (this.m_evt3DCtr != null || this.m_processUpdate || this.m_rspace.getRaySelector() != null) {
-          this.m_rspace.run();
-          this.m_renderProxy.status.povNumber = this.m_rspace.getPOVNumber();
-        }
-      }
-    }
-
-    if (this.m_processUpdate) {
-      this.m_renderer.updateAllProcess();
-    }
-
-    if (this.m_mouseTestBoo && !this.m_evtFlowEnabled) {
-      if (mouseEventEnabled) {
-        this.runMouseTest(1, 0);
-      } else if (this.m_evt3DCtr != null) {
-        this.m_evt3DCtr.mouseOutEventTarget();
-      }
-    }
-  } // 运行渲染可见性裁剪测试，射线检测等空间管理机制
-
-
-  cullingTest() {
-    if (this.m_rspace != null) {
-      this.m_rspace.run();
-      this.m_renderProxy.status.povNumber = this.m_rspace.getPOVNumber();
-    }
-
-    this.m_cullingTestBoo = false;
-  } // 鼠标位置的射线拾取测试
-
-
-  mouseRayTest() {
-    if (this.m_rspace != null) {
-      this.m_renderProxy.getMouseXYWorldRay(this.m_mouse_rlpv, this.m_mouse_rltv);
-      this.m_rspace.rayTest(this.m_mouse_rlpv, this.m_mouse_rltv);
-    }
+    return this;
   }
 
-  runRenderNodes(nodes) {
-    if (nodes != null) {
-      // console.log("CoSC runRenderNodes(), nodes.length: ", nodes.length);
-      for (let i = 0; i < nodes.length; ++i) {
-        nodes[i].render();
-      }
-    }
-  }
-
-  addRenderNodes(node, nodes) {
-    for (let i = 0; i < nodes.length; ++i) {
-      if (node == nodes[i]) {
-        return;
-      }
-    }
-
-    nodes.push(node);
-  }
-
-  prependRenderNode(node) {
-    if (node != null && node != this) {
-      if (this.m_prependNodes == null) this.m_prependNodes = [];
-      this.addRenderNodes(node, this.m_prependNodes);
-    }
-  }
-
-  appendRenderNode(node) {
-    if (node != null && node != this) {
-      if (this.m_appendNodes == null) this.m_appendNodes = [];
-      let ls = this.m_appendNodes;
-
-      for (let i = 0; i < ls.length; ++i) {
-        if (node == ls[i]) {
-          return;
-        }
-      }
-
-      ls.push(node);
-    }
-  }
-
-  removeRenderNode(node) {
-    if (node != null) {
-      let ls = this.m_prependNodes;
-
-      if (ls != null) {
-        for (let i = 0; i < ls.length; ++i) {
-          if (node == ls[i]) {
-            ls.splice(i, 1);
-            break;
-          }
-        }
-      }
-    }
-  }
-  /**
-   * run all renderer processes in the renderer instance
-   */
-
-
-  run(autoCycle = true) {
-    if (this.m_enabled) {
-      if (autoCycle && this.m_autoRunning) {
-        if (this.m_runFlag != 1) this.update();
-        this.m_runFlag = 2;
-      }
-
-      this.runnableQueue.run();
-      this.runRenderNodes(this.m_prependNodes);
-
-      if (this.m_subscListLen > 0) {
-        for (let i = 0; i < this.m_processidsLen; ++i) {
-          this.m_renderer.runAt(this.m_processids[i]);
-        }
-      } else {
-        this.m_renderer.run();
-      }
-
-      this.runRenderNodes(this.m_appendNodes);
-
-      if (autoCycle) {
-        this.runEnd();
-      }
-    }
-  }
-  /**
-   * run the specific renderer process by its index in the renderer instance
-   * @param index the renderer process index in the renderer instance
-   */
-
-
-  runAt(index) {
-    if (this.m_enabled) {
-      this.m_renderer.runAt(this.m_processids[index]);
-    }
-  }
-
-  runEnd() {
-    if (this.m_evt3DCtr != null) {
-      this.m_evt3DCtr.runEnd();
-    }
-
-    this.m_rcontext.runEnd();
-
-    if (this.m_rspace != null) {
-      this.m_rspace.runEnd();
-    }
-
-    if (this.m_autoRunning) {
-      this.m_runFlag = -1;
-    }
-
-    if (this.m_accessor != null) {
-      this.m_accessor.renderEnd(this);
-    }
-  }
-
-  render() {}
-
-  renderFlush() {
-    if (this.m_renderProxy != null) {
-      this.m_renderProxy.flush();
-    }
-  }
-
-  updateCamera() {
-    if (this.m_renderProxy != null) {
-      this.m_renderProxy.updateCamera();
-    }
-  }
-
-  destroy() {
-    this.runnableQueue.destroy();
+  isAutoRunning() {
+    return this.m_autoRRun;
   }
 
 }
 
-RendererScene.s_uid = 0;
 exports.default = RendererScene;
 
 /***/ }),
@@ -38648,6 +41499,12 @@ class PNGParserListerner {
         DivLog_1.default.ShowLogOnce("obj file loading " + k + "%");
       }, (status, url) => {
         console.error("load png img data error, url: ", url);
+        this.pngParseFinish(null, {
+          url: url,
+          width: 0,
+          height: 0,
+          filterType: 0
+        });
       });
     }
   } // 一个任务数据处理完成后的侦听器回调函数
@@ -38718,7 +41575,8 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
-const MaterialConst_1 = __importDefault(__webpack_require__("644c"));
+const MaterialConst_1 = __importDefault(__webpack_require__("644c")); // import DebugFlag from "../debug/DebugFlag";
+
 /**
  * 作为渲染器运行时 material shader 资源的管理类
  * renderer runtime material shader resource manager
@@ -38741,7 +41599,7 @@ class RenderShader {
 
     this.m_uniform = null; // 只有transform相关的信息uniform
 
-    this.m_transformUniform = null;
+    this.m_trsu = null;
     this.m_shdProgramBuilder = null; // 用于记录 renderState(低10位)和ColorMask(高10位) 的状态组合
 
     this.drawFlag = -1;
@@ -38780,10 +41638,13 @@ class RenderShader {
     return this.m_rcuid;
   }
 
-  useTransUniform(transUniform) {
-    if (this.m_transformUniform != transUniform) {
-      this.m_transformUniform = transUniform;
-      transUniform.use(this);
+  useTransUniform(u) {
+    if (this.m_trsu != u) {
+      // if(DebugFlag.Flag_0 > 0) {
+      //     console.log("useTransUniform() ...", u.dataList);
+      // }
+      this.m_trsu = u;
+      u.use(this);
     }
   }
 
@@ -38863,15 +41724,18 @@ class RenderShader {
         this.m_fragOutputTotal = shd.getFragOutputTotal();
 
         if (this.m_fragOutputTotal != this.getActiveAttachmentTotal()) {
-          //if(RendererDevice.SHOWLOG_ENABLED) {
+          // if(RendererDevice.SHOWLOG_ENABLED) {
           console.log("shd.getUniqueShaderName(): string: " + shd.getUniqueShaderName());
           console.log("this.m_fragOutputTotal: " + this.m_fragOutputTotal + ", rc.getActiveAttachmentTotal(): " + this.getActiveAttachmentTotal());
-          console.error("Error: MRT output amount is not equal to current shader( " + shd.toString() + " ) frag shader output amount !!!"); //}
+          console.error("Error: MRT output amount is not equal to current shader( " + shd.toString() + " ) frag shader output amount !!!"); // }
         }
 
         this.m_gpuProgram = shd.getGPUProgram();
         this.m_rc.useProgram(this.m_gpuProgram);
-        shd.useTexLocation(); //console.log("use a new shader uid: ",shd.getUid(),",uns: ",shd.getUniqueShaderName());
+        shd.useTexLocation(); // console.log("use a new shader uid: ",shd.getUid(),",uns: ",shd.getUniqueShaderName());
+        // if(DebugFlag.Flag_0 > 0) {
+        //     console.log("use a new shader uid: ",shd.getUid(),",uns: ",shd.getUniqueShaderName());
+        // }
         // use global shared uniform
 
         let uniform = this.m_sharedUniformList[shd.getUid()]; //  let boo: boolean = false;
@@ -38920,10 +41784,18 @@ class RenderShader {
     return this.m_preuid;
   }
 
+  resetTransUniform() {
+    this.m_trsu = null;
+  }
+
   resetUniform() {
     this.m_uniform = null;
-    this.m_transformUniform = null;
+    this.m_trsu = null;
     this.m_guniform = null;
+  }
+
+  resetRenderState() {
+    this.drawFlag = -1;
   }
   /**
    * frame begin run this function
@@ -38961,8 +41833,8 @@ class RenderShader {
       uniform.useByShd(this, this.m_currShd);
     }
 
-    if (this.m_transformUniform != transUniform) {
-      this.m_transformUniform != transUniform;
+    if (this.m_trsu != transUniform) {
+      this.m_trsu != transUniform;
       transUniform.useByShd(this, this.m_currShd);
     }
   }
@@ -38972,12 +41844,13 @@ class RenderShader {
 
 
   useUniformMat4(ult, mat4f32Arr) {
+    // console.log("df");
     this.m_rc.uniformMatrix4fv(ult, false, mat4f32Arr);
   }
 
   useUniformV2(ult, type, f32Arr, dataSize, offset) {
     const mc = MaterialConst_1.default;
-    const rc = this.m_rc;
+    const rc = this.m_rc; // console.log("useUniformV2 A, type:",type,", dataSize: ",dataSize);
 
     switch (type) {
       case mc.SHADER_MAT4:
@@ -38989,8 +41862,7 @@ class RenderShader {
         break;
 
       case mc.SHADER_VEC4FV:
-        //console.log("MaterialConst.SHADER_VEC4FV dataSize: ",dataSize);
-        //console.log(f32Arr);
+        // console.log("useUniformV2, f32Arr: ",f32Arr);
         rc.uniform4fv(ult, f32Arr, offset, dataSize * 4);
         break;
 
@@ -38999,6 +41871,7 @@ class RenderShader {
         break;
 
       case mc.SHADER_VEC4:
+        // console.log("useUniformV2, vec4 f32Arr.length: ",f32Arr.length);
         rc.uniform4f(ult, f32Arr[0], f32Arr[1], f32Arr[2], f32Arr[3]);
         break;
 
@@ -39017,7 +41890,7 @@ class RenderShader {
 
   useUniformV1(ult, type, f32Arr, dataSize) {
     const mc = MaterialConst_1.default;
-    const rc = this.m_rc;
+    const rc = this.m_rc; // console.log("useUniformV1 A, dataSize: ",dataSize, ", f32Arr: ", f32Arr);
 
     switch (type) {
       case mc.SHADER_MAT4:
@@ -39255,6 +42128,7 @@ class FBXSceneNode extends SceneNode_1.SceneNode {
     fbxBufLoader.loadBySteps(url, (model, bufObj, index, total, url) => {
       this.m_modelsTotal = total;
       this.m_waitPartsTotal = total;
+      model.status = bufObj.errorStatus;
       this.initEntity(model, bufObj.transform, index);
 
       if (index + 1 == total) {
@@ -39340,13 +42214,14 @@ const Vector3D_1 = __importDefault(__webpack_require__("8e17"));
 
 class Axis3DEntity extends DisplayEntity_1.default {
   constructor() {
-    super(); // 用于射线检测
+    super();
+    this.m_sm = null; // 用于射线检测
 
     this.rayTestRadius = 8.0;
+    this.m_posarr = [0, 0, 0, 100.0, 0, 0, 0, 0, 0, 0, 100.0, 0, 0, 0, 0, 0, 0, 100.0];
     this.colorX = new Color4_1.default(1.0, 0.0, 0.0, 1.0);
     this.colorY = new Color4_1.default(0.0, 1.0, 0.0, 1.0);
     this.colorZ = new Color4_1.default(0.0, 0.0, 1.0, 1.0);
-    this.m_posarr = [0, 0, 0, 100.0, 0, 0, 0, 0, 0, 0, 100.0, 0, 0, 0, 0, 0, 0, 100.0];
   }
 
   setLineWidth(lineW) {//if(this.getMesh())
@@ -39371,7 +42246,17 @@ class Axis3DEntity extends DisplayEntity_1.default {
       mesh.setBufSortFormat(material.getBufSortFormat());
       mesh.initialize(this.m_posarr, colorarr);
       this.setMesh(mesh);
+      this.m_sm = mesh;
     }
+  }
+
+  updateDataWithPos(axisXPos, axisYPos, axisZPos) {
+    let ls = this.m_posarr;
+    axisXPos.toArray(ls, 3);
+    axisYPos.toArray(ls, 9);
+    axisZPos.toArray(ls, 15);
+    this.m_sm.setVSData(this.m_posarr);
+    this.m_sm.updateData();
   }
   /**
    * initialize the axis entity mesh and geometry data
@@ -39449,8 +42334,9 @@ class Axis3DEntity extends DisplayEntity_1.default {
     this.activeDisplay();
   }
 
-  toString() {
-    return "Axis3DEntity(name=" + this.name + ",uid = " + this.getUid() + ", rseFlag = " + this.__$rseFlag + ")";
+  destroy() {
+    super.destroy();
+    this.m_sm = null;
   }
 
 }
@@ -40035,21 +42921,37 @@ class RendererParam {
     this.m_tickUpdateTime = 20; // delay 50 ms
 
     this.m_polygonOffsetEnabled = false;
-    this.m_ditherEnabled = false; // display 3d view buf size auto sync window size
+    this.m_ditherEnabled = false;
+    this.divW = 800;
+    this.divH = 600; // display 3d view buf size auto sync window size
 
     this.autoSyncRenderBufferAndWindowSize = true;
     this.maxWebGLVersion = 2;
     this.cameraPerspectiveEnabled = true; // event flow control enable
 
-    this.evtFlowEnabled = false; // x: fov, y: near, z: far
+    this.evtFlowEnabled = false;
+    /**
+     * x: fov, y: near, z: far
+     */
 
     this.camProjParam = new Vector3D_1.default(45.0, 10.0, 5000.0);
     this.camPosition = new Vector3D_1.default(2000.0, 2000.0, 2000.0);
     this.camLookAtPos = new Vector3D_1.default(0.0, 0.0, 0.0);
     this.camUpDirect = new Vector3D_1.default(0.0, 1.0, 0.0);
+    this.syncBgColor = true;
     this.batchEnabled = true;
     this.processFixedState = false;
     this.m_mainDiv = div;
+
+    if (div) {
+      let str = div.style.width;
+      str = str.slice(0, str.indexOf("px"));
+      this.divW = parseInt(str);
+      str = div.style.height;
+      str = str.slice(0, str.indexOf("px"));
+      this.divH = parseInt(str);
+    }
+
     this.autoSyncRenderBufferAndWindowSize = div == null;
   }
   /**
@@ -40211,20 +43113,20 @@ const Plane_1 = __importDefault(__webpack_require__("e214"));
 
 const AABB_1 = __importDefault(__webpack_require__("fecb"));
 
+const pmin = MathConst_1.default.MATH_MIN_POSITIVE;
+
 class CameraBase {
   constructor() {
     this.version = 0;
     this.matUProbe = null;
     this.ufrustumProbe = null;
     this.uniformEnabled = false;
-    this.name = "Camera"; //
-
+    this.name = "Camera";
     this.m_tempV = new Vector3D_1.default();
     this.m_tempV1 = new Vector3D_1.default();
     this.m_initRV = new Vector3D_1.default();
     this.m_initUP = new Vector3D_1.default();
-    this.m_lookRHEnabled = true; //
-
+    this.m_lookRHEnabled = true;
     this.m_matrix = new Matrix4_1.default();
     this.m_viewMat = new Matrix4_1.default();
     this.m_viewInvertMat = new Matrix4_1.default();
@@ -40235,11 +43137,9 @@ class CameraBase {
     this.m_lookAtPos = new Vector3D_1.default();
     this.m_up = new Vector3D_1.default();
     this.m_lookDirectNV = new Vector3D_1.default();
-    this.m_lookAtDirec = new Vector3D_1.default(); //
-
+    this.m_lookAtDirec = new Vector3D_1.default();
     this.m_nearPlaneWidth = 1.0;
-    this.m_nearPlaneHeight = 1.0; //
-
+    this.m_nearPlaneHeight = 1.0;
     this.m_viewX = 0.0;
     this.m_viewY = 0.0;
     this.m_viewW = 800.0;
@@ -40276,13 +43176,13 @@ class CameraBase {
     this.m_nearPlaneHalfH = 0.5;
     this.m_nearWCV = new Vector3D_1.default();
     this.m_farWCV = new Vector3D_1.default();
-    this.m_wNV = new Vector3D_1.default(); // 4 far point, 4 near point 
+    this.m_wNV = new Vector3D_1.default(); // 4 far point, 4 near point
 
-    this.m_wFrustumVtxArr = [new Vector3D_1.default(), new Vector3D_1.default(), new Vector3D_1.default(), new Vector3D_1.default(), new Vector3D_1.default(), new Vector3D_1.default(), new Vector3D_1.default(), new Vector3D_1.default(), null, null, null]; // world space front,back ->(view space -z,z), world space left,right ->(view space -x,x),world space top,bottm ->(view space y,-y)
+    this.m_wFrustumVS = [new Vector3D_1.default(), new Vector3D_1.default(), new Vector3D_1.default(), new Vector3D_1.default(), new Vector3D_1.default(), new Vector3D_1.default(), new Vector3D_1.default(), new Vector3D_1.default(), null, null, null]; // world space front,back ->(view space -z,z), world space left,right ->(view space -x,x),world space top,bottm ->(view space y,-y)
 
-    this.m_wFruPlaneList = [new Plane_1.default(), new Plane_1.default(), new Plane_1.default(), new Plane_1.default(), new Plane_1.default(), new Plane_1.default()];
-    this.m_fpNVArr = [new Vector3D_1.default(), new Vector3D_1.default(), new Vector3D_1.default(), new Vector3D_1.default(), new Vector3D_1.default(), new Vector3D_1.default()];
-    this.m_fpDisArr = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+    this.m_wFruPlanes = [new Plane_1.default(), new Plane_1.default(), new Plane_1.default(), new Plane_1.default(), new Plane_1.default(), new Plane_1.default()];
+    this.m_fpns = [new Vector3D_1.default(), new Vector3D_1.default(), new Vector3D_1.default(), new Vector3D_1.default(), new Vector3D_1.default(), new Vector3D_1.default()];
+    this.m_fpds = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
     this.m_viewMatrix = null;
   } // 不允许外界修改camera数据
 
@@ -40300,10 +43200,11 @@ class CameraBase {
     if (this.m_unlock) {
       this.m_camPos.copyFrom(camPos);
       this.m_lookAtPos.copyFrom(lookAtPos);
-      this.m_up.copyFrom(up);
-      this.m_lookAtDirec.x = this.m_lookAtPos.x - this.m_camPos.x;
-      this.m_lookAtDirec.y = this.m_lookAtPos.y - this.m_camPos.y;
-      this.m_lookAtDirec.z = this.m_lookAtPos.z - this.m_camPos.z;
+      this.m_up.copyFrom(up); // this.m_lookAtDirec.x = this.m_lookAtPos.x - this.m_camPos.x;
+      // this.m_lookAtDirec.y = this.m_lookAtPos.y - this.m_camPos.y;
+      // this.m_lookAtDirec.z = this.m_lookAtPos.z - this.m_camPos.z;
+
+      this.m_lookAtDirec.subVecsTo(this.m_lookAtPos, this.m_camPos);
       this.m_lookRHEnabled = false;
       this.m_lookDirectNV.copyFrom(this.m_lookAtDirec);
       this.m_lookDirectNV.normalize();
@@ -40318,10 +43219,11 @@ class CameraBase {
   lookAtRH(camPos, lookAtPos, up) {
     if (this.m_unlock) {
       this.m_camPos.copyFrom(camPos);
-      this.m_lookAtPos.copyFrom(lookAtPos);
-      this.m_lookAtDirec.x = this.m_lookAtPos.x - this.m_camPos.x;
-      this.m_lookAtDirec.y = this.m_lookAtPos.y - this.m_camPos.y;
-      this.m_lookAtDirec.z = this.m_lookAtPos.z - this.m_camPos.z;
+      this.m_lookAtPos.copyFrom(lookAtPos); // this.m_lookAtDirec.x = this.m_lookAtPos.x - this.m_camPos.x;
+      // this.m_lookAtDirec.y = this.m_lookAtPos.y - this.m_camPos.y;
+      // this.m_lookAtDirec.z = this.m_lookAtPos.z - this.m_camPos.z;
+
+      this.m_lookAtDirec.subVecsTo(this.m_lookAtPos, this.m_camPos);
       this.m_lookRHEnabled = true;
       this.m_lookDirectNV.copyFrom(this.m_lookAtDirec);
       this.m_lookDirectNV.normalize();
@@ -40495,10 +43397,11 @@ class CameraBase {
 
   translation(v3) {
     if (this.m_unlock) {
-      this.m_camPos.copyFrom(v3);
-      this.m_lookAtPos.x = v3.x + this.m_lookAtDirec.x;
-      this.m_lookAtPos.y = v3.y + this.m_lookAtDirec.y;
-      this.m_lookAtPos.z = v3.z + this.m_lookAtDirec.z;
+      this.m_camPos.copyFrom(v3); // this.m_lookAtPos.x = v3.x + this.m_lookAtDirec.x;
+      // this.m_lookAtPos.y = v3.y + this.m_lookAtDirec.y;
+      // this.m_lookAtPos.z = v3.z + this.m_lookAtDirec.z;
+
+      this.m_lookAtPos.addVecsTo(v3, this.m_lookAtDirec);
       this.m_changed = true;
     }
   }
@@ -40519,10 +43422,11 @@ class CameraBase {
     if (this.m_unlock) {
       this.m_camPos.x += this.m_lookDirectNV.x * dis;
       this.m_camPos.y += this.m_lookDirectNV.y * dis;
-      this.m_camPos.z += this.m_lookDirectNV.z * dis;
-      this.m_lookAtPos.x = this.m_camPos.x + this.m_lookAtDirec.x;
-      this.m_lookAtPos.y = this.m_camPos.y + this.m_lookAtDirec.y;
-      this.m_lookAtPos.z = this.m_camPos.z + this.m_lookAtDirec.z;
+      this.m_camPos.z += this.m_lookDirectNV.z * dis; // this.m_lookAtPos.x = this.m_camPos.x + this.m_lookAtDirec.x;
+      // this.m_lookAtPos.y = this.m_camPos.y + this.m_lookAtDirec.y;
+      // this.m_lookAtPos.z = this.m_camPos.z + this.m_lookAtDirec.z;
+
+      this.m_lookAtPos.addVecsTo(this.m_camPos, this.m_lookAtDirec);
       this.m_changed = true;
     }
   }
@@ -40552,12 +43456,14 @@ class CameraBase {
 
   forwardFixPos(dis, pos) {
     if (this.m_unlock) {
-      this.m_camPos.x = pos.x + this.m_lookDirectNV.x * dis;
-      this.m_camPos.y = pos.y + this.m_lookDirectNV.y * dis;
-      this.m_camPos.z = pos.z + this.m_lookDirectNV.z * dis;
-      this.m_lookAtPos.x = this.m_camPos.x + this.m_lookAtDirec.x;
-      this.m_lookAtPos.y = this.m_camPos.y + this.m_lookAtDirec.y;
-      this.m_lookAtPos.z = this.m_camPos.z + this.m_lookAtDirec.z;
+      this.m_camPos.copyFrom(this.m_lookDirectNV).scaleBy(dis).addBy(pos); // this.m_camPos.x = pos.x + this.m_lookDirectNV.x * dis;
+      // this.m_camPos.y = pos.y + this.m_lookDirectNV.y * dis;
+      // this.m_camPos.z = pos.z + this.m_lookDirectNV.z * dis;
+      // this.m_lookAtPos.x = this.m_camPos.x + this.m_lookAtDirec.x;
+      // this.m_lookAtPos.y = this.m_camPos.y + this.m_lookAtDirec.y;
+      // this.m_lookAtPos.z = this.m_camPos.z + this.m_lookAtDirec.z;
+
+      this.m_lookAtPos.addVecsTo(this.m_camPos, this.m_lookAtDirec);
       this.m_changed = true;
     }
   }
@@ -40570,18 +43476,21 @@ class CameraBase {
         this.m_tempMat.appendRotation(rad * MathConst_1.default.MATH_PI_OVER_180, axis);
       } else {
         this.m_tempMat.appendRotation(rad * MathConst_1.default.MATH_PI_OVER_180, Vector3D_1.default.Y_AXIS);
-      }
+      } // this.m_lookAtDirec.x = this.m_camPos.x - this.m_lookAtPos.x;
+      // this.m_lookAtDirec.y = this.m_camPos.y - this.m_lookAtPos.y;
+      // this.m_lookAtDirec.z = this.m_camPos.z - this.m_lookAtPos.z;
 
-      this.m_lookAtDirec.x = this.m_camPos.x - this.m_lookAtPos.x;
-      this.m_lookAtDirec.y = this.m_camPos.y - this.m_lookAtPos.y;
-      this.m_lookAtDirec.z = this.m_camPos.z - this.m_lookAtPos.z;
-      this.m_tempMat.transformVectorSelf(this.m_lookAtDirec);
-      this.m_camPos.x = this.m_lookAtDirec.x + this.m_lookAtPos.x;
-      this.m_camPos.y = this.m_lookAtDirec.y + this.m_lookAtPos.y;
-      this.m_camPos.z = this.m_lookAtDirec.z + this.m_lookAtPos.z;
-      this.m_lookAtDirec.x = this.m_lookAtPos.x - this.m_camPos.x;
-      this.m_lookAtDirec.y = this.m_lookAtPos.y - this.m_camPos.y;
-      this.m_lookAtDirec.z = this.m_lookAtPos.z - this.m_camPos.z;
+
+      this.m_lookAtDirec.subVecsTo(this.m_camPos, this.m_lookAtPos);
+      this.m_tempMat.transformVectorSelf(this.m_lookAtDirec); // this.m_camPos.x = this.m_lookAtDirec.x + this.m_lookAtPos.x;
+      // this.m_camPos.y = this.m_lookAtDirec.y + this.m_lookAtPos.y;
+      // this.m_camPos.z = this.m_lookAtDirec.z + this.m_lookAtPos.z;
+
+      this.m_camPos.addVecsTo(this.m_lookAtDirec, this.m_lookAtPos); // this.m_lookAtDirec.x = this.m_lookAtPos.x - this.m_camPos.x;
+      // this.m_lookAtDirec.y = this.m_lookAtPos.y - this.m_camPos.y;
+      // this.m_lookAtDirec.z = this.m_lookAtPos.z - this.m_camPos.z;
+
+      this.m_lookAtDirec.subVecsTo(this.m_lookAtPos, this.m_camPos);
       this.m_lookRHEnabled = true;
       this.m_lookDirectNV.copyFrom(this.m_lookAtDirec);
       this.m_lookDirectNV.normalize(); //
@@ -40598,21 +43507,23 @@ class CameraBase {
   swingHorizontal(degree) {
     if (this.m_unlock) {
       this.m_tempMat.identity();
-      this.m_tempMat.appendRotation(degree * MathConst_1.default.MATH_PI_OVER_180, this.m_up);
-      this.m_lookAtDirec.x = this.m_camPos.x - this.m_lookAtPos.x;
-      this.m_lookAtDirec.y = this.m_camPos.y - this.m_lookAtPos.y;
-      this.m_lookAtDirec.z = this.m_camPos.z - this.m_lookAtPos.z;
-      this.m_tempMat.transformVectorSelf(this.m_lookAtDirec);
-      this.m_camPos.x = this.m_lookAtDirec.x + this.m_lookAtPos.x;
-      this.m_camPos.y = this.m_lookAtDirec.y + this.m_lookAtPos.y;
-      this.m_camPos.z = this.m_lookAtDirec.z + this.m_lookAtPos.z;
-      this.m_lookAtDirec.x = this.m_lookAtPos.x - this.m_camPos.x;
-      this.m_lookAtDirec.y = this.m_lookAtPos.y - this.m_camPos.y;
-      this.m_lookAtDirec.z = this.m_lookAtPos.z - this.m_camPos.z;
+      this.m_tempMat.appendRotation(degree * MathConst_1.default.MATH_PI_OVER_180, this.m_up); // this.m_lookAtDirec.x = this.m_camPos.x - this.m_lookAtPos.x;
+      // this.m_lookAtDirec.y = this.m_camPos.y - this.m_lookAtPos.y;
+      // this.m_lookAtDirec.z = this.m_camPos.z - this.m_lookAtPos.z;
+
+      this.m_lookAtDirec.subVecsTo(this.m_camPos, this.m_lookAtPos);
+      this.m_tempMat.transformVectorSelf(this.m_lookAtDirec); // this.m_camPos.x = this.m_lookAtDirec.x + this.m_lookAtPos.x;
+      // this.m_camPos.y = this.m_lookAtDirec.y + this.m_lookAtPos.y;
+      // this.m_camPos.z = this.m_lookAtDirec.z + this.m_lookAtPos.z;
+
+      this.m_camPos.addVecsTo(this.m_lookAtDirec, this.m_lookAtPos); // this.m_lookAtDirec.x = this.m_lookAtPos.x - this.m_camPos.x;
+      // this.m_lookAtDirec.y = this.m_lookAtPos.y - this.m_camPos.y;
+      // this.m_lookAtDirec.z = this.m_lookAtPos.z - this.m_camPos.z;
+
+      this.m_lookAtDirec.subVecsTo(this.m_lookAtPos, this.m_camPos);
       this.m_lookRHEnabled = true;
       this.m_lookDirectNV.copyFrom(this.m_lookAtDirec);
-      this.m_lookDirectNV.normalize(); //
-
+      this.m_lookDirectNV.normalize();
       Vector3D_1.default.Cross(this.m_lookAtDirec, this.m_up, this.m_initRV);
       this.m_initRV.normalize();
       this.m_changed = true;
@@ -40622,21 +43533,23 @@ class CameraBase {
   swingVertical(degree) {
     if (this.m_unlock) {
       this.m_tempMat.identity();
-      this.m_tempMat.appendRotation(degree * MathConst_1.default.MATH_PI_OVER_180, this.m_initRV);
-      this.m_lookAtDirec.x = this.m_camPos.x - this.m_lookAtPos.x;
-      this.m_lookAtDirec.y = this.m_camPos.y - this.m_lookAtPos.y;
-      this.m_lookAtDirec.z = this.m_camPos.z - this.m_lookAtPos.z;
-      this.m_tempMat.transformVectorSelf(this.m_lookAtDirec);
-      this.m_camPos.x = this.m_lookAtDirec.x + this.m_lookAtPos.x;
-      this.m_camPos.y = this.m_lookAtDirec.y + this.m_lookAtPos.y;
-      this.m_camPos.z = this.m_lookAtDirec.z + this.m_lookAtPos.z;
-      this.m_lookAtDirec.x = this.m_lookAtPos.x - this.m_camPos.x;
-      this.m_lookAtDirec.y = this.m_lookAtPos.y - this.m_camPos.y;
-      this.m_lookAtDirec.z = this.m_lookAtPos.z - this.m_camPos.z;
+      this.m_tempMat.appendRotation(degree * MathConst_1.default.MATH_PI_OVER_180, this.m_initRV); // this.m_lookAtDirec.x = this.m_camPos.x - this.m_lookAtPos.x;
+      // this.m_lookAtDirec.y = this.m_camPos.y - this.m_lookAtPos.y;
+      // this.m_lookAtDirec.z = this.m_camPos.z - this.m_lookAtPos.z;
+
+      this.m_lookAtDirec.subVecsTo(this.m_camPos, this.m_lookAtPos);
+      this.m_tempMat.transformVectorSelf(this.m_lookAtDirec); // this.m_camPos.x = this.m_lookAtDirec.x + this.m_lookAtPos.x;
+      // this.m_camPos.y = this.m_lookAtDirec.y + this.m_lookAtPos.y;
+      // this.m_camPos.z = this.m_lookAtDirec.z + this.m_lookAtPos.z;
+
+      this.m_camPos.addVecsTo(this.m_lookAtDirec, this.m_lookAtPos); // this.m_lookAtDirec.x = this.m_lookAtPos.x - this.m_camPos.x;
+      // this.m_lookAtDirec.y = this.m_lookAtPos.y - this.m_camPos.y;
+      // this.m_lookAtDirec.z = this.m_lookAtPos.z - this.m_camPos.z;
+
+      this.m_lookAtDirec.subVecsTo(this.m_lookAtPos, this.m_camPos);
       this.m_lookRHEnabled = true;
       this.m_lookDirectNV.copyFrom(this.m_lookAtDirec);
-      this.m_lookDirectNV.normalize(); //
-
+      this.m_lookDirectNV.normalize();
       Vector3D_1.default.Cross(this.m_initRV, this.m_lookAtDirec, this.m_up);
       this.m_up.normalize();
       this.m_initUP.copyFrom(this.m_up);
@@ -40650,15 +43563,14 @@ class CameraBase {
       let dot = this.m_tempV.dot(this.m_initUP);
       this.m_tempV1.copyFrom(this.m_initUP);
       this.m_tempV1.scaleBy(dot);
-      this.m_tempV.subtractBy(this.m_tempV1); //m_tempV.y = 0;
+      this.m_tempV.subtractBy(this.m_tempV1);
+      this.m_camPos.copyFrom(v3); // this.m_lookAtDirec.x = this.m_lookAtPos.x - this.m_camPos.x;
+      // this.m_lookAtDirec.y = this.m_lookAtPos.y - this.m_camPos.y;
+      // this.m_lookAtDirec.z = this.m_lookAtPos.z - this.m_camPos.z;
 
-      this.m_camPos.copyFrom(v3);
-      this.m_lookAtDirec.x = this.m_lookAtPos.x - this.m_camPos.x;
-      this.m_lookAtDirec.y = this.m_lookAtPos.y - this.m_camPos.y;
-      this.m_lookAtDirec.z = this.m_lookAtPos.z - this.m_camPos.z;
+      this.m_lookAtDirec.subVecsTo(this.m_lookAtPos, this.m_camPos);
       this.m_lookDirectNV.copyFrom(this.m_lookAtDirec);
-      this.m_lookDirectNV.normalize(); //
-
+      this.m_lookDirectNV.normalize();
       Vector3D_1.default.Cross(this.m_tempV, this.m_lookAtDirec, this.m_up);
       this.m_up.normalize();
       this.m_changed = true;
@@ -40672,13 +43584,13 @@ class CameraBase {
       this.m_tempV1.copyFrom(this.m_initUP);
       this.m_tempV1.scaleBy(dot);
       this.m_tempV.subtractBy(this.m_tempV1);
-      this.m_camPos.setTo(px, py, pz);
-      this.m_lookAtDirec.x = this.m_lookAtPos.x - this.m_camPos.x;
-      this.m_lookAtDirec.y = this.m_lookAtPos.y - this.m_camPos.y;
-      this.m_lookAtDirec.z = this.m_lookAtPos.z - this.m_camPos.z;
-      this.m_lookDirectNV.copyFrom(this.m_lookAtDirec);
-      this.m_lookDirectNV.normalize(); //
+      this.m_camPos.setTo(px, py, pz); // this.m_lookAtDirec.x = this.m_lookAtPos.x - this.m_camPos.x;
+      // this.m_lookAtDirec.y = this.m_lookAtPos.y - this.m_camPos.y;
+      // this.m_lookAtDirec.z = this.m_lookAtPos.z - this.m_camPos.z;
 
+      this.m_lookAtDirec.subVecsTo(this.m_lookAtPos, this.m_camPos);
+      this.m_lookDirectNV.copyFrom(this.m_lookAtDirec);
+      this.m_lookDirectNV.normalize();
       Vector3D_1.default.Cross(this.m_tempV, this.m_lookAtDirec, this.m_up);
       this.m_up.normalize();
       this.m_changed = true;
@@ -40687,14 +43599,14 @@ class CameraBase {
 
   setLookPosXYZFixUp(px, py, pz) {
     if (this.m_unlock) {
-      this.m_lookAtPos.setTo(px, py, pz);
-      this.m_lookAtDirec.x = this.m_lookAtPos.x - this.m_camPos.x;
-      this.m_lookAtDirec.y = this.m_lookAtPos.y - this.m_camPos.y;
-      this.m_lookAtDirec.z = this.m_lookAtPos.z - this.m_camPos.z;
+      this.m_lookAtPos.setTo(px, py, pz); // this.m_lookAtDirec.x = this.m_lookAtPos.x - this.m_camPos.x;
+      // this.m_lookAtDirec.y = this.m_lookAtPos.y - this.m_camPos.y;
+      // this.m_lookAtDirec.z = this.m_lookAtPos.z - this.m_camPos.z;
+
+      this.m_lookAtDirec.subVecsTo(this.m_lookAtPos, this.m_camPos);
       this.m_lookRHEnabled = true;
       this.m_lookDirectNV.copyFrom(this.m_lookAtDirec);
-      this.m_lookDirectNV.normalize(); //
-
+      this.m_lookDirectNV.normalize();
       Vector3D_1.default.Cross(this.m_lookAtDirec, this.m_up, this.m_initRV);
       this.m_initRV.normalize();
       this.m_changed = true;
@@ -40703,14 +43615,14 @@ class CameraBase {
 
   setPositionXYZFixUp(px, py, pz) {
     if (this.m_unlock) {
-      this.m_camPos.setTo(px, py, pz);
-      this.m_lookAtDirec.x = this.m_lookAtPos.x - this.m_camPos.x;
-      this.m_lookAtDirec.y = this.m_lookAtPos.y - this.m_camPos.y;
-      this.m_lookAtDirec.z = this.m_lookAtPos.z - this.m_camPos.z;
+      this.m_camPos.setTo(px, py, pz); // this.m_lookAtDirec.x = this.m_lookAtPos.x - this.m_camPos.x;
+      // this.m_lookAtDirec.y = this.m_lookAtPos.y - this.m_camPos.y;
+      // this.m_lookAtDirec.z = this.m_lookAtPos.z - this.m_camPos.z;
+
+      this.m_lookAtDirec.subVecsTo(this.m_lookAtPos, this.m_camPos);
       this.m_lookRHEnabled = true;
       this.m_lookDirectNV.copyFrom(this.m_lookAtDirec);
-      this.m_lookDirectNV.normalize(); //
-
+      this.m_lookDirectNV.normalize();
       Vector3D_1.default.Cross(this.m_lookAtDirec, this.m_up, this.m_initRV);
       this.m_initRV.normalize();
       this.m_changed = true;
@@ -40719,10 +43631,11 @@ class CameraBase {
 
   setPositionFixUp(v3) {
     if (this.m_unlock) {
-      this.m_camPos.copyFrom(v3);
-      this.m_lookAtDirec.x = this.m_lookAtPos.x - this.m_camPos.x;
-      this.m_lookAtDirec.y = this.m_lookAtPos.y - this.m_camPos.y;
-      this.m_lookAtDirec.z = this.m_lookAtPos.z - this.m_camPos.z;
+      this.m_camPos.copyFrom(v3); // this.m_lookAtDirec.x = this.m_lookAtPos.x - this.m_camPos.x;
+      // this.m_lookAtDirec.y = this.m_lookAtPos.y - this.m_camPos.y;
+      // this.m_lookAtDirec.z = this.m_lookAtPos.z - this.m_camPos.z;
+
+      this.m_lookAtDirec.subVecsTo(this.m_lookAtPos, this.m_camPos);
       this.m_lookRHEnabled = true;
       this.m_lookDirectNV.copyFrom(this.m_lookAtDirec);
       this.m_lookDirectNV.normalize();
@@ -40775,10 +43688,11 @@ class CameraBase {
 
   setLookAtPosition(pv) {
     if (this.m_unlock) {
-      this.m_lookAtPos.copyFrom(pv);
-      this.m_lookAtDirec.x = this.m_lookAtPos.x - this.m_camPos.x;
-      this.m_lookAtDirec.y = this.m_lookAtPos.y - this.m_camPos.y;
-      this.m_lookAtDirec.z = this.m_lookAtPos.z - this.m_camPos.z;
+      this.m_lookAtPos.copyFrom(pv); // this.m_lookAtDirec.x = this.m_lookAtPos.x - this.m_camPos.x;
+      // this.m_lookAtDirec.y = this.m_lookAtPos.y - this.m_camPos.y;
+      // this.m_lookAtDirec.z = this.m_lookAtPos.z - this.m_camPos.z;
+
+      this.m_lookAtDirec.subVecsTo(this.m_lookAtPos, this.m_camPos);
       this.m_lookDirectNV.copyFrom(this.m_lookAtDirec);
       this.m_lookDirectNV.normalize();
       this.m_changed = true;
@@ -40787,10 +43701,11 @@ class CameraBase {
 
   setLookAtXYZ(px, py, pz) {
     if (this.m_unlock) {
-      this.m_lookAtPos.setTo(px, py, pz);
-      this.m_lookAtDirec.x = this.m_lookAtPos.x - this.m_camPos.x;
-      this.m_lookAtDirec.y = this.m_lookAtPos.y - this.m_camPos.y;
-      this.m_lookAtDirec.z = this.m_lookAtPos.z - this.m_camPos.z;
+      this.m_lookAtPos.setTo(px, py, pz); // this.m_lookAtDirec.x = this.m_lookAtPos.x - this.m_camPos.x;
+      // this.m_lookAtDirec.y = this.m_lookAtPos.y - this.m_camPos.y;
+      // this.m_lookAtDirec.z = this.m_lookAtPos.z - this.m_camPos.z;
+
+      this.m_lookAtDirec.subVecsTo(this.m_lookAtPos, this.m_camPos);
       this.m_lookDirectNV.copyFrom(this.m_lookAtDirec);
       this.m_lookDirectNV.normalize();
       this.m_changed = true;
@@ -40966,6 +43881,10 @@ class CameraBase {
     outV.w = outV.w - outV.y;
   }
 
+  getFrustumWorldPlantAt(i) {
+    return this.m_wFruPlanes[i];
+  }
+
   getInvertViewMatrix() {
     return this.m_invViewMat;
   }
@@ -41007,11 +43926,9 @@ class CameraBase {
   }
 
   __calcTestParam() {
-    if (this.m_invViewMat == null) this.m_invViewMat = new Matrix4_1.default(); //Matrix4Pool.GetMatrix();
-
+    if (this.m_invViewMat == null) this.m_invViewMat = new Matrix4_1.default();
     this.m_invViewMat.copyFrom(this.m_viewMat);
-    this.m_invViewMat.invert(); //
-
+    this.m_invViewMat.invert();
     let plane = null;
     let halfMinH = this.m_viewHalfH;
     let halfMinW = this.m_viewHalfW;
@@ -41019,148 +43936,117 @@ class CameraBase {
     let halfMaxW = this.m_viewHalfW;
 
     if (this.m_perspectiveEnabled) {
-      let tanv = Math.tan(this.m_fovRadian * 0.5);
+      const tanv = Math.tan(this.m_fovRadian * 0.5);
       halfMinH = this.m_zNear * tanv;
       halfMinW = halfMinH * this.m_aspect;
       halfMaxH = this.m_zFar * tanv;
       halfMaxW = halfMaxH * this.m_aspect;
-    } //console.log("CameraBase::__calcTestParam(), (halfMinW, halfMinH): "+halfMinW+", "+halfMinH);
+    }
 
+    const wfva = this.m_wFrustumVS;
+    const wfpa = this.m_wFruPlanes; //console.log("CameraBase::__calcTestParam(), (halfMinW, halfMinH): "+halfMinW+", "+halfMinH);
 
     this.m_nearPlaneHalfW = halfMinW;
     this.m_nearPlaneHalfH = halfMinH; // inner view space
 
-    this.m_nearWCV.setTo(0, 0, -this.m_zNear);
-    this.m_farWCV.setTo(0, 0, -this.m_zFar);
+    this.m_nearWCV.setXYZ(0, 0, -this.m_zNear);
+    this.m_farWCV.setXYZ(0, 0, -this.m_zFar);
     this.m_invViewMat.transformVectorSelf(this.m_nearWCV);
     this.m_invViewMat.transformVectorSelf(this.m_farWCV);
-    this.m_wNV.x = this.m_farWCV.x - this.m_nearWCV.x;
-    this.m_wNV.y = this.m_farWCV.y - this.m_nearWCV.y;
-    this.m_wNV.z = this.m_farWCV.z - this.m_nearWCV.z;
-    this.m_wNV.normalize(); // front face
+    this.m_wNV.subVecsTo(this.m_farWCV, this.m_nearWCV);
+    this.m_wNV.normalize(); // front face, far plane
 
-    plane = this.m_wFruPlaneList[0];
+    plane = wfpa[0];
     plane.nv.copyFrom(this.m_wNV);
     plane.distance = plane.nv.dot(this.m_farWCV);
-    plane.position.copyFrom(this.m_farWCV); // back face
+    plane.position.copyFrom(this.m_farWCV); // back face, near face
 
-    plane = this.m_wFruPlaneList[1];
-    plane.nv.copyFrom(this.m_wFruPlaneList[0].nv);
+    plane = wfpa[1];
+    plane.nv.copyFrom(wfpa[0].nv);
     plane.distance = plane.nv.dot(this.m_nearWCV);
-    plane.position.copyFrom(this.m_nearWCV); //
+    plane.position.copyFrom(this.m_nearWCV);
+    wfva[8] = this.m_nearWCV;
+    wfva[9] = this.m_farWCV;
+    wfva[11] = this.m_wNV; // far face
 
-    this.m_wFrustumVtxArr[8] = this.m_nearWCV;
-    this.m_wFrustumVtxArr[9] = this.m_farWCV;
-    this.m_wFrustumVtxArr[11] = this.m_wNV; // far face
+    wfva[0].setXYZ(-halfMaxW, -halfMaxH, -this.m_zFar);
+    wfva[1].setXYZ(halfMaxW, -halfMaxH, -this.m_zFar);
+    wfva[2].setXYZ(halfMaxW, halfMaxH, -this.m_zFar);
+    wfva[3].setXYZ(-halfMaxW, halfMaxH, -this.m_zFar); // near face
 
-    this.m_wFrustumVtxArr[0].setTo(-halfMaxW, -halfMaxH, -this.m_zFar);
-    this.m_wFrustumVtxArr[1].setTo(halfMaxW, -halfMaxH, -this.m_zFar);
-    this.m_wFrustumVtxArr[2].setTo(halfMaxW, halfMaxH, -this.m_zFar);
-    this.m_wFrustumVtxArr[3].setTo(-halfMaxW, halfMaxH, -this.m_zFar); // near face
-
-    this.m_wFrustumVtxArr[4].setTo(-halfMinW, -halfMinH, -this.m_zNear);
-    this.m_wFrustumVtxArr[5].setTo(halfMinW, -halfMinH, -this.m_zNear);
-    this.m_wFrustumVtxArr[6].setTo(halfMinW, halfMinH, -this.m_zNear);
-    this.m_wFrustumVtxArr[7].setTo(-halfMinW, halfMinH, -this.m_zNear); //
-
-    this.m_invViewMat.transformVectorSelf(this.m_wFrustumVtxArr[0]);
-    this.m_invViewMat.transformVectorSelf(this.m_wFrustumVtxArr[1]);
-    this.m_invViewMat.transformVectorSelf(this.m_wFrustumVtxArr[2]);
-    this.m_invViewMat.transformVectorSelf(this.m_wFrustumVtxArr[3]);
-    this.m_invViewMat.transformVectorSelf(this.m_wFrustumVtxArr[4]);
-    this.m_invViewMat.transformVectorSelf(this.m_wFrustumVtxArr[5]);
-    this.m_invViewMat.transformVectorSelf(this.m_wFrustumVtxArr[6]);
-    this.m_invViewMat.transformVectorSelf(this.m_wFrustumVtxArr[7]); //
-
-    this.m_frustumWAABB.max.setTo(-9999999, -9999999, -9999999);
-    this.m_frustumWAABB.min.setTo(9999999, 9999999, 9999999);
+    wfva[4].setXYZ(-halfMinW, -halfMinH, -this.m_zNear);
+    wfva[5].setXYZ(halfMinW, -halfMinH, -this.m_zNear);
+    wfva[6].setXYZ(halfMinW, halfMinH, -this.m_zNear);
+    wfva[7].setXYZ(-halfMinW, halfMinH, -this.m_zNear);
+    const invM = this.m_invViewMat;
+    invM.transformVectorSelf(wfva[0]);
+    invM.transformVectorSelf(wfva[1]);
+    invM.transformVectorSelf(wfva[2]);
+    invM.transformVectorSelf(wfva[3]);
+    invM.transformVectorSelf(wfva[4]);
+    invM.transformVectorSelf(wfva[5]);
+    invM.transformVectorSelf(wfva[6]);
+    invM.transformVectorSelf(wfva[7]);
+    this.m_frustumWAABB.reset();
 
     for (let i = 0; i < 8; ++i) {
-      this.m_frustumWAABB.addPosition(this.m_wFrustumVtxArr[i]);
+      this.m_frustumWAABB.addPosition(wfva[i]);
     }
 
-    this.m_frustumWAABB.updateFast(); //let abCV = m_frustumWAABB.getCenter();
-    // bottom
+    this.m_frustumWAABB.updateFast(); // bottom
 
-    let v0 = this.m_wFrustumVtxArr[0];
-    let v1 = this.m_wFrustumVtxArr[4];
-    this.m_tempV.x = v0.x - v1.x;
-    this.m_tempV.y = v0.y - v1.y;
-    this.m_tempV.z = v0.z - v1.z;
-    v0 = this.m_wFrustumVtxArr[1];
-    v1 = this.m_wFrustumVtxArr[5];
-    this.m_tempV1.x = v0.x - v1.x;
-    this.m_tempV1.y = v0.y - v1.y;
-    this.m_tempV1.z = v0.z - v1.z;
-    plane = this.m_wFruPlaneList[3];
+    this.m_tempV.subVecsTo(wfva[0], wfva[4]);
+    let v0 = wfva[1];
+    this.m_tempV1.subVecsTo(wfva[1], wfva[5]);
+    plane = wfpa[3];
     Vector3D_1.default.Cross(this.m_tempV1, this.m_tempV, plane.nv);
     plane.nv.normalize();
     plane.distance = plane.nv.dot(v0);
     plane.position.copyFrom(v0); // top
 
-    v0 = this.m_wFrustumVtxArr[3];
-    v1 = this.m_wFrustumVtxArr[7];
-    this.m_tempV.x = v0.x - v1.x;
-    this.m_tempV.y = v0.y - v1.y;
-    this.m_tempV.z = v0.z - v1.z;
-    v0 = this.m_wFrustumVtxArr[2];
-    v1 = this.m_wFrustumVtxArr[6];
-    this.m_tempV1.x = v0.x - v1.x;
-    this.m_tempV1.y = v0.y - v1.y;
-    this.m_tempV1.z = v0.z - v1.z;
-    plane = this.m_wFruPlaneList[2];
+    this.m_tempV.subVecsTo(wfva[3], wfva[7]);
+    v0 = wfva[2];
+    this.m_tempV1.subVecsTo(wfva[2], wfva[6]);
+    plane = wfpa[2];
     Vector3D_1.default.Cross(this.m_tempV1, this.m_tempV, plane.nv);
     plane.nv.normalize();
     plane.distance = plane.nv.dot(v0);
     plane.position.copyFrom(v0); // left
 
-    v0 = this.m_wFrustumVtxArr[0];
-    v1 = this.m_wFrustumVtxArr[4];
-    this.m_tempV.x = v0.x - v1.x;
-    this.m_tempV.y = v0.y - v1.y;
-    this.m_tempV.z = v0.z - v1.z;
-    v0 = this.m_wFrustumVtxArr[3];
-    v1 = this.m_wFrustumVtxArr[7];
-    this.m_tempV1.x = v0.x - v1.x;
-    this.m_tempV1.y = v0.y - v1.y;
-    this.m_tempV1.z = v0.z - v1.z;
-    plane = this.m_wFruPlaneList[4];
+    this.m_tempV.subVecsTo(wfva[0], wfva[4]);
+    v0 = wfva[3];
+    this.m_tempV1.subVecsTo(wfva[3], wfva[7]);
+    plane = wfpa[4];
     Vector3D_1.default.Cross(this.m_tempV, this.m_tempV1, plane.nv);
     plane.nv.normalize();
     plane.distance = plane.nv.dot(v0);
     plane.position.copyFrom(v0); // right
 
-    v0 = this.m_wFrustumVtxArr[1];
-    v1 = this.m_wFrustumVtxArr[5];
-    this.m_tempV.x = v0.x - v1.x;
-    this.m_tempV.y = v0.y - v1.y;
-    this.m_tempV.z = v0.z - v1.z;
-    v0 = this.m_wFrustumVtxArr[2];
-    v1 = this.m_wFrustumVtxArr[6];
-    this.m_tempV1.x = v0.x - v1.x;
-    this.m_tempV1.y = v0.y - v1.y;
-    this.m_tempV1.z = v0.z - v1.z;
-    plane = this.m_wFruPlaneList[5];
+    this.m_tempV.subVecsTo(wfva[1], wfva[5]);
+    v0 = wfva[2];
+    this.m_tempV1.subVecsTo(wfva[2], wfva[6]);
+    plane = wfpa[5];
     Vector3D_1.default.Cross(this.m_tempV, this.m_tempV1, plane.nv);
     plane.nv.normalize();
     plane.distance = plane.nv.dot(v0);
     plane.position.copyFrom(v0);
-    this.m_fpNVArr[0].copyFrom(this.m_wFruPlaneList[0].nv);
-    this.m_fpNVArr[1].copyFrom(this.m_wFruPlaneList[1].nv);
-    this.m_fpNVArr[1].scaleBy(-1.0);
-    this.m_fpNVArr[2].copyFrom(this.m_wFruPlaneList[2].nv);
-    this.m_fpNVArr[3].copyFrom(this.m_wFruPlaneList[3].nv);
-    this.m_fpNVArr[3].scaleBy(-1.0);
-    this.m_fpNVArr[4].copyFrom(this.m_wFruPlaneList[4].nv);
-    this.m_fpNVArr[4].scaleBy(-1.0);
-    this.m_fpNVArr[5].copyFrom(this.m_wFruPlaneList[5].nv); //
-
-    this.m_fpDisArr[0] = this.m_wFruPlaneList[0].distance;
-    this.m_fpDisArr[1] = -this.m_wFruPlaneList[1].distance;
-    this.m_fpDisArr[2] = this.m_wFruPlaneList[2].distance;
-    this.m_fpDisArr[3] = -this.m_wFruPlaneList[3].distance;
-    this.m_fpDisArr[4] = -this.m_wFruPlaneList[4].distance;
-    this.m_fpDisArr[5] = this.m_wFruPlaneList[5].distance;
+    const fpna = this.m_fpns;
+    fpna[0].copyFrom(wfpa[0].nv);
+    fpna[1].copyFrom(wfpa[1].nv);
+    fpna[1].scaleBy(-1.0);
+    fpna[2].copyFrom(wfpa[2].nv);
+    fpna[3].copyFrom(wfpa[3].nv);
+    fpna[3].scaleBy(-1.0);
+    fpna[4].copyFrom(wfpa[4].nv);
+    fpna[4].scaleBy(-1.0);
+    fpna[5].copyFrom(wfpa[5].nv);
+    const fpda = this.m_fpds;
+    fpda[0] = wfpa[0].distance;
+    fpda[1] = -wfpa[1].distance;
+    fpda[2] = wfpa[2].distance;
+    fpda[3] = -wfpa[3].distance;
+    fpda[4] = -wfpa[4].distance;
+    fpda[5] = wfpa[5].distance;
   }
 
   getWordFrustumWAABB() {
@@ -41172,109 +44058,128 @@ class CameraBase {
   }
 
   getWordFrustumVtxArr() {
-    return this.m_wFrustumVtxArr;
+    return this.m_wFrustumVS;
   }
 
   getWordFrustumPlaneArr() {
-    return this.m_wFruPlaneList;
+    return this.m_wFruPlanes;
+  }
+  /**
+   * @param w_cv 世界坐标位置
+   * @param radius 球体半径
+   * @returns 0表示完全不会再近平面内, 1表示完全在近平面内, 2表示和近平面相交
+   */
+
+
+  visiTestNearPlaneWithSphere(w_cv, radius) {
+    const v = this.m_fpns[1].dot(w_cv) - this.m_fpds[1]; // - radius;
+
+    if (v - radius > pmin) {
+      // 表示完全在近平面之外，也就是前面
+      return 0;
+    } else if (v + radius < MathConst_1.default.MATH_MAX_NEGATIVE) {
+      // 表示完全在近平面内, 也就是后面
+      return 1;
+    } // 表示和近平面相交
+
+
+    return 2;
   }
 
   visiTestSphere2(w_cv, radius) {
-    let boo = this.m_fpNVArr[0].dot(w_cv) - this.m_fpDisArr[0] - radius > MathConst_1.default.MATH_MIN_POSITIVE;
+    let boo = this.m_fpns[0].dot(w_cv) - this.m_fpds[0] - radius > pmin;
     if (boo) return false;
-    boo = this.m_fpNVArr[1].dot(w_cv) - this.m_fpDisArr[1] - radius > MathConst_1.default.MATH_MIN_POSITIVE;
+    boo = this.m_fpns[1].dot(w_cv) - this.m_fpds[1] - radius > pmin;
     if (boo) return false;
-    boo = this.m_fpNVArr[2].dot(w_cv) - this.m_fpDisArr[2] - radius > MathConst_1.default.MATH_MIN_POSITIVE;
+    boo = this.m_fpns[2].dot(w_cv) - this.m_fpds[2] - radius > pmin;
     if (boo) return false;
-    boo = this.m_fpNVArr[3].dot(w_cv) - this.m_fpDisArr[3] - radius > MathConst_1.default.MATH_MIN_POSITIVE;
+    boo = this.m_fpns[3].dot(w_cv) - this.m_fpds[3] - radius > pmin;
     if (boo) return false;
-    boo = this.m_fpNVArr[4].dot(w_cv) - this.m_fpDisArr[4] - radius > MathConst_1.default.MATH_MIN_POSITIVE;
+    boo = this.m_fpns[4].dot(w_cv) - this.m_fpds[4] - radius > pmin;
     if (boo) return false;
-    boo = this.m_fpNVArr[5].dot(w_cv) - this.m_fpDisArr[5] - radius > MathConst_1.default.MATH_MIN_POSITIVE;
+    boo = this.m_fpns[5].dot(w_cv) - this.m_fpds[5] - radius > pmin;
     if (boo) return false;
     return true;
   }
 
   visiTestSphere3(w_cv, radius, farROffset) {
-    let boo = this.m_fpNVArr[0].dot(w_cv) - this.m_fpDisArr[0] + farROffset - radius > MathConst_1.default.MATH_MIN_POSITIVE;
+    let boo = this.m_fpns[0].dot(w_cv) - this.m_fpds[0] + farROffset - radius > pmin;
     if (boo) return false;
-    boo = this.m_fpNVArr[1].dot(w_cv) - this.m_fpDisArr[1] - radius > MathConst_1.default.MATH_MIN_POSITIVE;
+    boo = this.m_fpns[1].dot(w_cv) - this.m_fpds[1] - radius > pmin;
     if (boo) return false;
-    boo = this.m_fpNVArr[2].dot(w_cv) - this.m_fpDisArr[2] - radius > MathConst_1.default.MATH_MIN_POSITIVE;
+    boo = this.m_fpns[2].dot(w_cv) - this.m_fpds[2] - radius > pmin;
     if (boo) return false;
-    boo = this.m_fpNVArr[3].dot(w_cv) - this.m_fpDisArr[3] - radius > MathConst_1.default.MATH_MIN_POSITIVE;
+    boo = this.m_fpns[3].dot(w_cv) - this.m_fpds[3] - radius > pmin;
     if (boo) return false;
-    boo = this.m_fpNVArr[4].dot(w_cv) - this.m_fpDisArr[4] - radius > MathConst_1.default.MATH_MIN_POSITIVE;
+    boo = this.m_fpns[4].dot(w_cv) - this.m_fpds[4] - radius > pmin;
     if (boo) return false;
-    boo = this.m_fpNVArr[5].dot(w_cv) - this.m_fpDisArr[5] - radius > MathConst_1.default.MATH_MIN_POSITIVE;
+    boo = this.m_fpns[5].dot(w_cv) - this.m_fpds[5] - radius > pmin;
     if (boo) return false;
     return true;
   }
 
   visiTestPosition(pv) {
-    let boo = this.m_fpNVArr[0].dot(pv) - this.m_fpDisArr[0] > MathConst_1.default.MATH_MIN_POSITIVE;
+    let boo = this.m_fpns[0].dot(pv) - this.m_fpds[0] > pmin;
     if (boo) return false;
-    boo = this.m_fpNVArr[1].dot(pv) - this.m_fpDisArr[1] > MathConst_1.default.MATH_MIN_POSITIVE;
+    boo = this.m_fpns[1].dot(pv) - this.m_fpds[1] > pmin;
     if (boo) return false;
-    boo = this.m_fpNVArr[2].dot(pv) - this.m_fpDisArr[2] > MathConst_1.default.MATH_MIN_POSITIVE;
+    boo = this.m_fpns[2].dot(pv) - this.m_fpds[2] > pmin;
     if (boo) return false;
-    boo = this.m_fpNVArr[3].dot(pv) - this.m_fpDisArr[3] > MathConst_1.default.MATH_MIN_POSITIVE;
+    boo = this.m_fpns[3].dot(pv) - this.m_fpds[3] > pmin;
     if (boo) return false;
-    boo = this.m_fpNVArr[4].dot(pv) - this.m_fpDisArr[4] > MathConst_1.default.MATH_MIN_POSITIVE;
+    boo = this.m_fpns[4].dot(pv) - this.m_fpds[4] > pmin;
     if (boo) return false;
-    boo = this.m_fpNVArr[5].dot(pv) - this.m_fpDisArr[5] > MathConst_1.default.MATH_MIN_POSITIVE;
+    boo = this.m_fpns[5].dot(pv) - this.m_fpds[5] > pmin;
     if (boo) return false;
     return true;
   }
 
   visiTestPlane(nv, distance) {
-    let f0 = nv.dot(this.m_wFruPlaneList[0].position) - distance;
-    let f1 = f0 * (nv.dot(this.m_wFruPlaneList[1].position) - distance);
-    if (f1 < MathConst_1.default.MATH_MIN_POSITIVE) return true;
-    f1 = f0 * (nv.dot(this.m_wFruPlaneList[2].position) - distance);
-    if (f1 < MathConst_1.default.MATH_MIN_POSITIVE) return true;
-    f1 = f0 * (nv.dot(this.m_wFruPlaneList[3].position) - distance);
-    if (f1 < MathConst_1.default.MATH_MIN_POSITIVE) return true;
-    f1 = f0 * (nv.dot(this.m_wFruPlaneList[4].position) - distance);
-    if (f1 < MathConst_1.default.MATH_MIN_POSITIVE) return true;
-    f1 = f0 * (nv.dot(this.m_wFruPlaneList[5].position) - distance);
-    if (f1 < MathConst_1.default.MATH_MIN_POSITIVE) return true;
+    const ls = this.m_wFruPlanes;
+    let f0 = nv.dot(ls[0].position) - distance;
+    let f1 = f0 * (nv.dot(ls[1].position) - distance);
+    if (f1 < pmin) return true;
+    f1 = f0 * (nv.dot(ls[2].position) - distance);
+    if (f1 < pmin) return true;
+    f1 = f0 * (nv.dot(ls[3].position) - distance);
+    if (f1 < pmin) return true;
+    f1 = f0 * (nv.dot(ls[4].position) - distance);
+    if (f1 < pmin) return true;
+    f1 = f0 * (nv.dot(ls[5].position) - distance);
+    if (f1 < pmin) return true;
     return false;
-  } //this.m_wFruPlaneList
+  } //this.m_wFruPlanes
   // frustum intersect sphere in wrod space
 
 
   visiTestSphere(w_cv, radius) {
-    let boo = this.m_frustumWAABB.sphereIntersect(w_cv, radius); //
+    const ls = this.m_wFruPlanes;
+    let boo = this.m_frustumWAABB.sphereIntersect(w_cv, radius);
 
     if (boo) {
-      let pf0 = this.m_wFruPlaneList[0].intersectSphere(w_cv, radius);
-      let pf1 = this.m_wFruPlaneList[1].intersectSphere(w_cv, radius); //trace("0 pf0,pf1: "+pf0+","+pf1);
+      let pf0 = ls[0].intersectSphere(w_cv, radius);
+      let pf1 = ls[1].intersectSphere(w_cv, radius);
 
       if (pf0 * pf1 >= 0) {
-        //this.intersectBoo
-        //trace("TT A0");
-        if (this.m_wFruPlaneList[0].intersectBoo || this.m_wFruPlaneList[1].intersectBoo) {} else {
+        if (ls[0].intersectBoo || ls[1].intersectBoo) {} else {
           return false;
         }
       }
 
-      pf0 = this.m_wFruPlaneList[2].intersectSphere(w_cv, radius);
-      pf1 = this.m_wFruPlaneList[3].intersectSphere(w_cv, radius); //trace("1 pf0,pf1: "+pf0+","+pf1);
+      pf0 = ls[2].intersectSphere(w_cv, radius);
+      pf1 = ls[3].intersectSphere(w_cv, radius);
 
       if (pf0 * pf1 >= 0) {
-        //trace("TT A1");
-        if (this.m_wFruPlaneList[2].intersectBoo || this.m_wFruPlaneList[3].intersectBoo) {} else {
+        if (ls[2].intersectBoo || ls[3].intersectBoo) {} else {
           return false;
         }
       }
 
-      pf0 = this.m_wFruPlaneList[4].intersectSphere(w_cv, radius);
-      pf1 = this.m_wFruPlaneList[5].intersectSphere(w_cv, radius);
+      pf0 = ls[4].intersectSphere(w_cv, radius);
+      pf1 = ls[5].intersectSphere(w_cv, radius);
 
       if (pf0 * pf1 >= 0) {
-        //trace("TT A2");
-        if (this.m_wFruPlaneList[4].intersectBoo || this.m_wFruPlaneList[5].intersectBoo) {} else {
+        if (ls[4].intersectBoo || ls[5].intersectBoo) {} else {
           return false;
         }
       }
@@ -41293,32 +44198,33 @@ class CameraBase {
     //return m_frustumWAABB.sphereIntersectFast(ro.bounds.getCenter(),ro.bounds.getRadius());
     let w_cv = ab.center;
     let radius = ab.radius;
-    let boo = this.m_frustumWAABB.sphereIntersect(w_cv, radius); //
+    let boo = this.m_frustumWAABB.sphereIntersect(w_cv, radius);
+    const ls = this.m_wFruPlanes;
 
     if (boo) {
-      let pf0 = this.m_wFruPlaneList[0].intersectSphere(w_cv, radius);
-      let pf1 = this.m_wFruPlaneList[1].intersectSphere(w_cv, radius);
+      let pf0 = ls[0].intersectSphere(w_cv, radius);
+      let pf1 = ls[1].intersectSphere(w_cv, radius);
 
       if (pf0 * pf1 >= 0) {
-        if (this.m_wFruPlaneList[0].intersectBoo || this.m_wFruPlaneList[1].intersectBoo) {} else {
+        if (ls[0].intersectBoo || ls[1].intersectBoo) {} else {
           return false;
         }
       }
 
-      pf0 = this.m_wFruPlaneList[2].intersectSphere(w_cv, radius);
-      pf1 = this.m_wFruPlaneList[3].intersectSphere(w_cv, radius);
+      pf0 = ls[2].intersectSphere(w_cv, radius);
+      pf1 = ls[3].intersectSphere(w_cv, radius);
 
       if (pf0 * pf1 >= 0) {
-        if (this.m_wFruPlaneList[2].intersectBoo || this.m_wFruPlaneList[3].intersectBoo) {} else {
+        if (ls[2].intersectBoo || ls[3].intersectBoo) {} else {
           return false;
         }
       }
 
-      pf0 = this.m_wFruPlaneList[4].intersectSphere(w_cv, radius);
-      pf1 = this.m_wFruPlaneList[5].intersectSphere(w_cv, radius);
+      pf0 = ls[4].intersectSphere(w_cv, radius);
+      pf1 = ls[5].intersectSphere(w_cv, radius);
 
       if (pf0 * pf1 >= 0) {
-        if (this.m_wFruPlaneList[4].intersectBoo || this.m_wFruPlaneList[5].intersectBoo) {} else {
+        if (ls[4].intersectBoo || ls[5].intersectBoo) {} else {
           return false;
         }
       }
@@ -41464,6 +44370,8 @@ const RenderStateObject_1 = __webpack_require__("a5ba");
 
 class RPOUnit {
   constructor() {
+    this.rentity = null;
+    this.retype = 0;
     this.uid = -1;
     this.value = -1; // 记录自身和RPONode的对应关系
 
@@ -41473,23 +44381,21 @@ class RPOUnit {
     this.shader = null; // 这个posotion和bounds的center会是同一个实例
 
     this.pos = null;
-    this.bounds = null; // 记录对应的RODisplay的渲染所需的状态数据
-
-    this.ibufType = 0; // UNSIGNED_SHORT or UNSIGNED_INT
-
-    this.ibufStep = 2; // 2 or 4
-
-    this.ivsIndex = 0;
-    this.ivsCount = 0;
-    this.insCount = 0;
-    this.drawOffset = 0;
+    this.bounds = null;
     this.partTotal = 0; // partTotal = partGroup.length
 
     this.partGroup = null;
-    this.trisNumber = 0;
+    /**
+     * 是否在渲染过程中可见, the default value is true
+     */
+
     this.visible = true;
-    this.drawEnabled = true;
-    this.drawMode = 0;
+    this.drawing = true;
+    /**
+     * 是否对当前unit进行渲染的状态
+     */
+
+    this.rendering = true;
     this.renderState = 0;
     this.rcolorMask = 0; // 用于记录 renderState(低10位)和ColorMask(高10位) 的状态组合
 
@@ -41511,13 +44417,41 @@ class RPOUnit {
      */
 
     this.polygonOffset = null;
+    this.rdp = null;
+    this.vdrInfo = null;
+    this.rgraph = null;
+    this.m_ver = 0;
   }
 
   testDrawFlag() {
+    this.drawFlag = (this.rcolorMask << 10) + this.renderState;
+
     if (this.shader.drawFlag != this.drawFlag) {
       this.shader.drawFlag = this.drawFlag;
       RenderStateObject_1.RenderStateObject.UseRenderState(this.renderState);
       RenderColorMask_1.RenderColorMask.UseRenderState(this.rcolorMask);
+    }
+  }
+
+  copyMaterialFrom(unit) {
+    this.tro = unit.tro;
+    this.uniform = unit.uniform;
+    this.ubo = unit.ubo;
+    this.texMid = unit.texMid; // if(this.shdUid != unit.shdUid) {
+    //     console.log(">>>>>>> copyMaterialFrom this.shdUid, unit.shdUid: ", this.shdUid, unit.shdUid);
+    //     unit.transUniform.uns = "new_unit_trans";
+    //     unit.uniform.uns = "new_uniform";
+    // }
+
+    this.shdUid = unit.shdUid;
+    this.transUniform = unit.transUniform;
+  }
+
+  applyShader(force = false) {
+    this.shader.bindToGpu(this.shdUid);
+
+    if (force) {
+      this.shader.resetUniform();
     }
   }
 
@@ -41538,30 +44472,74 @@ class RPOUnit {
   }
 
   setIvsParam(ivsIndex, ivsCount) {
-    this.ivsIndex = ivsIndex;
-    this.ivsCount = ivsCount;
-    this.drawOffset = ivsIndex * this.ibufStep;
-    this.drawEnabled = this.visible && this.ivsCount > 0;
+    throw Error("illegal operation !!!"); // console.log("RPOUint::setIvsParam(), ivsIndex: ", ivsIndex, ", ivsCount: ", ivsCount);
+    // // this.indicesRes.setIvsParam(ivsIndex, ivsCount);
+    // this.rdp.setIvsParam(ivsIndex, ivsCount);
+    // this.testVisible();
+  }
+
+  testVisible() {
+    if (!this.rdp.rd) {
+      throw Error("illegal operation !!!");
+    }
+
+    this.drawing = this.visible && this.rdp.rd.ivsSize > 0;
   }
 
   setVisible(boo) {
     this.visible = boo;
-    this.drawEnabled = boo && this.ivsCount > 0; // if(DebugFlag.Flag_0 > 0) console.log("#### setVisible(): ", boo, "this.drawEnabled: ",this.drawEnabled);
+    this.testVisible(); // if(DebugFlag.Flag_0 > 0) console.log("#### setVisible(): ", boo, "this.drawing: ",this.drawing);
   }
 
   setDrawFlag(renderState, rcolorMask) {
     this.renderState = renderState;
     this.rcolorMask = rcolorMask;
-    this.drawFlag = (rcolorMask << 10) + renderState;
+    this.drawFlag = (this.rcolorMask << 10) + this.renderState;
   }
 
-  drawThis(rc) {
+  updateVtx() {
+    if (this.vdrInfo.isUnlock()) {
+      const rdp = this.rdp;
+      rdp.ver = this.m_ver; // if(DebugFlag.Flag_0 > 0) {
+      //     console.log("AA ---- AA XXXXX RPOUint::updateVtx() ..., rdp.getUid(): ", rdp.getUid());
+      //     console.log("           XXXXX RPOUint::updateVtx() ..., rdp.ver: ", rdp.ver);
+      // }
+
+      const flag = this.vdrInfo.__$$copyToRDP(rdp);
+
+      this.m_ver = rdp.ver; // if(DebugFlag.Flag_0 > 0) {
+      //     console.log("BB ---- BB XXXXX RPOUint::updateVtx() ..., this.m_ver: ", this.m_ver);
+      // }
+
+      rdp.ver = 0;
+      this.testVisible(); // if(DebugFlag.Flag_0 > 0) {
+      //     console.log("##### ##### ###### ##### ---------------------- RPOUint::updateVtx() ...");
+      // }
+
+      return flag;
+    }
+
+    return false;
+  }
+
+  draw(rc) {
+    throw Error("illegal operation !!!");
+  }
+
+  __$$drawThis(rc) {
     const st = rc.status;
     st.drawCallTimes++;
-    st.drawTrisNumber += this.trisNumber; // TODO(Vily): 下面这个判断流程需要优化(由于几何数据更改之后上传gpu的动作是一帧上传16个这样的速度下实现的，所以需要下面这句代码来保证不出错: [.WebGL-000037DC02C2B800] GL_INVALID_OPERATION: Insufficient buffer size)
+    const rd = this.rdp.rd;
+    st.drawTrisNumber += rd.trisNumber; // console.log("this.rdp.getUid(): ", this.rdp.getUid());
+    // TODO(Vily): 下面这个判断流程需要优化(由于几何数据更改之后上传gpu的动作是一帧上传16个这样的速度下实现的，所以需要下面这句代码来保证不出错: [.WebGL-000037DC02C2B800] GL_INVALID_OPERATION: Insufficient buffer size)
+    // let ivsCount = ir.getVTCount();
 
-    let ivsCount = this.indicesRes.getVTCount();
-    if (this.ivsCount <= ivsCount) ivsCount = this.ivsCount;
+    let ivsCount = rd.ivsSize; // if (this.ivsCount <= ivsCount && ir.isCommon()) ivsCount = this.ivsCount;
+    // console.log("runit::drawThis(), ivsCount: ", ivsCount, ",ivsOffset: ", rd.ivsOffset, this.rdp.getUid(), rd.getUid());
+    // if(DebugFlag.Flag_0 > 0) {
+    //     console.log("runit::drawThis(), ivsCount: ", ivsCount, ",ivsOffset: ", rd.ivsOffset, this.rdp.getUid(), ", rd.getUid(): " ,rd.getUid());
+    //     //DebugFlag.Flag_0 = 0;
+    // }
 
     if (this.polygonOffset != null) {
       rc.setPolygonOffset(this.polygonOffset[0], this.polygonOffset[1]);
@@ -41569,48 +44547,42 @@ class RPOUnit {
       rc.resetPolygonOffset();
     }
 
-    const rdm = RenderConst_1.RenderDrawMode;
-    let gl = rc.RContext;
+    const gl = rc.RContext;
 
-    switch (this.drawMode) {
-      case rdm.ELEMENTS_TRIANGLES:
-        // if(DebugFlag.Flag_0 > 0)console.log("RPOUnit::run(), TRIANGLES drawElements(ivsCount="+this.ivsCount+", ivsIndex="+this.ivsIndex+"),drawOffset: "+this.drawOffset);
-        //rc.RContext.drawElements(rc.TRIANGLES, this.ivsCount, this.ibufType,this.ivsIndex * this.ibufStep);
-        gl.drawElements(rc.TRIANGLES, ivsCount, this.ibufType, this.drawOffset);
+    switch (rd.drawMode) {
+      case RenderConst_1.RenderDrawMode.ELEMENTS_TRIANGLES:
+      case RenderConst_1.RenderDrawMode.ELEMENTS_LINES:
+      case RenderConst_1.RenderDrawMode.ELEMENTS_TRIANGLE_STRIP:
+      case RenderConst_1.RenderDrawMode.ELEMENTS_LINES_STRIP:
+        // console.log("rd.gldm: ", rd.gldm);
+        // if(DebugFlag.Flag_0 > 0)console.log("RPOUnit::run(), drawElements(ivsCount="+this.ivsCount+", ivsIndex="+this.ivsIndex+"),drawOffset: "+this.drawOffset);
+        //rc.RContext.drawElements(rc.TRIANGLES, this.ivsCount, rd.ibufType,this.ivsIndex * this.ibufStep);
+        gl.drawElements(rd.gldm, ivsCount, rd.bufType, rd.ivsOffset);
         break;
 
-      case rdm.ELEMENTS_LINES:
-        //console.log("RPOUnit::run(), ELEMENTS_LINES drawElements(ivsCount="+this.ivsCount+", ivsIndex="+this.ivsIndex+"),drawOffset: "+this.drawOffset);
-        //rc.RContext.drawElements(rc.ELEMENTS_LINES, this.ivsCount, this.ibufType,this.ivsIndex * this.ibufStep);
-        gl.drawElements(rc.LINES, ivsCount, this.ibufType, this.drawOffset);
-        break;
-
-      case rdm.ELEMENTS_TRIANGLE_STRIP:
-        //console.log("RPOUnit::run(), TRIANGLE_STRIP drawElements(ivsCount="+this.ivsCount+", ivsIndex="+this.ivsIndex+")");
-        //rc.RContext.drawElements(rc.TRIANGLE_STRIP, this.ivsCount, this.ibufType,this.ivsIndex * this.ibufStep);
-        gl.drawElements(rc.TRIANGLE_STRIP, ivsCount, this.ibufType, this.drawOffset);
-        break;
-
-      case rdm.ELEMENTS_INSTANCED_TRIANGLES:
+      case RenderConst_1.RenderDrawMode.ELEMENTS_INSTANCED_TRIANGLES:
+      case RenderConst_1.RenderDrawMode.ELEMENTS_INSTANCED_LINES:
+      case RenderConst_1.RenderDrawMode.ELEMENTS_INSTANCED_TRIANGLES_STRIP:
+      case RenderConst_1.RenderDrawMode.ELEMENTS_INSTANCED_LINES_STRIP:
         //console.log("RPOUnit::run(), drawElementsInstanced(ivsCount="+this.ivsCount+", ivsIndex="+this.ivsIndex+", insCount: "+this.insCount+")");
-        //rc.RContext.drawElementsInstanced(rc.TRIANGLES,this.ivsCount, this.ibufType, this.ivsIndex * this.ibufStep, this.insCount);
-        gl.drawElementsInstanced(rc.TRIANGLES, ivsCount, this.ibufType, this.drawOffset, this.insCount);
+        //rc.RContext.drawElementsInstanced(rc.TRIANGLES,this.ivsCount, rd.bufType, this.ivsIndex * this.ibufStep, this.insCount);
+        gl.drawElementsInstanced(rd.gldm, ivsCount, rd.bufType, rd.ivsOffset, rd.insCount);
         break;
 
-      case rdm.ELEMENTS_TRIANGLE_FAN:
+      case RenderConst_1.RenderDrawMode.ELEMENTS_TRIANGLE_FAN:
         //console.log("RPOUnit::run(), TRIANGLE_STRIP drawElements(ivsCount="+this.ivsCount+", ivsIndex="+this.ivsIndex+")");
-        //rc.RContext.drawElements(rc.TRIANGLE_FAN, this.ivsCount, this.ibufType,this.ivsIndex * this.ibufStep);
-        gl.drawElements(rc.TRIANGLE_FAN, ivsCount, this.ibufType, this.drawOffset);
+        //rc.RContext.drawElements(rc.TRIANGLE_FAN, this.ivsCount, rd.bufType,this.ivsIndex * this.ibufStep);
+        gl.drawElements(rc.TRIANGLE_FAN, ivsCount, rd.bufType, rd.ivsOffset);
         break;
 
-      case rdm.ARRAYS_LINES:
+      case RenderConst_1.RenderDrawMode.ARRAYS_LINES:
         //console.log("RPOUnit::run(), ARRAYS_LINES drawArrays(ivsCount="+this.ivsCount+", ivsIndex="+this.ivsIndex+")");
-        gl.drawArrays(rc.LINES, this.ivsIndex, this.ivsCount);
+        gl.drawArrays(rc.LINES, rd.ivsIndex, ivsCount);
         break;
 
-      case rdm.ARRAYS_LINE_STRIP:
+      case RenderConst_1.RenderDrawMode.ARRAYS_LINE_STRIP:
         //console.log("RPOUnit::run(), ARRAYS_LINE_STRIP drawArrays(ivsCount="+this.ivsCount+", ivsIndex="+this.ivsIndex+")");
-        gl.drawArrays(rc.LINE_STRIP, this.ivsIndex, this.ivsCount);
+        gl.drawArrays(rc.LINE_STRIP, rd.ivsIndex, ivsCount);
         break;
 
       default:
@@ -41618,13 +44590,14 @@ class RPOUnit {
     }
   }
 
-  drawPart(rc) {
+  __$$drawPart(rc) {
     const st = rc.status;
-    st.drawCallTimes++;
-    st.drawTrisNumber += this.trisNumber; // TODO(Vily): 下面这个判断流程需要优化(由于几何数据更改之后上传gpu的动作是一帧上传16个这样的速度下实现的，所以需要下面这句代码来保证不出错: [.WebGL-000037DC02C2B800] GL_INVALID_OPERATION: Insufficient buffer size)
+    st.drawCallTimes++; // const ir = this.indicesRes;
 
-    let ivsCount = this.indicesRes.getVTCount();
-    if (this.ivsCount <= ivsCount) ivsCount = this.ivsCount;
+    const rd = this.rdp.rd;
+    st.drawTrisNumber += rd.trisNumber; // TODO(Vily): 下面这个判断流程需要优化(由于几何数据更改之后上传gpu的动作是一帧上传16个这样的速度下实现的，所以需要下面这句代码来保证不出错: [.WebGL-000037DC02C2B800] GL_INVALID_OPERATION: Insufficient buffer size)
+
+    let ivsCount = rd.ivsSize; // if (this.ivsCount <= ivsCount && ir.isCommon()) ivsCount = this.ivsCount;
 
     if (this.polygonOffset != null) {
       rc.setPolygonOffset(this.polygonOffset[0], this.polygonOffset[1]);
@@ -41632,61 +44605,48 @@ class RPOUnit {
       rc.resetPolygonOffset();
     }
 
-    const rdm = RenderConst_1.RenderDrawMode;
     let i = 0;
     let gl = rc.RContext;
 
-    switch (this.drawMode) {
-      case rdm.ELEMENTS_TRIANGLES:
+    switch (rd.drawMode) {
+      case RenderConst_1.RenderDrawMode.ELEMENTS_TRIANGLES:
+      case RenderConst_1.RenderDrawMode.ELEMENTS_LINES:
+      case RenderConst_1.RenderDrawMode.ELEMENTS_TRIANGLE_STRIP:
+      case RenderConst_1.RenderDrawMode.ELEMENTS_LINES_STRIP:
         for (; i < this.partTotal;) {
           // 这里面可以增加一个回调函数,这个回调函数可以对uniform(或者transformUniform)做一些数据改变，进而来控制相应的状态
           // 因此可以通过改变uniform实现大量的显示绘制
           //  let count:number = this.partGroup[i++];
           //  let offset:number = this.partGroup[i++];
           //  gl.drawElements(rc.TRIANGLES, count, this.ibufType, offset);
-          gl.drawElements(rc.TRIANGLES, this.partGroup[i++], this.ibufType, this.partGroup[i++]);
+          gl.drawElements(rd.gldm, this.partGroup[i++], rd.bufType, this.partGroup[i++]);
         }
 
         break;
 
-      case rdm.ELEMENTS_LINES:
-        for (; i < this.partTotal;) {
-          // 这里面可以增加一个回调函数,这个回调函数可以对uniform(或者transformUniform)做一些数据改变，进而来控制相应的状态
-          // 因此可以通过改变uniform实现大量的显示绘制
-          //  let count:number = this.partGroup[i++];
-          //  let offset:number = this.partGroup[i++];
-          //  gl.drawElements(rc.TRIANGLES, count, this.ibufType, offset);
-          gl.drawElements(rc.LINES, this.partGroup[i++], this.ibufType, this.partGroup[i++]);
-        }
-
-        break;
-
-      case rdm.ELEMENTS_TRIANGLE_STRIP:
-        //console.log("RPOUnit::run(), TRIANGLE_STRIP drawElements(ivsCount="+this.ivsCount+", ivsIndex="+this.ivsIndex+")");
-        //rc.RContext.drawElements(rc.TRIANGLE_STRIP, this.ivsCount, this.ibufType,this.ivsIndex * this.ibufStep);
-        gl.drawElements(rc.TRIANGLE_STRIP, this.ivsCount, this.ibufType, this.drawOffset);
-        break;
-
-      case rdm.ELEMENTS_INSTANCED_TRIANGLES:
+      case RenderConst_1.RenderDrawMode.ELEMENTS_INSTANCED_TRIANGLES:
+      case RenderConst_1.RenderDrawMode.ELEMENTS_INSTANCED_LINES:
+      case RenderConst_1.RenderDrawMode.ELEMENTS_INSTANCED_TRIANGLES_STRIP:
+      case RenderConst_1.RenderDrawMode.ELEMENTS_INSTANCED_LINES_STRIP:
         //console.log("RPOUnit::run(), drawElementsInstanced(ivsCount="+this.ivsCount+", ivsIndex="+this.ivsIndex+", insCount: "+this.insCount+")");
         //rc.RContext.drawElementsInstanced(rc.TRIANGLES,this.ivsCount, this.ibufType, this.ivsIndex * this.ibufStep, this.insCount);
-        gl.drawElementsInstanced(rc.TRIANGLES, this.ivsCount, this.ibufType, this.drawOffset, this.insCount);
+        gl.drawElementsInstanced(rd.gldm, ivsCount, rd.bufType, rd.ivsOffset, rd.insCount);
         break;
 
-      case rdm.ELEMENTS_TRIANGLE_FAN:
+      case RenderConst_1.RenderDrawMode.ELEMENTS_TRIANGLE_FAN:
         //console.log("RPOUnit::run(), TRIANGLE_STRIP drawElements(ivsCount="+this.ivsCount+", ivsIndex="+this.ivsIndex+")");
         //rc.RContext.drawElements(rc.TRIANGLE_FAN, this.ivsCount, this.ibufType,this.ivsIndex * this.ibufStep);
-        gl.drawElements(rc.TRIANGLE_FAN, this.ivsCount, this.ibufType, this.drawOffset);
+        gl.drawElements(rc.TRIANGLE_FAN, ivsCount, rd.bufType, rd.ivsOffset);
         break;
 
-      case rdm.ARRAYS_LINES:
+      case RenderConst_1.RenderDrawMode.ARRAYS_LINES:
         //console.log("RPOUnit::run(), drawArrays(ivsCount="+this.ivsCount+", ivsIndex="+this.ivsIndex+")");
-        gl.drawArrays(rc.LINES, this.ivsIndex, this.ivsCount);
+        gl.drawArrays(rc.LINES, rd.ivsIndex, ivsCount);
         break;
 
-      case rdm.ARRAYS_LINE_STRIP:
+      case RenderConst_1.RenderDrawMode.ARRAYS_LINE_STRIP:
         //console.log("RPOUnit::run(), drawArrays(ivsCount="+this.ivsCount+", ivsIndex="+this.ivsIndex+")");
-        gl.drawArrays(rc.LINE_STRIP, this.ivsIndex, this.ivsCount);
+        gl.drawArrays(rc.LINE_STRIP, rd.ivsIndex, ivsCount);
         break;
 
       default:
@@ -41735,44 +44695,48 @@ class RPOUnit {
 
   reset() {
     //  console.log("RPOUnit::reset(), uid: ",this.getUid());
-    this.indicesRes = null;
-    this.polygonOffset = null;
+    if (this.vdrInfo) {
+      this.indicesRes = null;
+      this.polygonOffset = null;
 
-    this.vro.__$detachThis();
+      this.vro.__$detachThis();
 
-    this.vro = null;
+      this.vro = null;
 
-    this.tro.__$detachThis();
+      this.tro.__$detachThis();
 
-    this.tro = null;
-    this.texMid = -1;
-    this.__$rprouid = -1;
-    this.ubo = null;
-    this.shdUid = -1;
-    this.vtxUid = -1;
-    this.uniform = null;
-    this.transUniform = null;
-    this.partGroup = null;
-    this.ivsIndex = 0;
-    this.ivsCount = 0;
-    this.insCount = 0;
-    this.partTotal = 0;
-    this.drawMode = 0;
-    this.drawFlag = 0x0;
-    this.renderState = 0;
-    this.rcolorMask = 0;
-    this.drawEnabled = true;
-    this.shader = null;
-    this.bounds = null;
-    this.pos = null;
+      this.tro = null;
+      this.texMid = -1;
+      this.__$rprouid = -1;
+      this.ubo = null;
+      this.shdUid = -1;
+      this.vtxUid = -1;
+      this.uniform = null;
+      this.transUniform = null;
+      this.partGroup = null;
+      this.partTotal = 0;
+      this.drawFlag = 0x0;
+      this.renderState = 0;
+      this.rcolorMask = 0;
+      this.drawing = true;
+      this.rendering = true;
+      this.shader = null;
+      this.bounds = null;
+      this.pos = null;
+
+      if (this.rdp) {
+        if (this.rdp.lifeTime > 0) this.rdp.clear();
+        this.rdp = null;
+      }
+
+      this.vdrInfo = null;
+      this.rgraph = null;
+      this.rentity = null;
+    }
   }
 
   destroy() {
     this.reset();
-  }
-
-  toString() {
-    return "[RPOUnit(uid = " + this.uid + ")]";
   }
 
 }
@@ -41817,15 +44781,25 @@ const RaySelectedNode_1 = __importDefault(__webpack_require__("c120"));
 
 const AABBCalc_1 = __webpack_require__("e160");
 
+class QueryUnit {
+  constructor() {
+    this.ets = null;
+    this.total = 0;
+  }
+
+  query(ets, total) {
+    this.ets = ets;
+    this.total = total;
+  }
+
+}
+
 class RaySelector {
   constructor() {
-    this.m_renderer = null;
-    this.m_camera = null;
-    this.m_headNode = null;
     this.m_rsn = null; // 最多检测256个对象
 
     this.m_hitList = new Uint8Array(256);
-    this.m_rsnList = null;
+    this.m_rsnList = new Array(256);
     this.m_selectedNode = null;
     this.m_selectedTotal = 0;
     this.m_testMode = 0;
@@ -41838,11 +44812,15 @@ class RaySelector {
     this.m_outv = new Vector3D_1.default();
     this.m_vecs = [null, null];
     this.m_gpuTestEnabled = false;
+    this.m_qu = new QueryUnit();
+    this.etset = null;
+
+    for (let i = 0; i < 256; ++i) {
+      this.m_rsnList[i] = new RaySelectedNode_1.default();
+    }
   }
 
-  setRenderer(renderer) {
-    this.m_renderer = renderer;
-  }
+  setRenderer(renderer) {}
 
   setRayTestMode(testMode) {
     this.m_testMode = testMode;
@@ -41858,34 +44836,11 @@ class RaySelector {
     out_rltv.copyFrom(this.m_rltv);
   }
 
-  setCamera(cam) {
-    this.m_camera = cam;
-  }
-
-  setCullingNodeHead(headNode) {
-    this.m_headNode = headNode;
-
-    if (this.m_rsnList == null) {
-      this.m_rsnList = [];
-      let i = 0;
-
-      for (; i < 256; ++i) {
-        this.m_rsnList.push(new RaySelectedNode_1.default());
-      }
-    }
-  } //  setSelectedNode(node:RaySelectedNode):void
-  //  {
-  //      this.m_selectedNode = node;
-  //  }
-
+  setCamera(cam) {}
 
   getSelectedNode() {
     return this.m_selectedNode;
-  } //  setSelectedNodes(nodes:RaySelectedNode[], total:number):void
-  //  {
-  //      //this.m_rsnList = nodes;
-  //  }
-
+  }
 
   getSelectedNodes() {
     return this.m_rsnList;
@@ -41929,74 +44884,71 @@ class RaySelector {
   }
 
   run() {
-    let nextNode = this.m_headNode; //console.log("RaySelect run() nextNode != null: "+(nextNode != null));
-
-    if (nextNode != null) {
+    if (this.etset.getTotal() > 0) {
       let dis = 0.0;
       let rtv = this.m_rltv;
       let rpv = this.m_rlpv;
       let outv = this.m_outv;
       let node = null;
-      let total = 0; //console.log("raySelector rpv,rtv: ", rpv, rtv);
+      let total = 0;
+      let minv = MathConst_1.default.MATH_MIN_POSITIVE;
+      let maxv = MathConst_1.default.MATH_MAX_POSITIVE;
 
-      if (Math.abs(rtv.x) > MathConst_1.default.MATH_MIN_POSITIVE) {
+      if (Math.abs(rtv.x) > minv) {
         this.m_rlinvtv.x = 1.0 / rtv.x;
       } else {
-        this.m_rlinvtv.x = MathConst_1.default.MATH_MAX_POSITIVE;
+        this.m_rlinvtv.x = maxv;
       }
 
-      if (Math.abs(rtv.y) > MathConst_1.default.MATH_MIN_POSITIVE) {
+      if (Math.abs(rtv.y) > minv) {
         this.m_rlinvtv.y = 1.0 / rtv.y;
       } else {
-        this.m_rlinvtv.y = MathConst_1.default.MATH_MAX_POSITIVE;
+        this.m_rlinvtv.y = maxv;
       }
 
-      if (Math.abs(rtv.z) > MathConst_1.default.MATH_MIN_POSITIVE) {
+      if (Math.abs(rtv.z) > minv) {
         this.m_rlinvtv.z = 1.0 / rtv.z;
       } else {
-        this.m_rlinvtv.z = MathConst_1.default.MATH_MAX_POSITIVE;
+        this.m_rlinvtv.z = maxv;
       }
 
-      if (this.m_rlinvtv.x < 0) this.m_rlsiv[0] = 1;else this.m_rlsiv[0] = 0;
-      if (this.m_rlinvtv.y < 0) this.m_rlsiv[1] = 1;else this.m_rlsiv[1] = 0;
-      if (this.m_rlinvtv.z < 0) this.m_rlsiv[2] = 1;else this.m_rlsiv[2] = 0;
+      let rivs = this.m_rlsiv;
+      let rtvs = this.m_rlinvtv;
+      rivs[0] = rtvs.x < 0 ? 1 : 0;
+      rivs[1] = rtvs.y < 0 ? 1 : 0;
+      rivs[2] = rtvs.z < 0 ? 1 : 0;
+      let qu = this.m_qu;
+      this.etset.query(qu);
+      let ets = qu.ets;
+      let tot = qu.total;
+      let vecs = this.m_vecs;
 
-      while (nextNode != null) {
-        if (nextNode.drawEnabled && nextNode.entity.mouseEnabled) {
-          //if(AABB.IntersectionRL2(rtv,rpv, nextNode.bounds, outv))
-          outv.subVecsTo(nextNode.bounds.center, rpv); // outv.x = nextNode.bounds.center.x - rpv.x;
-          // outv.y = nextNode.bounds.center.y - rpv.y;
-          // outv.z = nextNode.bounds.center.z - rpv.z;
+      for (let i = 0; i < tot; ++i) {
+        let et = ets[i];
 
+        if (et.mouseEnabled) {
+          const bounds = et.getGlobalBounds();
+          outv.subVecsTo(bounds.center, rpv);
           dis = outv.dot(rtv);
           outv.x -= dis * rtv.x;
           outv.y -= dis * rtv.y;
           outv.z -= dis * rtv.z;
 
-          if (outv.getLengthSquared() <= nextNode.bounds.radius2) {
+          if (outv.getLengthSquared() <= bounds.radius2) {
             // 如果只是几何检测(例如球体包围体的检测)就不需要在进入后续的aabb检测
-            if (nextNode.rayTestState < 1) {
-              this.m_vecs[0] = nextNode.bounds.min;
-              this.m_vecs[1] = nextNode.bounds.max;
+            vecs[0] = bounds.min;
+            vecs[1] = bounds.max;
 
-              if (AABBCalc_1.AABBCalc.IntersectionRL3(this.m_vecs, this.m_rlsiv, this.m_rlinvtv, rtv, rpv, outv)) {
-                node = this.m_rsnList[total];
-                node.entity = nextNode.entity;
-                node.dis = this.m_rlinvtv.w;
-                node.wpv.copyFrom(outv); //  console.log("H Hit Dis: "+rtv.dot(outv));
-                //console.log("Ray hit test a renderNode.");
+            if (AABBCalc_1.AABBCalc.IntersectionRL3(vecs, rivs, rtvs, rtv, rpv, outv)) {
+              node = this.m_rsnList[total];
+              node.entity = et;
+              node.dis = this.m_rlinvtv.w;
+              node.wpv.copyFrom(outv); //  console.log("H Hit Dis: "+rtv.dot(outv));
 
-                ++total;
-              }
-            } //  else
-            //  {
-            //      //其他检测方式
-            //  }
-
+              ++total;
+            }
           }
         }
-
-        nextNode = nextNode.next;
       }
 
       this.m_selectedNode = null;
@@ -42462,15 +45414,13 @@ class BitConst {
 
   static AddBit(target, bit) {
     return bit | target;
-  } //
-
+  }
 
   static AssembleFromIntArray(intArray) {
-    let i = 0;
     let bit = 0x0;
     let len = intArray.length;
 
-    for (; i < len; ++i) {
+    for (let i = 0; i < len; ++i) {
       if (intArray[i] > 0) {
         bit |= 1 << i;
       }
@@ -42545,6 +45495,8 @@ const VtxBufConst_2 = __webpack_require__("8a0a");
 const ROVertexBuffer_1 = __importDefault(__webpack_require__("e7d2"));
 
 const RenderConst_1 = __webpack_require__("e08e");
+
+const ROIvsData_1 = __importDefault(__webpack_require__("2048"));
 /**
  * mesh(Polygon face convex mesh or Parametric geometry Objecct:):
  *      1.基于面(例如三角面)描述的多面体实体(Polygon face geometry mesh,for example: triangle mesh)
@@ -42560,12 +45512,12 @@ class MeshBase {
     this.m_bufStatusList = null;
     this.m_bufTypeList = null;
     this.m_bufSizeList = null;
-    this.m_polyhedral = true; //private m_isDyn:boolean = false;
-    // very important!!!
+    this.m_polyhedral = true; // very important!!!
 
     this.m_layoutBit = 0x0;
     this.m_transMatrix = null;
     this.m_vbuf = null;
+    this.m_ivbuf = null;
     this.m_ivs = null;
     /**
      * 强制更新 vertex indices buffer 数据, 默认值为false
@@ -42577,6 +45529,11 @@ class MeshBase {
      */
 
     this.wireframe = false;
+    /**
+     * 是否启用形状模式数据, 默认值为true
+     */
+
+    this.shape = true;
     /**
      * vtx positons bounds AABB in the local space
      */
@@ -42590,12 +45547,12 @@ class MeshBase {
     this.drawMode = RenderConst_1.RenderDrawMode.ELEMENTS_TRIANGLES; //  vtx postion in data stream used count
 
     this.vtCount = 0;
-    this.vbWholeDataEnabled = true;
+    this.vbWholeDataEnabled = false;
     this.drawInsBeginIndex = 0;
     this.drawInsStride = 0;
     this.drawInsTotal = 0;
     this.m_attachCount = 0;
-    this.m_bufDataUsage = bufDataUsage; //this.m_isDyn = bufDataUsage == VtxBufConst.VTX_DYNAMIC_DRAW;
+    this.m_bufDataUsage = bufDataUsage;
   }
 
   isUVSEnabled() {
@@ -42652,41 +45609,11 @@ class MeshBase {
   }
 
   createIVSBYSize(size) {
-    return size > 65535 ? new Uint32Array(size) : new Uint16Array(size);
+    return size > 65536 ? new Uint32Array(size) : new Uint16Array(size);
   }
 
   createIVSByArray(arr) {
-    return arr.length > 65535 ? new Uint32Array(arr) : new Uint16Array(arr);
-  }
-
-  updateWireframeIvs() {
-    this.drawMode = RenderConst_1.RenderDrawMode.ELEMENTS_TRIANGLES;
-
-    if (this.wireframe && this.m_ivs !== null) {
-      let ivs = this.m_ivs;
-      let len = ivs.length * 2;
-      let wIvs;
-      if (len < 65535) wIvs = new Uint16Array(len);else wIvs = new Uint32Array(len);
-      let a;
-      let b;
-      let c;
-      let k = 0;
-
-      for (let i = 0, l = ivs.length; i < l; i += 3) {
-        a = ivs[i + 0];
-        b = ivs[i + 1];
-        c = ivs[i + 2];
-        wIvs[k] = a;
-        wIvs[k + 1] = b;
-        wIvs[k + 2] = b;
-        wIvs[k + 3] = c;
-        wIvs[k + 4] = c;
-        wIvs[k + 5] = a;
-        k += 6;
-      }
-
-      this.drawMode = RenderConst_1.RenderDrawMode.ELEMENTS_LINES;
-    }
+    return arr.length > 65536 ? new Uint32Array(arr) : new Uint16Array(arr);
   }
 
   buildEnd() {
@@ -42732,6 +45659,14 @@ class MeshBase {
     return -1;
   }
 
+  crateROIvsData() {
+    const ird = new ROIvsData_1.default(); // console.log(this, ", crateROIvsData, (), this.wireframe: ", this.wireframe);
+
+    ird.wireframe = this.wireframe;
+    ird.shape = this.shape;
+    return ird;
+  }
+
   rebuild() {
     if (this.m_vbuf == null) {
       if (this.m_bufDataList != null) {
@@ -42747,11 +45682,24 @@ class MeshBase {
         this.m_vbuf = ROVertexBuffer_1.default.CreateBySaveData(this.getBufDataUsage());
 
         if (this.m_ivs != null) {
-          this.m_vbuf.setUintIVSData(this.m_ivs);
+          let ird = this.crateROIvsData();
+          ird.setData(this.m_ivs);
+          this.m_vbuf.setIVSDataAt(ird);
           this.vtCount = this.m_ivs.length;
         }
       }
     }
+  }
+
+  __$attachIVBuf() {
+    return this.m_ivbuf;
+  }
+
+  __$detachIVBuf(ivbuf) {
+    if (this.m_vbuf != ivbuf) {
+      throw Error("Fatal Error!");
+    } // ROVertexBuffer.__$$DetachAt(this.m_vbuf.getUid());
+
   }
 
   __$attachVBuf() {
@@ -42779,6 +45727,18 @@ class MeshBase {
 
   getBufDataUsage() {
     return this.m_bufDataUsage;
+  }
+
+  getVSStride() {
+    return 3;
+  }
+
+  getUVSStride() {
+    return 2;
+  }
+
+  getNVSStride() {
+    return 3;
   }
   /**
    * @returns vertex position buffer Float32Array
@@ -42922,10 +45882,6 @@ class MeshBase {
       this.m_bufTypeList = null;
       this.m_bufSizeList = null;
     }
-  }
-
-  toString() {
-    return "[MeshBase()]";
   }
 
 }
@@ -43172,8 +46128,6 @@ const RTTTextureProxy_1 = __importDefault(__webpack_require__("cfaf"));
 const DepthTextureProxy_1 = __importDefault(__webpack_require__("acaa"));
 
 const WrapperTextureProxy_1 = __importDefault(__webpack_require__("85b6"));
-
-const RendererDevice_1 = __importDefault(__webpack_require__("3b73"));
 /**
  * 本类作为所有RTT纹理对象的管理类
  */
@@ -43181,17 +46135,21 @@ const RendererDevice_1 = __importDefault(__webpack_require__("3b73"));
 
 class RTTTextureStore {
   constructor(renderProxy) {
-    this.m_renderProxy = null; // reusable rtt texture resources for one renderer context
+    this.m_rp = null; // reusable rtt texture resources for one renderer context
 
-    this.m_rttTexs = [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null];
-    this.m_rttCubeTexs = [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null];
-    this.m_rttFloatTexs = [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null];
-    this.m_rttDepthTexs = [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null];
-    this.m_renderProxy = renderProxy;
+    this.m_rttTexs = new Array(16);
+    this.m_rttCubeTexs = new Array(16);
+    this.m_rttFloatTexs = new Array(16);
+    this.m_rttDepthTexs = new Array(16);
+    this.m_rp = renderProxy;
+    this.m_rttTexs.fill(null);
+    this.m_rttCubeTexs.fill(null);
+    this.m_rttFloatTexs.fill(null);
+    this.m_rttDepthTexs.fill(null);
   }
 
   getRenderProxy() {
-    return this.m_renderProxy;
+    return this.m_rp;
   }
 
   createWrapperTex(pw, ph, powerof2Boo = false) {
@@ -43209,157 +46167,87 @@ class RTTTextureStore {
     return tex;
   }
 
-  getCubeRTTTextureAt(i) {
+  getCubeRTTTextureAt(i, pw = 64, ph = 64) {
     if (this.m_rttCubeTexs[i] != null) {
-      this.m_rttCubeTexs[i].__$setRenderProxy(this.m_renderProxy);
+      this.m_rttCubeTexs[i].__$setRenderProxy(this.m_rp);
 
       return this.m_rttCubeTexs[i];
     }
 
-    this.m_rttCubeTexs[i] = this.createRTTTex2D(32, 32);
-    this.m_rttCubeTexs[i].toCubeTexture();
-    this.m_rttCubeTexs[i].name = "sys_cube_rttTex_" + i;
-    this.m_rttCubeTexs[i].minFilter = TextureConst_1.default.LINEAR;
-    this.m_rttCubeTexs[i].magFilter = TextureConst_1.default.LINEAR;
-
-    this.m_rttCubeTexs[i].__$setRenderProxy(this.m_renderProxy);
-
-    return this.m_rttCubeTexs[i];
-  }
-
-  createCubeRTTTextureAt(i, pw, ph) {
     pw = pw > 1 ? pw : 1;
     ph = ph > 1 ? ph : 1;
-
-    if (this.m_rttCubeTexs[i] != null) {
-      this.m_rttCubeTexs[i].__$setRenderProxy(this.m_renderProxy);
-
-      return this.m_rttCubeTexs[i];
-    }
-
     this.m_rttCubeTexs[i] = this.createRTTTex2D(pw, ph);
     this.m_rttCubeTexs[i].toCubeTexture();
     this.m_rttCubeTexs[i].name = "sys_cube_rttTex_" + i;
     this.m_rttCubeTexs[i].minFilter = TextureConst_1.default.LINEAR;
     this.m_rttCubeTexs[i].magFilter = TextureConst_1.default.LINEAR;
 
-    this.m_rttCubeTexs[i].__$setRenderProxy(this.m_renderProxy);
+    this.m_rttCubeTexs[i].__$setRenderProxy(this.m_rp);
 
     return this.m_rttCubeTexs[i];
   }
 
-  getRTTTextureAt(i) {
-    if (this.m_rttTexs[i] != null) {
-      this.m_rttTexs[i].__$setRenderProxy(this.m_renderProxy);
-
-      return this.m_rttTexs[i];
-    }
-
-    this.m_rttTexs[i] = this.createRTTTex2D(32, 32);
-    this.m_rttTexs[i].to2DTexture();
-    this.m_rttTexs[i].name = "sys_rttTex_" + i;
-    this.m_rttTexs[i].minFilter = TextureConst_1.default.LINEAR;
-    this.m_rttTexs[i].magFilter = TextureConst_1.default.LINEAR;
-
-    this.m_rttTexs[i].__$setRenderProxy(this.m_renderProxy);
-
-    return this.m_rttTexs[i];
+  createCubeRTTTextureAt(i, pw, ph) {
+    return this.getCubeRTTTextureAt(i, pw, ph);
   }
 
-  createRTTTextureAt(i, pw, ph) {
-    pw = pw > 1 ? pw : 1;
-    ph = ph > 1 ? ph : 1;
-
+  getRTTTextureAt(i, pw = 64, ph = 64) {
     if (this.m_rttTexs[i] != null) {
-      this.m_rttTexs[i].__$setRenderProxy(this.m_renderProxy);
+      this.m_rttTexs[i].__$setRenderProxy(this.m_rp);
 
       return this.m_rttTexs[i];
     }
 
+    pw = pw > 1 ? pw : 1;
+    ph = ph > 1 ? ph : 1;
     this.m_rttTexs[i] = this.createRTTTex2D(pw, ph);
     this.m_rttTexs[i].to2DTexture();
     this.m_rttTexs[i].name = "sys_rttTex_" + i;
     this.m_rttTexs[i].minFilter = TextureConst_1.default.LINEAR;
     this.m_rttTexs[i].magFilter = TextureConst_1.default.LINEAR;
 
-    this.m_rttTexs[i].__$setRenderProxy(this.m_renderProxy);
+    this.m_rttTexs[i].__$setRenderProxy(this.m_rp);
 
     return this.m_rttTexs[i];
   }
 
-  getDepthTextureAt(i) {
+  createRTTTextureAt(i, pw, ph) {
+    return this.getRTTTextureAt(i, pw, ph);
+  }
+
+  getDepthTextureAt(i, pw = 64, ph = 64) {
     if (this.m_rttDepthTexs[i] != null) {
-      this.m_rttDepthTexs[i].__$setRenderProxy(this.m_renderProxy);
+      this.m_rttDepthTexs[i].__$setRenderProxy(this.m_rp);
 
       return this.m_rttDepthTexs[i];
     }
 
-    this.m_rttDepthTexs[i] = this.createDepthTex2D(64, 64);
+    pw = pw > 1 ? pw : 1;
+    ph = ph > 1 ? ph : 1;
+    this.m_rttDepthTexs[i] = this.createDepthTex2D(pw, ph);
     this.m_rttDepthTexs[i].to2DTexture();
     this.m_rttDepthTexs[i].name = "sys_depthTex_" + i;
     this.m_rttDepthTexs[i].minFilter = TextureConst_1.default.NEAREST;
     this.m_rttDepthTexs[i].magFilter = TextureConst_1.default.NEAREST;
 
-    this.m_rttDepthTexs[i].__$setRenderProxy(this.m_renderProxy);
+    this.m_rttDepthTexs[i].__$setRenderProxy(this.m_rp);
 
     return this.m_rttDepthTexs[i];
   }
 
   createDepthTextureAt(i, pw, ph) {
-    pw = pw > 1 ? pw : 1;
-    ph = ph > 1 ? ph : 1;
-
-    if (this.m_rttDepthTexs[i] != null) {
-      this.m_rttDepthTexs[i].__$setRenderProxy(this.m_renderProxy);
-
-      return this.m_rttDepthTexs[i];
-    }
-
-    this.m_rttDepthTexs[i] = this.createDepthTex2D(pw, ph);
-    this.m_rttDepthTexs[i].to2DTexture();
-    this.m_rttDepthTexs[i].name = "sys_depthTex_" + i;
-
-    this.m_rttDepthTexs[i].__$setRenderProxy(this.m_renderProxy);
-
-    return this.m_rttDepthTexs[i];
+    return this.getDepthTextureAt(i, pw, ph);
   }
 
-  getRTTFloatTextureAt(i) {
+  getRTTFloatTextureAt(i, pw = 64, ph = 64) {
     if (this.m_rttFloatTexs[i] != null) {
-      this.m_rttFloatTexs[i].__$setRenderProxy(this.m_renderProxy);
+      this.m_rttFloatTexs[i].__$setRenderProxy(this.m_rp);
 
       return this.m_rttFloatTexs[i];
     }
 
-    let tex = this.createRTTTex2D(64, 64);
-    tex.to2DTexture();
-    this.m_rttFloatTexs[i] = tex;
-    this.m_rttFloatTexs[i].name = "sys_rttFloatTex_" + i;
-    tex.internalFormat = TextureFormat_1.default.RGBA16F;
-    tex.srcFormat = TextureFormat_1.default.RGBA;
-    tex.dataType = TextureDataType_1.default.FLOAT;
-    tex.minFilter = TextureConst_1.default.NEAREST;
-    tex.magFilter = TextureConst_1.default.NEAREST;
-
-    if (RendererDevice_1.default.IsWebGL1()) {
-      tex.dataType = TextureDataType_1.default.HALF_FLOAT_OES;
-    }
-
-    this.m_rttFloatTexs[i].__$setRenderProxy(this.m_renderProxy);
-
-    return tex;
-  }
-
-  createRTTFloatTextureAt(i, pw, ph) {
     pw = pw > 1 ? pw : 1;
     ph = ph > 1 ? ph : 1;
-
-    if (this.m_rttFloatTexs[i] != null) {
-      this.m_rttFloatTexs[i].__$setRenderProxy(this.m_renderProxy);
-
-      return this.m_rttFloatTexs[i];
-    }
-
     let tex = this.createRTTTex2D(pw, ph);
     tex.to2DTexture();
     this.m_rttFloatTexs[i] = tex;
@@ -43370,13 +46258,17 @@ class RTTTextureStore {
     tex.minFilter = TextureConst_1.default.NEAREST;
     tex.magFilter = TextureConst_1.default.NEAREST;
 
-    if (RendererDevice_1.default.IsWebGL1()) {
+    if (this.m_rp.isWebGL1()) {
       tex.dataType = TextureDataType_1.default.HALF_FLOAT_OES;
     }
 
-    this.m_rttFloatTexs[i].__$setRenderProxy(this.m_renderProxy);
+    this.m_rttFloatTexs[i].__$setRenderProxy(this.m_rp);
 
     return tex;
+  }
+
+  createRTTFloatTextureAt(i, pw, ph) {
+    return this.getRTTFloatTextureAt(i, pw, ph);
   }
 
 }
@@ -43509,6 +46401,18 @@ class RTTTextureProxy extends TextureProxy_1.default {
     this.magFilter = TextureConst_1.default.NEAREST;
   }
 
+  toRedFormat() {
+    this.srcFormat = TextureFormat_1.default.RED;
+
+    if (this.dataType == TextureDataType_1.default.FLOAT) {
+      this.internalFormat = TextureFormat_1.default.R16F; // this.internalFormat = TextureFormat.R32F;
+    } else {
+      this.internalFormat = TextureFormat_1.default.RED;
+    } // this.srcFormat = TextureFormat.RED;
+    // this.internalFormat = TextureFormat.R16F;
+
+  }
+
   to2DTexture() {
     this.m_texTarget = TextureTarget_1.default.TEXTURE_2D;
   }
@@ -43587,13 +46491,51 @@ class RTTTextureProxy extends TextureProxy_1.default {
     }
   }
 
-  toString() {
-    return "[RTTTextureProxy(name:" + this.name + ",uid=" + this.getUid() + ",width=" + this.getWidth() + ",height=" + this.getHeight() + ")]";
+}
+
+exports.default = RTTTextureProxy;
+
+/***/ }),
+
+/***/ "d08b":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+/***************************************************************************/
+
+/*                                                                         */
+
+/*  Copyright 2018-2022 by                                                 */
+
+/*  Vily(vily313@126.com)                                                  */
+
+/*                                                                         */
+
+/***************************************************************************/
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+class VtxBufRenderData {
+  constructor() {}
+
+  getBufSortFormat() {
+    return 0x7;
+  }
+
+  getBufTypeList() {
+    return [1, 2, 3];
+  }
+
+  getBufSizeList() {
+    return [3, 2, 3];
   }
 
 }
 
-exports.default = RTTTextureProxy;
+exports.VtxBufRenderData = VtxBufRenderData;
 
 /***/ }),
 
@@ -44055,6 +46997,7 @@ class ShaderUniformV2 extends ShaderUniform {
     //     let arr = this.dataList[0].slice(0);
     //     console.log("ggg arr: ",arr);
     // }
+    // console.log("ShaderUniformV2::use()..");
     let i = 0;
 
     for (; i < this.uniformSize; ++i) {
@@ -44128,6 +47071,7 @@ class ShaderMat4Uniform extends ShaderUniform {
   }
 
   use(rc) {
+    // console.log("use() uns: ", this.uns);
     rc.useUniformMat4(this.locations[0], this.dataList[0]);
   }
 
@@ -44136,6 +47080,7 @@ class ShaderMat4Uniform extends ShaderUniform {
   }
 
   useByShd(rc, shd) {
+    // console.log("useByShd() uns: ", this.uns, "uname: ", this.uniformNameList[0]);
     rc.useUniformMat4(shd.getUniformLocationByNS(this.uniformNameList[0]), this.dataList[0]);
   }
 
@@ -44171,21 +47116,12 @@ exports.default = ShaderUniform;
 
 /***************************************************************************/
 
-var __importDefault = this && this.__importDefault || function (mod) {
-  return mod && mod.__esModule ? mod : {
-    "default": mod
-  };
-};
-
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-
-const Vector3D_1 = __importDefault(__webpack_require__("8e17"));
 /**
  * 在 renderer process 中 通过和摄像机之间的距离, 对可渲染对象渲染先后顺序的排序
  */
-
 
 class CameraDsistanceSorter {
   constructor(rc) {
@@ -44194,13 +47130,13 @@ class CameraDsistanceSorter {
   }
 
   sortRODisplay(nodes, nodesTotal) {
-    let camPos = this.m_rc.getCamera().getPosition();
-
-    for (let i = 0; i < nodesTotal; ++i) {
-      nodes[i].value = -Vector3D_1.default.DistanceSquared(nodes[i].bounds.center, camPos); //nodes[i].value = nodes[i].pos.y;
-    }
-
-    return 0;
+    // let camPos = this.m_rc.getCamera().getPosition();
+    // for (let i = 0; i < nodesTotal; ++i) {
+    //     nodes[i].value = -Vector3D.DistanceSquared(nodes[i].bounds.center, camPos);
+    //     // nodes[i].value = nodes[i].pos.y;
+    // }
+    // return 0;// sort
+    return 1; // disable sort
   }
 
 }
@@ -44393,6 +47329,7 @@ class RendererInstance {
     this.m_roVtxBuilder = null;
     this.m_stage3D = null;
     this.m_fixProcess = null;
+    this.textureBlock = null;
     this.m_uid = RendererInstance.s_uid++;
     this.m_renderInsContext = new RendererInstanceContext_1.RendererInstanceContext(this.m_uid);
   }
@@ -44463,6 +47400,11 @@ class RendererInstance {
   createCamera() {
     return null;
   }
+  /**
+   * @param camera IRenderCamera instance
+   * @param syncCamView the default value is false
+   */
+
 
   useCamera(camera, syncCamView = false) {}
 
@@ -44492,7 +47434,8 @@ class RendererInstance {
       contextParam.shaderProgramBuilder = shdProgramBuider;
       this.m_renderInsContext.initialize(param, camera, contextParam);
       this.m_adapter = this.m_renderProxy.getRenderAdapter();
-      this.m_dataBuilder.initialize(this.m_renderProxy, this.m_rpoUnitBuilder, this.m_processBuider, this.m_roVtxBuilder);
+      this.m_dataBuilder.initialize(this.m_renderProxy, this.m_rpoUnitBuilder, this.m_processBuider, this.m_roVtxBuilder); // (this.m_renderProxy as any).rshader = this.m_dataBuilder.getRenderShader();
+
       this.m_renderInsContext.initManager(this.m_dataBuilder);
       this.m_entity3DMana = new DispEntity3DManager_1.default(this.m_uid, this.m_dataBuilder, this.m_rpoUnitBuilder, this.m_processBuider);
       this.m_fixProcess = this.createSeparatedProcess();
@@ -44534,16 +47477,32 @@ class RendererInstance {
   setEntityManaListener(listener) {
     this.m_entity3DMana.setListener(listener);
   }
+
+  addContainer(container, processIndex = 0) {
+    if (container) {
+      if (processIndex > -1 && processIndex < this.m_processesLen) {
+        this.m_entity3DMana.addContainer(container, this.m_processes[processIndex].getUid());
+      }
+    }
+  }
+
+  removeContainer(container, processIndex = 0) {
+    if (container) {
+      if (processIndex > -1 && processIndex < this.m_processesLen) {
+        this.m_entity3DMana.removeContainer(container, this.m_processes[processIndex].getUid());
+      }
+    }
+  }
   /**
    * add an entity to the renderer process of the renderer instance
    * @param entity IRenderEntity instance(for example: DisplayEntity class instance)
-   * @param processIndex this destination renderer process index of the m_processes array.
-   * @param deferred if the value is true,the entity will not to be immediately add to the renderer process by its id
+   * @param processIndex this destination renderer process index of the m_processes array, the defaule value is 0
+   * @param deferred if the value is true,the entity will not to be immediately add to the renderer process by its id, the defaule value is true
    */
 
 
   addEntity(entity, processIndex = 0, deferred = true) {
-    if (entity != null) {
+    if (entity) {
       if (entity.__$testRendererEnabled()) {
         if (processIndex > -1 && processIndex < this.m_processesLen) {
           this.m_entity3DMana.addEntity(entity, this.m_processes[processIndex].getUid(), deferred);
@@ -44553,7 +47512,7 @@ class RendererInstance {
   }
 
   addEntityToProcess(entity, process, deferred = true) {
-    if (process != null && entity != null) {
+    if (process && entity) {
       if (entity.__$testRendererEnabled()) {
         if (process.getRCUid() == this.m_uid) {
           this.m_entity3DMana.addEntity(entity, process.getUid(), deferred);
@@ -44568,7 +47527,7 @@ class RendererInstance {
 
 
   moveEntityToProcessAt(entity, dstProcessIndex) {
-    if (entity != null && entity.getRendererUid() == this.m_uid) {
+    if (entity && entity.getRendererUid() == this.m_uid) {
       if (entity.isInRendererProcess()) {
         if (dstProcessIndex > -1 && dstProcessIndex < this.m_processesLen) {
           let srcUid = entity.getDisplay().__$$runit.getRPROUid();
@@ -44587,7 +47546,7 @@ class RendererInstance {
   }
 
   moveEntityToProcess(entity, dstProcess) {
-    if (dstProcess != null && entity != null && entity.getRendererUid() == this.m_uid) {
+    if (dstProcess && entity && entity.getRendererUid() == this.m_uid) {
       if (entity.isInRendererProcess()) {
         let srcUid = entity.getDisplay().__$$runit.getRPROUid();
 
@@ -44609,7 +47568,7 @@ class RendererInstance {
 
 
   removeEntity(entity) {
-    if (entity != null && entity.getRendererUid() == this.m_uid) {
+    if (entity && entity.getRendererUid() == this.m_uid) {
       this.m_entity3DMana.removeEntity(entity);
 
       entity.__$setRenderProxy(null);
@@ -44623,8 +47582,8 @@ class RendererInstance {
 
 
   removeEntityFromProcess(entity, process) {
-    if (process != null && process.getRCUid() == this.m_uid) {
-      if (entity != null && entity.getRendererUid() == this.m_uid) {
+    if (process && process.getRCUid() == this.m_uid) {
+      if (entity && entity.getRendererUid() == this.m_uid) {
         process.removeDisp(entity.getDisplay());
 
         entity.__$setRenderProxy(null);
@@ -44640,7 +47599,7 @@ class RendererInstance {
 
   removeEntityByProcessIndex(entity, processIndex) {
     if (processIndex >= 0 && processIndex < this.m_processesLen) {
-      if (entity != null && entity.getRendererUid() == this.m_uid) {
+      if (entity && entity.getRendererUid() == this.m_uid) {
         this.m_processes[processIndex].removeDisp(entity.getDisplay());
 
         entity.__$setRenderProxy(null);
@@ -44655,9 +47614,8 @@ class RendererInstance {
   }
 
   setProcessSortEnabled(process, sortEnabled) {
-    if (process != null && process.getRCUid() == this.m_uid) {
-      let p = process;
-      p.setSortEnabled(sortEnabled);
+    if (process && process.getRCUid() == this.m_uid) {
+      process.setSortEnabled(sortEnabled);
     }
   }
   /**
@@ -44706,6 +47664,12 @@ class RendererInstance {
     }
   }
 
+  setProcessEnabledAt(i, enabled) {
+    if (i > -1 && i < this.m_processesLen) {
+      this.m_processes[i].setEnabled(enabled);
+    }
+  }
+
   getProcessAt(index) {
     if (index > -1 && index < this.m_processesLen) {
       return this.m_processes[index];
@@ -44728,25 +47692,12 @@ class RendererInstance {
     this.m_dataBuilder.getRenderShader().useUniformToCurrentShd(material.__$uniform);
   }
   /**
-   * Deprecated(废弃, 不推荐使用)
-   * 绘制已经完全加入渲染器了渲染资源已经准备完毕的entity
-   * 要锁定Material才能用这种绘制方式,再者这个,这种方式比较耗性能，只能用在特殊的地方
-   */
-
-
-  drawEntityByLockMaterial(entity, useGlobalUniform = false, forceUpdateUniform = true) {
-    if (entity != null && entity.getVisible() && entity.getRendererUid() == this.m_uid && !this.m_renderProxy.isContextLost()) {
-      this.m_fixProcess.drawLockMaterialByDisp(entity.getDisplay(), useGlobalUniform, forceUpdateUniform);
-    }
-  }
-  /**
    * 在任意阶段绘制一个指定的 entity,只要其资源数据准备完整
    */
 
 
   drawEntity(entity, useGlobalUniform = false, forceUpdateUniform = true) {
     if (entity != null && entity.getVisible() && !this.m_renderProxy.isContextLost()) {
-      // console.log("***8** rendewrer ins drawEntity(), entity: ",entity, entity.getRendererUid() == this.m_uid);
       if (entity.getRendererUid() == this.m_uid) {
         this.m_fixProcess.drawDisp(entity.getDisplay(), useGlobalUniform, forceUpdateUniform);
       } else if (entity.__$testRendererEnabled()) {
@@ -44806,9 +47757,11 @@ class RendererInstance {
     this.m_renderProxy.flush();
   }
 
-  toString() {
-    return "[RendererInstance(uid = " + this.m_uid + ")]";
-  }
+  prependRenderNode(node) {}
+
+  appendRenderNode(node) {}
+
+  removeRenderNode(node) {}
 
 }
 
@@ -45351,10 +48304,12 @@ const RendererState_1 = __importDefault(__webpack_require__("29ef"));
 class RODisplay {
   constructor() {
     this.m_uid = 0;
+    this.m_partGroup = null;
+    this.m_trans = null;
     this.m_material = null; // 只是持有引用不做任何管理操作
 
     this.m_matFS32 = null;
-    this.name = "RODisplay"; // render yes or no
+    this.uuid = ""; // render yes or no
 
     this.visible = true;
     this.ivsIndex = 0;
@@ -45363,15 +48318,15 @@ class RODisplay {
     this.trisNumber = 0;
     this.insCount = 0;
     this.drawMode = RenderConst_1.RenderDrawMode.ELEMENTS_TRIANGLES;
-    this.vbuf = null; // record render state: shadowMode(one byte) + depthTestMode(one byte) + blendMode(one byte) + cullFaceMode(one byte)
+    this.vbuf = null;
+    this.ivbuf = null;
+    this.rendering = true; // record render state: shadowMode(one byte) + depthTestMode(one byte) + blendMode(one byte) + cullFaceMode(one byte)
     // its value come from: RendererState.CreateRenderState("default", CullFaceMode.BACK,RenderBlendMode.NORMAL,DepthTestMode.OPAQUE);
 
     this.renderState = RendererState_1.default.NORMAL_STATE;
     this.rcolorMask = RendererState_1.default.COLOR_MASK_ALL_TRUE; // mouse interaction enabled flag
 
-    this.mouseEnabled = false;
-    this.m_partGroup = null;
-    this.m_trans = null; // 只能由渲染系统内部调用
+    this.mouseEnabled = false; // 只能由渲染系统内部调用
 
     this.__$ruid = -1; // 用于关联IRPODisplay对象
 
@@ -45380,6 +48335,27 @@ class RODisplay {
     this.__$$rsign = RenderConst_1.DisplayRenderSign.NOT_IN_RENDERER;
     this.__$$runit = null;
     this.m_uid = RODisplay.s_uid++;
+  }
+
+  getVtxResUid() {
+    let v = 131 + this.vbuf.getUid();
+
+    if (this.ivbuf == null) {
+      return v;
+    }
+
+    console.log("RODisplay::getVtxResUid() apply this.ivbuf now.....");
+    return v * 131 + this.ivbuf.getUid();
+  }
+
+  getVtxResVer() {
+    let v = 131 + this.vbuf.version;
+
+    if (this.ivbuf == null) {
+      return v;
+    }
+
+    return v = v * 131 + this.ivbuf.version;
   } // draw parts group: [ivsCount0,ivsIndex0, ivsCount1,ivsIndex1, ivsCount2,ivsIndex2, ...]
 
 
@@ -45454,7 +48430,7 @@ class RODisplay {
   }
 
   toString() {
-    return "RODisplay(name=" + this.name + ",uid=" + this.getUid() + ", __$ruid=" + this.__$ruid + ")";
+    return "RODisplay(uuid=" + this.uuid + ",uid=" + this.getUid() + ", __$ruid=" + this.__$ruid + ")";
   }
 
   destroy() {
@@ -45476,6 +48452,7 @@ class RODisplay {
     this.ivsCount = 0;
     this.m_partGroup = null;
     this.__$$runit = null;
+    this.rendering = true;
   }
 
   static GetFreeId() {
@@ -45566,7 +48543,7 @@ const RenderFilter_1 = __importDefault(__webpack_require__("722e"));
 
 const RenderMaskBitfield_1 = __importDefault(__webpack_require__("8333"));
 
-const RODrawState_1 = __webpack_require__("7c63");
+const RODrawState_1 = __webpack_require__("e7f2");
 
 const RenderColorMask_1 = __webpack_require__("070b");
 
@@ -45588,7 +48565,7 @@ const RSTBuilder_1 = __importDefault(__webpack_require__("e035"));
 
 const RendererState_1 = __importDefault(__webpack_require__("29ef"));
 
-const Stencil_1 = __webpack_require__("8171");
+const RenderingStencil_1 = __webpack_require__("a4f8");
 
 const VROBase_1 = __importDefault(__webpack_require__("919c"));
 
@@ -45645,6 +48622,9 @@ class RenderProxy {
     this.stencil = null;
     this.renderingState = null;
     this.colorMask = null;
+    this.rshader = null;
+    this.rdataBuilder = null;
+    this.status = new RPStatus_1.RPStatus();
     this.m_uid = 0;
     this.m_camUBO = null;
     this.m_adapter = null;
@@ -45662,9 +48642,12 @@ class RenderProxy {
     this.m_camSwitched = false; // 是否舞台尺寸和view自动同步一致
 
     this.m_autoSynViewAndStage = true;
-    this.status = new RPStatus_1.RPStatus();
     this.m_initMainCamera = true;
     this.m_uid = rcuid;
+  }
+
+  applyStencil(st) {
+    st.apply(this.RDrawState);
   }
   /**
    * @returns return system gpu context
@@ -45762,7 +48745,7 @@ class RenderProxy {
   }
 
   drawInstanced(count, offset, instanceCount) {
-    if (this.m_WEBGL_VER == 2) {
+    if (this.isWebGL2()) {
       this.m_rc.drawElementsInstanced(this.TRIANGLES, count, this.UNSIGNED_SHORT, offset, instanceCount);
     } else {
       RCExtension_1.default.ANGLE_instanced_arrays.drawElementsInstancedANGLE(this.TRIANGLES, count, offset, instanceCount);
@@ -45861,7 +48844,7 @@ class RenderProxy {
     this.m_viewPortRect.setTo(px, py, pw, ph);
     let stage = this.m_adapterContext.getStage();
 
-    if (stage != null) {
+    if (stage) {
       stage.setViewPort(pw, py, pw, ph);
       this.updateCameraView();
     }
@@ -45923,6 +48906,14 @@ class RenderProxy {
     return this.m_WEBGL_VER;
   }
 
+  isWebGL2() {
+    return this.m_WEBGL_VER == 2;
+  }
+
+  isWebGL1() {
+    return this.m_WEBGL_VER == 1;
+  }
+
   buildCameraParam() {
     let camera = this.m_camera;
 
@@ -45959,7 +48950,7 @@ class RenderProxy {
       this.resizeCallback();
     });
     this.m_adapterContext.setWebGLMaxVersion(this.m_maxWebGLVersion);
-    this.m_adapterContext.initialize(this.m_uid, stage, param.getDiv(), param.getRenderContextAttri());
+    this.m_adapterContext.initialize(this.m_uid, stage, param);
     this.m_WEBGL_VER = this.m_adapterContext.getWebGLVersion();
     this.m_rc = this.m_adapterContext.getRC();
     let selfT = this;
@@ -45973,13 +48964,12 @@ class RenderProxy {
     selfT.VtxBufUpdater = proxyParam.vtxBufUpdater;
     selfT.uniformContext = proxyParam.uniformContext;
     let rstate = new RODrawState_1.RODrawState();
-    rstate.setRenderContext(this.m_adapterContext); // RendererState.Initialize(rstate, new VROBase());
-
+    rstate.setRenderContext(this.m_adapterContext);
     let obj = RendererState_1.default;
     new RSTBuilder_1.default().initialize(obj, rstate, new VROBase_1.default());
-    selfT.RState = rstate;
+    selfT.RDrawState = rstate;
     selfT.RContext = this.m_rc;
-    selfT.stencil = new Stencil_1.Stencil(rstate);
+    selfT.stencil = new RenderingStencil_1.RenderingStencil(rstate);
     selfT.renderingState = new RenderingState_1.RenderingState(RendererState_1.default);
     selfT.colorMask = new RenderingColorMask_1.RenderingColorMask(RendererState_1.default);
     this.buildCameraParam();
@@ -46046,10 +49036,12 @@ class RenderProxy {
     cvs[0] = pr;
     cvs[1] = pg;
     cvs[2] = pb;
+    this.adapter.syncHtmlBodyColor();
   }
 
   setClearColor(color) {
-    color.toArray(this.m_adapter.bgColor);
+    color.toArray4(this.m_adapter.bgColor);
+    this.adapter.syncHtmlBodyColor();
   }
   /**
    * @param colorUint24 uint24 number rgb color value, example: 0xff0000, it is red rolor
@@ -46063,6 +49055,7 @@ class RenderProxy {
     cvs[1] = (colorUint24 >> 8 & 0x0000ff) / 255.0;
     cvs[2] = (colorUint24 & 0x0000ff) / 255.0;
     cvs[3] = alpha;
+    this.adapter.syncHtmlBodyColor();
   }
 
   setClearRGBAColor4f(pr, pg, pb, pa) {
@@ -46071,10 +49064,11 @@ class RenderProxy {
     cvs[1] = pg;
     cvs[2] = pb;
     cvs[3] = pa;
+    this.adapter.syncHtmlBodyColor();
   }
 
   getClearRGBAColor4f(color4) {
-    color4.fromArray(this.m_adapter.bgColor);
+    color4.fromArray4(this.m_adapter.bgColor);
   }
 
   getViewportWidth() {
@@ -46777,7 +49771,7 @@ class RPONodeLinker {
       while (nextNode != null) {
         vtxStr += nextNode.vtxUid + ",";
         texStr += nextNode.texMid + ",";
-        ivsCountStr += nextNode.ivsCount + ",";
+        ivsCountStr += nextNode.unit.indicesRes.rdp.rd.ivsSize + ",";
         nextNode = nextNode.next;
       }
 
@@ -47041,10 +50035,6 @@ exports.default = RSTBuilder;
 
 "use strict";
 
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
 /***************************************************************************/
 
 /*                                                                         */
@@ -47057,18 +50047,23 @@ Object.defineProperty(exports, "__esModule", {
 
 /***************************************************************************/
 
-class RenderDrawMode {}
+var __importDefault = this && this.__importDefault || function (mod) {
+  return mod && mod.__esModule ? mod : {
+    "default": mod
+  };
+};
 
-RenderDrawMode.ELEMENTS_TRIANGLES = 1;
-RenderDrawMode.ELEMENTS_TRIANGLE_STRIP = 2;
-RenderDrawMode.ELEMENTS_TRIANGLE_FAN = 3;
-RenderDrawMode.ELEMENTS_INSTANCED_TRIANGLES = 4;
-RenderDrawMode.ARRAYS_LINES = 5;
-RenderDrawMode.ARRAYS_LINE_STRIP = 6;
-RenderDrawMode.ARRAYS_POINTS = 7;
-RenderDrawMode.ELEMENTS_LINES = 8;
-RenderDrawMode.DISABLE = 0;
-exports.RenderDrawMode = RenderDrawMode; // blend mode
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const RenderDrawMode_1 = __importDefault(__webpack_require__("13b1"));
+
+exports.RenderDrawMode = RenderDrawMode_1.default;
+
+const DisplayRenderSign_1 = __webpack_require__("72bb");
+
+exports.DisplayRenderSign = DisplayRenderSign_1.DisplayRenderSign;
 
 class RenderBlendMode {}
 
@@ -47196,16 +50191,6 @@ DepthTestMode.TRUE_GREATER = 14; //glDepthMask(true); glDepthFunc(GL_GEQUAL);
 DepthTestMode.TRUE_GEQUAL = 15;
 DepthTestMode.DISABLE = 0;
 exports.DepthTestMode = DepthTestMode;
-var DisplayRenderSign;
-
-(function (DisplayRenderSign) {
-  // 还没有加入 renderer
-  DisplayRenderSign[DisplayRenderSign["NOT_IN_RENDERER"] = -1] = "NOT_IN_RENDERER"; // 正在进入 renderer
-
-  DisplayRenderSign[DisplayRenderSign["GO_TO_RENDERER"] = 1] = "GO_TO_RENDERER"; // 真正存在于 renderer, 也就是直接可以在 process 中使用了
-
-  DisplayRenderSign[DisplayRenderSign["LIVE_IN_RENDERER"] = 2] = "LIVE_IN_RENDERER";
-})(DisplayRenderSign = exports.DisplayRenderSign || (exports.DisplayRenderSign = {}));
 
 /***/ }),
 
@@ -47997,9 +50982,8 @@ class AABB2D {
   }
 
   flipY(height) {
-    this.y = height = this.y;
-    this.m_right = this.width + this.x;
-    this.m_top = this.height + this.y;
+    this.y = height - this.y;
+    this.update();
   }
 
   getX() {
@@ -48021,6 +51005,84 @@ class AABB2D {
 }
 
 exports.default = AABB2D;
+
+/***/ }),
+
+/***/ "e39a":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+/***************************************************************************/
+
+/*                                                                         */
+
+/*  Copyright 2019-2022 by                                                 */
+
+/*  Vily(vily313@126.com)                                                  */
+
+/*                                                                         */
+
+/***************************************************************************/
+
+var __importDefault = this && this.__importDefault || function (mod) {
+  return mod && mod.__esModule ? mod : {
+    "default": mod
+  };
+};
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const RPOUnit_1 = __importDefault(__webpack_require__("c62b"));
+
+const PassProcess_1 = __importDefault(__webpack_require__("34cd"));
+
+const ContainerFlowRenderer_1 = __importDefault(__webpack_require__("7f1c"));
+
+class RPOUnitCont extends RPOUnit_1.default {
+  constructor() {
+    super();
+    this.m_passProc = new PassProcess_1.default();
+    this.m_cr = new ContainerFlowRenderer_1.default();
+  }
+
+  resetCR() {
+    const cr = this.m_cr;
+    cr.passProc = this.m_passProc;
+    cr.shdUpdate = false;
+    cr.shader = this.shader;
+  }
+
+  run(rc) {
+    const c = this.rentity;
+
+    if (c && c.isVisible()) {
+      this.resetCR();
+      this.m_cr.runContainer(rc, c);
+    }
+  }
+
+  runLockMaterial2(puniform) {
+    const c = this.rentity;
+
+    if (c && c.isVisible()) {
+      this.resetCR();
+      this.m_cr.runContainerLock(this.shader.getRC(), c);
+    }
+  }
+
+  reset() {
+    this.shader = null;
+    this.rentity = null;
+    this.bounds = null;
+    this.pos = null;
+  }
+
+}
+
+exports.default = RPOUnitCont;
 
 /***/ }),
 
@@ -48235,26 +51297,14 @@ const VtxCombinedBuf_1 = __importDefault(__webpack_require__("f0f0"));
 
 const VtxSeparatedBuf_1 = __importDefault(__webpack_require__("7a04"));
 
-const RenderConst_1 = __webpack_require__("e08e");
+const ROIVertexBuffer_1 = __importDefault(__webpack_require__("febe"));
 
-class ROVertexBuffer {
+class ROVertexBuffer extends ROIVertexBuffer_1.default {
   constructor(bufDataUsage = VtxBufConst_1.default.VTX_STATIC_DRAW) {
-    this.m_uid = 0;
+    super(bufDataUsage);
     this.m_vtxBuf = null;
-    this.m_ivs = null;
-    this.m_bufDataUsage = 0;
-    this.m_ibufStep = 2; // 2 or 4
-
     this.m_bufTypeList = null;
     this.m_bufSizeList = null;
-    this.layoutBit = 0x0;
-    this.vertexVer = 0;
-    this.indicesVer = 0;
-    this.version = 0;
-    this.drawMode = RenderConst_1.RenderDrawMode.ELEMENTS_TRIANGLES;
-    this.bufData = null;
-    this.m_uid = ROVertexBuffer.s_uid++;
-    this.m_bufDataUsage = bufDataUsage;
   }
 
   setVtxBuf(vtxBuf) {
@@ -48295,8 +51345,8 @@ class ROVertexBuffer {
     return this.m_bufSizeList;
   }
 
-  getIBufStep() {
-    return this.m_ibufStep;
+  getIvsUnitBytes() {
+    return this.m_ivsUnitBytes;
   }
 
   getBufDataUsage() {
@@ -48311,56 +51361,46 @@ class ROVertexBuffer {
     return this.m_vtxBuf.getAttribsTotal();
   }
 
+  getF32DataVerAt(index) {
+    return this.m_vtxBuf.getF32DataVerAt(index);
+  }
+
+  setF32DataVerAt(index, ver) {
+    this.m_vtxBuf.setF32DataVerAt(index, ver);
+  }
+
+  updateF32DataVerAt(index) {
+    let ver = this.m_vtxBuf.getF32DataVerAt(index) + 1;
+    this.m_vtxBuf.setF32DataVerAt(index, ver);
+    this.vertexVer++;
+  }
+
   getF32DataAt(index) {
     return this.m_vtxBuf.getF32DataAt(index);
   }
 
-  getIvsData() {
-    return this.m_ivs;
-  }
-
   setF32DataAt(index, float32Arr, stepFloatsTotal, setpOffsets) {
+    // console.log("setF32DataAt(), ",index, ", float32Arr: ", float32Arr);
     this.m_vtxBuf.setF32DataAt(index, float32Arr, stepFloatsTotal, setpOffsets);
     this.vertexVer++;
   }
 
-  setUintIVSData(uint16Or32Arr, status = VtxBufConst_1.default.VTX_STATIC_DRAW) {
-    if (uint16Or32Arr instanceof Uint16Array) {
-      this.m_ibufStep = 2;
-
-      if (uint16Or32Arr.length > 65535) {
-        throw Error("its type is not Uint32Array.");
-      }
-    } else if (uint16Or32Arr instanceof Uint32Array) {
-      this.m_ibufStep = 4;
-    } else {
-      console.error("Error: uint16Or32Arr is not an Uint32Array or an Uint16Array bufferArray instance !!!!");
-      return;
-    }
-
-    this.m_ivs = uint16Or32Arr;
-
-    if (uint16Or32Arr != null) {
-      this.indicesVer++;
-    }
-  }
-
   setData4fAt(vertexI, attribI, px, py, pz, pw) {
-    if (this.m_vtxBuf != null) {
+    if (this.m_vtxBuf) {
       this.m_vtxBuf.setData4fAt(vertexI, attribI, px, py, pz, pw);
       this.vertexVer++;
     }
   }
 
   setData3fAt(vertexI, attribI, px, py, pz) {
-    if (this.m_vtxBuf != null) {
+    if (this.m_vtxBuf) {
       this.m_vtxBuf.setData3fAt(vertexI, attribI, px, py, pz);
       this.vertexVer++;
     }
   }
 
   setData2fAt(vertexI, attribI, px, py) {
-    if (this.m_vtxBuf != null) {
+    if (this.m_vtxBuf) {
       this.m_vtxBuf.setData2fAt(vertexI, attribI, px, py);
       this.vertexVer++;
     }
@@ -48370,7 +51410,9 @@ class ROVertexBuffer {
    */
 
 
-  destroy() {}
+  destroy() {
+    super.destroy();
+  }
 
   __$destroy() {
     console.log("ROVertexBuffer::__$destroy()... " + this);
@@ -48382,15 +51424,12 @@ class ROVertexBuffer {
       ROVertexBuffer.s_separatedBufs.push(this.m_vtxBuf);
     }
 
-    this.m_vtxBuf = null;
-    this.m_ivs = null;
+    this.m_vtxBuf = null; // this.m_ivs = null;
+
+    this.m_irds.fill(null);
     this.bufData = null;
     this.m_bufTypeList = null;
     this.m_bufSizeList = null;
-  }
-
-  toString() {
-    return "ROVertexBuffer(uid = " + this.m_uid + ")";
   }
 
   static GetFreeId() {
@@ -48406,35 +51445,38 @@ class ROVertexBuffer {
   }
 
   static Create(bufDataUsage = VtxBufConst_1.default.VTX_STATIC_DRAW) {
+    const rvb = ROVertexBuffer;
     let unit = null;
-    let index = ROVertexBuffer.GetFreeId();
+    let index = rvb.GetFreeId();
 
     if (index >= 0) {
-      unit = ROVertexBuffer.s_unitList[index];
+      unit = rvb.s_unitList[index];
       unit.setBufDataUsage(bufDataUsage);
-      ROVertexBuffer.s_unitFlagList[index] = ROVertexBuffer.s_FLAG_BUSY;
+      rvb.s_unitFlagList[index] = rvb.s_FLAG_BUSY;
     } else {
       unit = new ROVertexBuffer(bufDataUsage);
-      ROVertexBuffer.s_unitList.push(unit);
-      ROVertexBuffer.s_unitFlagList.push(ROVertexBuffer.s_FLAG_BUSY);
-      ROVertexBuffer.s_unitListLen++;
+      rvb.s_unitList.push(unit);
+      rvb.s_unitFlagList.push(rvb.s_FLAG_BUSY);
+      rvb.s_unitListLen++;
     }
 
     unit.vertexVer = 0;
     unit.indicesVer = 0;
     unit.version++; //console.log("ROVertexBuffer::Create(), ROVertexBuffer.s_unitList.length: "+ROVertexBuffer.s_unitList.length+", new buf: "+unit);
 
-    ROVertexBuffer.s_vtxStore.__$attachAt(unit.getUid());
+    rvb.s_vtxStore.__$attachAt(unit.getUid());
 
     return unit;
   }
 
   static __$Restore(pobj) {
-    if (pobj != null && ROVertexBuffer.s_unitFlagList[pobj.getUid()] == ROVertexBuffer.s_FLAG_BUSY) {
+    const rvb = ROVertexBuffer;
+
+    if (pobj != null && rvb.s_unitFlagList[pobj.getUid()] == rvb.s_FLAG_BUSY) {
       //console.log("ROVertexBuffer::__$Restore, pobj: "+pobj);
-      let uid = pobj.getUid();
-      ROVertexBuffer.s_freeIdList.push(uid);
-      ROVertexBuffer.s_unitFlagList[uid] = ROVertexBuffer.s_FLAG_FREE;
+      const uid = pobj.getUid();
+      rvb.s_freeIdList.push(uid);
+      rvb.s_unitFlagList[uid] = rvb.s_FLAG_FREE;
 
       pobj.__$destroy();
     }
@@ -48449,36 +51491,44 @@ class ROVertexBuffer {
   }
 
   static Reset() {
-    ROVertexBuffer.BufDataList = [];
-    ROVertexBuffer.s_stride = 0;
-    ROVertexBuffer.BufStatusList = [];
-    ROVertexBuffer.BufDataStepList = [];
-    ROVertexBuffer.vtxFS32 = null;
-    ROVertexBuffer.vbWholeDataEnabled = false;
-    ROVertexBuffer.dynBufSegEnabled = false;
-    ROVertexBuffer.useBufByIndexEnabled = false;
+    const rvb = ROVertexBuffer;
+    rvb.BufDataList = [];
+    rvb.s_stride = 0;
+    rvb.BufStatusList = [];
+    rvb.BufDataStepList = [];
+    rvb.BufVerList = [];
+    rvb.vtxFS32 = null;
+    rvb.vbWholeDataEnabled = false;
+    rvb.dynBufSegEnabled = false;
+    rvb.useBufByIndexEnabled = false;
+  }
+
+  static AddFloat32DataVer(ver) {
+    ROVertexBuffer.BufVerList.push(ver);
   }
 
   static AddFloat32Data(float32Arr, step, status = VtxBufConst_1.default.VTX_STATIC_DRAW) {
-    ROVertexBuffer.BufDataList.push(float32Arr);
-    ROVertexBuffer.BufDataStepList.push(step);
-    ROVertexBuffer.BufStatusList.push(status);
-    ROVertexBuffer.s_stride += step;
+    const rvb = ROVertexBuffer;
+    rvb.BufDataList.push(float32Arr);
+    rvb.BufDataStepList.push(step);
+    rvb.BufStatusList.push(status);
+    rvb.s_stride += step;
   }
 
   static CreateBySaveData(bufDataUsage = VtxBufConst_1.default.VTX_STATIC_DRAW, layoutBit = 0x0) {
+    const rvb = ROVertexBuffer;
     let i = 0;
     let k = 0;
     let stride = 0;
-    let bufTot = ROVertexBuffer.BufDataStepList.length;
+    let bufTot = rvb.BufDataStepList.length;
     let offsetList = [];
 
     for (; i < bufTot; i++) {
       offsetList.push(stride);
-      stride += ROVertexBuffer.BufDataStepList[i];
+      stride += rvb.BufDataStepList[i];
     }
 
-    let tot = ROVertexBuffer.BufDataList[0].length / ROVertexBuffer.BufDataStepList[0];
+    let tot = rvb.BufDataList[0].length / rvb.BufDataStepList[0];
     let vtxfs32 = new Float32Array(stride * tot);
     let j = 0;
     let segLen = 0;
@@ -48489,19 +51539,19 @@ class ROVertexBuffer {
       k = i * stride;
 
       for (j = 0; j < bufTot; ++j) {
-        segLen = ROVertexBuffer.BufDataStepList[j];
-        parrf32 = ROVertexBuffer.BufDataList[j];
+        segLen = rvb.BufDataStepList[j];
+        parrf32 = rvb.BufDataList[j];
         subArr = parrf32.subarray(i * segLen, (i + 1) * segLen);
         vtxfs32.set(subArr, k);
         k += segLen;
       }
     }
 
-    let vb = ROVertexBuffer.Create(bufDataUsage);
+    let vb = rvb.Create(bufDataUsage);
     vb.layoutBit = layoutBit;
 
-    if (ROVertexBuffer.s_combinedBufs.length > 0) {
-      let vtx = ROVertexBuffer.s_combinedBufs.pop();
+    if (rvb.s_combinedBufs.length > 0) {
+      let vtx = rvb.s_combinedBufs.pop();
       vb.setVtxBuf(vtx);
     } else {
       vb.setVtxBuf(new VtxCombinedBuf_1.default(vb.getBufDataUsage()));
@@ -48522,40 +51572,48 @@ class ROVertexBuffer {
       stride += bufDataStepList[i];
     }
 
-    let vb = ROVertexBuffer.Create(bufDataUsage);
+    const rvb = ROVertexBuffer;
+    let vb = rvb.Create(bufDataUsage);
     vb.layoutBit = layoutBit;
 
-    if (ROVertexBuffer.s_combinedBufs.length > 0) {
-      let vtx = ROVertexBuffer.s_combinedBufs.pop();
+    if (rvb.s_combinedBufs.length > 0) {
+      let vtx = rvb.s_combinedBufs.pop();
       vb.setVtxBuf(vtx);
     } else {
       vb.setVtxBuf(new VtxCombinedBuf_1.default(vb.getBufDataUsage()));
     }
 
     vb.setF32DataAt(0, vtxfs32, stride, offsetList);
+    const vls = rvb.BufVerList;
+
+    if (vls.length > 0) {
+      vb.setF32DataVerAt(0, vls[0]);
+    }
+
     return vb;
   }
 
   static UpdateCombinedBufData(vb) {
+    const rvb = ROVertexBuffer;
     let i = 0;
     let k = 0;
     let stride = 0;
-    let bufTot = ROVertexBuffer.BufDataStepList.length;
-    let tot = ROVertexBuffer.BufDataList[0].length / ROVertexBuffer.BufDataStepList[0];
+    let bufTot = rvb.BufDataStepList.length;
+    let tot = rvb.BufDataList[0].length / rvb.BufDataStepList[0];
     let vtxfs32 = vb.getF32DataAt(0);
-    let newBoo = ROVertexBuffer.s_stride * tot != vtxfs32.length;
+    let newBoo = rvb.s_stride * tot != vtxfs32.length;
     let offsetList = null;
 
     if (newBoo) {
       offsetList = [];
-      vtxfs32 = new Float32Array(ROVertexBuffer.s_stride * tot);
+      vtxfs32 = new Float32Array(rvb.s_stride * tot);
 
       for (; i < bufTot; i++) {
         offsetList.push(stride);
-        stride += ROVertexBuffer.BufDataStepList[i];
+        stride += rvb.BufDataStepList[i];
       }
     } else {
-      stride = ROVertexBuffer.s_stride;
+      stride = rvb.s_stride;
     }
 
     let j = 0;
@@ -48567,8 +51625,8 @@ class ROVertexBuffer {
       k = i * stride;
 
       for (j = 0; j < bufTot; ++j) {
-        segLen = ROVertexBuffer.BufDataStepList[j];
-        parrf32 = ROVertexBuffer.BufDataList[j];
+        segLen = rvb.BufDataStepList[j];
+        parrf32 = rvb.BufDataList[j];
         subArr = parrf32.subarray(i * segLen, (i + 1) * segLen);
         vtxfs32.set(subArr, k);
         k += segLen;
@@ -48579,6 +51637,12 @@ class ROVertexBuffer {
       vb.setF32DataAt(0, vtxfs32, stride, offsetList);
     } else {
       vb.setF32DataAt(0, vtxfs32, stride, null);
+    }
+
+    const vls = rvb.BufVerList;
+
+    if (vls.length > 0) {
+      vb.setF32DataVerAt(0, vls[0]);
     }
   }
 
@@ -48596,11 +51660,12 @@ class ROVertexBuffer {
     let bufTot = bufData.getAttributesTotal();
     let offsetList = new Array(bufTot);
     offsetList.fill(0);
-    let vb = ROVertexBuffer.Create(bufDataUsage);
+    const rvb = ROVertexBuffer;
+    let vb = rvb.Create(bufDataUsage);
     vb.layoutBit = layoutBit;
 
-    if (ROVertexBuffer.s_separatedBufs.length > 0) {
-      let vtx = ROVertexBuffer.s_separatedBufs.pop();
+    if (rvb.s_separatedBufs.length > 0) {
+      let vtx = rvb.s_separatedBufs.pop();
       vb.setVtxBuf(vtx);
     } else {
       vb.setVtxBuf(new VtxSeparatedBuf_1.default());
@@ -48610,38 +51675,73 @@ class ROVertexBuffer {
       vb.setF32DataAt(i, bufData.getAttributeDataAt(i, 0), stride, offsetList);
     }
 
-    vb.setUintIVSData(bufData.getIndexDataAt(0));
+    vb.setIVSDataAt(bufData.getIndexDataAt(0));
     vb.bufData = bufData;
+    const vls = rvb.BufVerList;
+
+    if (vls.length > 0) {
+      for (i = 0; i < bufTot; i++) {
+        vb.setF32DataVerAt(i, vls[i]);
+      }
+    }
+
     return vb;
   }
 
   static CreateBySaveDataSeparate(bufDataUsage = VtxBufConst_1.default.VTX_STATIC_DRAW) {
+    const rvb = ROVertexBuffer;
     let i = 0;
     let stride = 0;
-    let bufTot = ROVertexBuffer.BufDataStepList.length;
+    let bufTot = rvb.BufDataStepList.length;
     let offsetList = new Array(bufTot);
-    let vb = ROVertexBuffer.Create(bufDataUsage);
+    let vb = rvb.Create(bufDataUsage);
 
-    if (ROVertexBuffer.s_separatedBufs.length > 0) {
-      let vtx = ROVertexBuffer.s_separatedBufs.pop();
+    if (rvb.s_separatedBufs.length > 0) {
+      let vtx = rvb.s_separatedBufs.pop();
       vb.setVtxBuf(vtx);
     } else {
       vb.setVtxBuf(new VtxSeparatedBuf_1.default());
     }
 
     for (i = 0; i < bufTot; i++) {
-      vb.setF32DataAt(i, ROVertexBuffer.BufDataList[i], stride, offsetList);
+      offsetList[i] = rvb.BufDataStepList[i];
+    }
+
+    for (i = 0; i < bufTot; i++) {
+      vb.setF32DataAt(i, rvb.BufDataList[i], stride, offsetList);
+    }
+
+    const vls = rvb.BufVerList;
+
+    if (vls.length > 0) {
+      for (i = 0; i < bufTot; i++) {
+        vb.setF32DataVerAt(i, vls[i]);
+      }
     }
 
     return vb;
   }
 
   static UpdateSeparatedBufData(vb) {
-    let bufTot = ROVertexBuffer.BufDataStepList.length;
-    let offsetList = new Array(bufTot); // console.log("ROVertexBuffer::CreateBySaveDataSeparate(), bufTot: "+bufTot);
+    const rvb = ROVertexBuffer;
+    let bufTot = rvb.BufDataStepList.length;
+    let offsetList = new Array(bufTot);
 
     for (let i = 0; i < bufTot; i++) {
-      vb.setF32DataAt(i, ROVertexBuffer.BufDataList[i], 0, offsetList);
+      offsetList[i] = rvb.BufDataStepList[i];
+    } // console.log("ROVertexBuffer::CreateBySaveDataSeparate(), bufTot: "+bufTot);
+
+
+    for (let i = 0; i < bufTot; i++) {
+      vb.setF32DataAt(i, rvb.BufDataList[i], 0, offsetList);
+    }
+
+    const vls = rvb.BufVerList;
+
+    if (vls.length > 0) {
+      for (let i = 0; i < bufTot; i++) {
+        vb.setF32DataVerAt(i, vls[i]);
+      }
     }
 
     return vb;
@@ -48693,7 +51793,6 @@ class ROVertexBuffer {
 
 }
 
-ROVertexBuffer.s_uid = 0;
 ROVertexBuffer.s_combinedBufs = [];
 ROVertexBuffer.s_separatedBufs = [];
 ROVertexBuffer.s_FLAG_BUSY = 1;
@@ -48707,6 +51806,7 @@ ROVertexBuffer.s_stride = 0;
 ROVertexBuffer.BufDataList = null;
 ROVertexBuffer.BufDataStepList = null;
 ROVertexBuffer.BufStatusList = null;
+ROVertexBuffer.BufVerList = null;
 ROVertexBuffer.vtxDataFS32 = null;
 ROVertexBuffer.vbWholeDataEnabled = false;
 ROVertexBuffer.dynBufSegEnabled = false;
@@ -48714,6 +51814,230 @@ ROVertexBuffer.useBufByIndexEnabled = false;
 ROVertexBuffer.vtxFS32 = null;
 ROVertexBuffer.s_timeDelay = 128;
 exports.default = ROVertexBuffer;
+
+/***/ }),
+
+/***/ "e7f2":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+/***************************************************************************/
+
+/*                                                                         */
+
+/*  Copyright 2018-2022 by                                                 */
+
+/*  Vily(vily313@126.com)                                                  */
+
+/*                                                                         */
+
+/***************************************************************************/
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const RenderConst_1 = __webpack_require__("e08e");
+
+class ROStateUnit {
+  constructor() {
+    this.stencilMask = -1;
+  }
+
+}
+
+class RODrawState {
+  constructor() {
+    this.m_units = new Array(128);
+    this.m_unit = null;
+    this.m_blendMode = RenderConst_1.RenderBlendMode.NORMAL;
+    this.m_cullMode = RenderConst_1.CullFaceMode.NONE;
+    this.m_depthTestType = RenderConst_1.DepthTestMode.DISABLE;
+    this.m_cullDisabled = true;
+    this.m_context = null;
+    this.m_gl = null;
+    this.roColorMask = -11;
+  }
+
+  reset() {
+    this.roColorMask = -11;
+  }
+
+  setRenderContext(context) {
+    this.m_context = context;
+    this.m_gl = context.getRC();
+    let rcui = this.m_gl.rcuid;
+    this.m_unit = this.m_units[rcui];
+
+    if (this.m_unit == null) {
+      this.m_unit = this.m_units[rcui] = new ROStateUnit();
+    }
+  }
+
+  setColorMask(mr, mg, mb, ma) {
+    this.m_gl.colorMask(mr, mg, mb, ma);
+  }
+
+  setStencilFunc(func, ref, mask) {
+    this.m_gl.stencilFunc(func, ref, mask);
+  }
+
+  setStencilMask(mask) {
+    if (this.m_unit.stencilMask != mask && mask >= 0) {
+      this.m_unit.stencilMask = mask;
+      this.m_gl.stencilMask(mask);
+    }
+  }
+
+  setStencilOp(fail, zfail, zpass) {
+    this.m_gl.stencilOp(fail, zfail, zpass);
+  }
+
+  setDepthTestEnable(enable) {
+    if (enable) {
+      this.m_gl.enable(this.m_gl.DEPTH_TEST);
+    } else {
+      this.m_gl.disable(this.m_gl.DEPTH_TEST);
+    }
+  }
+
+  setCullFaceEnable(enable) {
+    if (enable) {
+      this.m_gl.enable(this.m_gl.CULL_FACE);
+    } else {
+      this.m_gl.disable(this.m_gl.CULL_FACE);
+    }
+  }
+
+  setBlendEnable(enable) {
+    if (enable) {
+      this.m_gl.enable(this.m_gl.BLEND);
+    } else {
+      this.m_gl.disable(this.m_gl.BLEND);
+    }
+  }
+
+  setCullFaceMode(mode) {
+    // console.log("this.m_cullMode,mode: ", this.m_cullMode,mode);
+    if (this.m_cullMode != mode) {
+      this.m_cullMode = mode;
+
+      if (mode != RenderConst_1.CullFaceMode.NONE) {
+        if (this.m_cullDisabled) {
+          this.m_cullDisabled = false;
+          this.m_gl.enable(this.m_gl.CULL_FACE);
+        }
+
+        this.m_gl.cullFace(mode);
+      } else if (!this.m_cullDisabled) {
+        this.m_cullDisabled = true;
+        this.m_gl.disable(this.m_gl.CULL_FACE);
+      }
+    }
+  }
+
+  setBlendMode(mode, params) {
+    if (this.m_blendMode != mode) {
+      this.m_blendMode = mode;
+
+      if (mode > 0) {
+        if (params[0] < 1) {
+          //FUNC_ADD
+          // this.m_gl.blendEquation(this.m_gl.FUNC_ADD);
+          // this.m_gl.blendFunc(this.m_gl.ONE, this.m_gl.ZERO);
+          this.m_gl.blendEquation(params[1]);
+          this.m_gl.blendFunc(params[3], params[4]);
+        } else {
+          this.m_gl.blendEquationSeparate(params[1], params[2]);
+          this.m_gl.blendFuncSeparate(params[3], params[4], params[5], params[6]);
+        }
+      } else {
+        this.m_gl.disable(this.m_gl.BLEND);
+      }
+    }
+  }
+
+  getDepthTestMode() {
+    return this.m_depthTestType;
+  }
+
+  setDepthTestMode(type) {
+    if (this.m_depthTestType != type) {
+      const gl = this.m_gl;
+      const DTM = RenderConst_1.DepthTestMode;
+      this.m_depthTestType = type; //trace("RendererBase::setDepthTest(),type：",std::to_string(static_cast<int>(type)));
+
+      switch (type) {
+        case DTM.ALWAYS:
+          //console.log("ALWAYS type: ", type,gl.ALWAYS);
+          gl.depthMask(false);
+          gl.depthFunc(gl.ALWAYS);
+          break;
+
+        case DTM.SKY:
+          gl.depthMask(true);
+          gl.depthFunc(gl.LEQUAL);
+          break;
+
+        case DTM.OPAQUE:
+          //console.log("OPAQUE type: ", type,gl.LESS);
+          gl.depthMask(true);
+          gl.depthFunc(gl.LESS);
+          break;
+
+        case DTM.OPAQUE_OVERHEAD:
+          gl.depthMask(false);
+          gl.depthFunc(gl.EQUAL);
+          break;
+
+        case DTM.DECALS:
+          gl.depthMask(false);
+          gl.depthFunc(gl.LEQUAL);
+          break;
+
+        case DTM.BLEND:
+          gl.depthMask(false);
+          gl.depthFunc(gl.LESS);
+          break;
+
+        case DTM.WIRE_FRAME:
+          gl.depthMask(true);
+          gl.depthFunc(gl.LEQUAL);
+          break;
+
+        case DTM.NEXT_LAYER:
+          gl.depthMask(false);
+          gl.depthFunc(gl.ALWAYS);
+          break;
+
+        case DTM.TRUE_EQUAL:
+          gl.depthMask(true);
+          gl.depthFunc(gl.EQUAL);
+          break;
+
+        case DTM.TRUE_GREATER:
+          gl.depthMask(true);
+          gl.depthFunc(gl.GREATER);
+          break;
+
+        case DTM.TRUE_GEQUAL:
+          gl.depthMask(true);
+          gl.depthFunc(gl.GEQUAL);
+          break;
+
+        case DTM.WIRE_FRAME_NEXT:
+          break;
+
+        default:
+          break;
+      }
+    }
+  }
+
+}
+
+exports.RODrawState = RODrawState;
 
 /***/ }),
 
@@ -48979,13 +52303,12 @@ Object.defineProperty(exports, "__esModule", {
 
 const PoolNodeBuilder_1 = __importDefault(__webpack_require__("2be1"));
 
-const RPOUnit_1 = __importDefault(__webpack_require__("c62b")); //import PoolNodeBuilder = PoolNodeBuilderT.vox.base.PoolNodeBuilder;
-// 这个类的实例，和每一个RPOUnit或者RODisplay关联(通过唯一的uid)
+const RPOUnit_1 = __importDefault(__webpack_require__("c62b")); // 这个类的实例，和每一个RPOUnit或者RODisplay关联(通过唯一的uid)
 
 
 class RCRPObj {
   constructor() {
-    // 这里假定最多有 16 个 RenerProcess, 每一个数组元素存放的是 RPONode 的uid, 数组的序号对应的是RenerProcess 的uid
+    // 这里假定最多有 16 个 RenderProcess, 每一个数组元素存放的是 RPONode 的uid, 数组的序号对应的是RenerProcess 的uid
     this.idsFlag = 0x0;
     this.count = 0; // 如果只有加入一个process的时候则有效
 
@@ -49007,7 +52330,7 @@ class RPOUnitBuilder extends PoolNodeBuilder_1.default {
     this.m_rcpoList = [];
   }
   /**
-   * the sub class override this function, for real implement.
+   * override the super class spec function
    */
 
 
@@ -49318,6 +52641,145 @@ exports.default = EvtNode;
 
 /***/ }),
 
+/***/ "ee6e":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+/***************************************************************************/
+
+/*                                                                         */
+
+/*  Copyright 2018-2022 by                                                 */
+
+/*  Vily(vily313@126.com)                                                  */
+
+/*                                                                         */
+
+/***************************************************************************/
+
+var __importDefault = this && this.__importDefault || function (mod) {
+  return mod && mod.__esModule ? mod : {
+    "default": mod
+  };
+};
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const MaterialBase_1 = __importDefault(__webpack_require__("0fc4"));
+
+const ShaderCodeBuffer_1 = __importDefault(__webpack_require__("faa5"));
+
+class MaterialShaderBuffer extends ShaderCodeBuffer_1.default {
+  constructor() {
+    super();
+    this.m_uniqueName = "";
+    this.decorator = null;
+    this.vertUniform = null;
+  }
+
+  initialize(texEnabled) {
+    super.initialize(texEnabled);
+    console.log("MaterialShaderBuffer::initialize()... texEnabled: " + texEnabled);
+    this.m_uniqueName = "SMS_"; // this.m_hasTex = texEnabled;
+
+    if (texEnabled) this.m_uniqueName += "Tex";
+  }
+
+  createTextureList() {
+    this.m_texBuilder.reset();
+    this.decorator.buildTextureList(this.m_texBuilder);
+    return this.m_texBuilder.getTextures();
+  }
+
+  buildShader() {
+    if (this.vertUniform != null) {
+      this.vertUniform.use(this.m_coder);
+    }
+
+    this.decorator.buildShader(this.m_coder);
+  }
+
+  getUniqueShaderName() {
+    // return this.m_uniqueName + this.decorator.getUniqueName();
+    let ns = this.m_uniqueName + this.decorator.getUniqueName();
+
+    if (this.vertUniform != null) {
+      ns += this.vertUniform.getUniqueNSKeyString();
+    }
+
+    return ns;
+  }
+
+}
+
+class SimpleMaterial extends MaterialBase_1.default {
+  constructor() {
+    super();
+    this.m_decorator = null;
+    this.vertUniform = null;
+    if (SimpleMaterial.s_shdBufins == null) SimpleMaterial.s_shdBufins = new MaterialShaderBuffer();
+  }
+
+  buildBuf() {
+    let buf = SimpleMaterial.s_shdBufins;
+    let decorator = this.m_decorator;
+    buf.decorator = decorator;
+    decorator.buildBufParams();
+    buf.vertColorEnabled = decorator.vertColorEnabled;
+    buf.shadowReceiveEnabled = decorator.premultiplyAlpha;
+    buf.fogEnabled = decorator.fogEnabled;
+    buf.buildPipelineParams();
+    buf.vertUniform = this.vertUniform;
+    let list = buf.createTextureList();
+    if (this.vertUniform != null) this.vertUniform.getTextures(buf.getShaderCodeBuilder(), list);
+    buf.getTexturesFromPipeline(list);
+    console.log(decorator, "texture list: ", list);
+    super.setTextureList(list); //buf.texturesTotal = list.length;
+  }
+
+  getCodeBuf() {
+    return SimpleMaterial.s_shdBufins;
+  }
+
+  setTextureList(texList) {
+    // throw Error("Illegal operations !!!");
+    console.error("Illegal operations !!!");
+  }
+
+  setDecorator(decorator) {
+    this.m_decorator = decorator;
+  }
+
+  getDecorator() {
+    return this.m_decorator;
+  }
+
+  createSelfUniformData() {
+    let sud = this.m_decorator.createUniformData();
+
+    if (this.vertUniform != null && sud != null) {
+      this.vertUniform.buildShaderUniformData(sud);
+    }
+
+    return sud;
+  }
+
+  destroy() {
+    super.destroy();
+    this.m_decorator = null;
+    this.vertUniform = null;
+  }
+
+}
+
+SimpleMaterial.s_shdBufins = null;
+exports.SimpleMaterial = SimpleMaterial;
+
+/***/ }),
+
 /***/ "eed9":
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -49385,6 +52847,12 @@ class DracoParserListerner {
         DivLog_1.default.ShowLogOnce("draco file loading " + k + "%");
       }, (status, url) => {
         console.error("load draco mesh data error, url: ", url);
+        this.dracoParseSingle({
+          vertices: null,
+          uvsList: null,
+          normals: null,
+          indices: null
+        }, url, 0);
       });
     }
   }
@@ -49496,6 +52964,7 @@ class VtxCombinedBuf {
   constructor(bufDataUsage) {
     this.m_uid = -1;
     this.m_total = 0;
+    this.m_ver = 0;
     this.layoutBit = 0x0;
     this.m_offsetList = null;
     this.m_f32 = null;
@@ -49519,13 +52988,21 @@ class VtxCombinedBuf {
     return this.m_offsetList.length;
   }
 
+  getF32DataVerAt(index) {
+    // console.log("VtxCombinedBuf::getF32DataVerAt(), index: ",index, ", ver: ", this.m_ver);
+    return this.m_ver;
+  }
+
+  setF32DataVerAt(index, ver) {}
+
   getF32DataAt(index) {
     return this.m_f32;
   }
 
   setF32DataAt(index, float32Arr, stepFloatsTotal, setpOffsets) {
     if (setpOffsets != null) this.m_offsetList = setpOffsets;
-    this.m_f32Stride = stepFloatsTotal; //console.log("VtxCombinedBuf::setF32DataAt(),"+this+" m_f32.length: "+float32Arr.length+", this.m_f32PreSize: "+this.m_f32PreSize);
+    this.m_f32Stride = stepFloatsTotal;
+    this.m_ver++; //console.log("VtxCombinedBuf::setF32DataAt(),"+this+" m_f32.length: "+float32Arr.length+", this.m_f32PreSize: "+this.m_f32PreSize);
 
     this.m_f32 = float32Arr;
   }
@@ -49559,10 +53036,6 @@ class VtxCombinedBuf {
     this.m_f32 = null;
   }
 
-  toString() {
-    return "VtxCombinedBuf(uid = " + this.m_uid + ")";
-  }
-
 }
 
 exports.default = VtxCombinedBuf;
@@ -49593,11 +53066,70 @@ Object.defineProperty(exports, "__esModule", {
 class ShaderCompileInfo {
   constructor() {
     this.info = "";
+    this.fragOutputTotal = 0;
   }
 
 }
 
 exports.default = ShaderCompileInfo;
+
+/***/ }),
+
+/***/ "f26a":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+/***************************************************************************/
+
+/*                                                                         */
+
+/*  Copyright 2018-2022 by                                                 */
+
+/*  Vily(vily313@126.com)                                                  */
+
+/*                                                                         */
+
+/***************************************************************************/
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+class ROTransUpdateWrapper {
+  constructor() {
+    this.m_updater = null;
+    /**
+     * the default value is 0
+     */
+
+    this.__$transUpdate = 0;
+    this.__$target = null;
+  }
+
+  destroy() {
+    this.m_updater = null;
+  }
+
+  updateTo() {
+    if (this.m_updater) {
+      this.m_updater.addItem(this);
+    }
+  }
+
+  setUpdater(updater) {
+    this.m_updater = updater;
+  }
+
+  update() {
+    this.__$target.update();
+
+    this.__$transUpdate = 0;
+  }
+
+}
+
+exports.default = ROTransUpdateWrapper;
 
 /***/ }),
 
@@ -49689,6 +53221,219 @@ AbsGeomBase.__tV1 = new Vector3D_1.default();
 AbsGeomBase.__tV2 = new Vector3D_1.default();
 exports.AbsGeomBase = AbsGeomBase;
 exports.default = AbsGeomBase;
+
+/***/ }),
+
+/***/ "f571":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+/***************************************************************************/
+
+/*                                                                         */
+
+/*  Copyright 2018-2022 by                                                 */
+
+/*  Vily(vily313@126.com)                                                  */
+
+/*                                                                         */
+
+/***************************************************************************/
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+class SortNodeLinkerNode {
+  constructor() {
+    this.value = 0;
+    this.uid = -1;
+    this.prev = null;
+    this.next = null;
+  }
+
+}
+
+exports.SortNodeLinkerNode = SortNodeLinkerNode;
+
+class SortNodeLinker {
+  constructor() {
+    this.m_begin = null;
+    this.m_end = null;
+    this.m_next = null;
+    this.m_node = null;
+    this.m_nodes = [];
+    this.m_nodesTotal = 0;
+  }
+
+  showInfo() {
+    let info = "";
+    let next = this.m_begin;
+
+    while (next != null) {
+      info += "(" + next.value + "," + next.uid + "),"; //info += next.value+",";
+
+      next = next.next;
+    }
+
+    console.log("SortNodeLinker info: \n", info);
+  }
+
+  clear() {
+    this.m_nodes = [];
+    let next = this.m_begin;
+    let curr = null;
+
+    while (next != null) {
+      curr = next;
+      next = next.next;
+      curr.prev = null;
+      curr.next = null;
+    }
+
+    this.m_begin = this.m_end = null;
+    this.m_nodesTotal = 0;
+  }
+
+  sort() {
+    if (this.m_nodesTotal > 0) {
+      //console.log("this.m_nodesTotal: ",this.m_nodesTotal);
+      // 如果是remove实际上是不需要排序的
+      let next = this.m_begin;
+
+      if (this.m_nodes.length < this.m_nodesTotal) {
+        this.m_nodes = new Array(Math.round(this.m_nodesTotal * 1.1) + 1);
+      }
+
+      let i = 0;
+
+      while (next != null) {
+        this.m_nodes[i] = next;
+        next = next.next;
+        ++i;
+      }
+
+      this.snsort(0, this.m_nodesTotal - 1);
+      this.m_begin = this.m_nodes[0];
+      this.m_begin.uid = 2;
+      this.m_begin.next = null;
+      this.m_begin.prev = null;
+      let prev = this.m_begin;
+
+      for (i = 1; i < this.m_nodesTotal; ++i) {
+        next = this.m_nodes[i];
+        next.uid = 2 + i;
+        next.prev = prev;
+        prev.next = next;
+        next.next = null;
+        prev = next;
+      }
+
+      this.m_end = this.m_nodes[this.m_nodesTotal - 1];
+      this.m_next = this.m_begin;
+    }
+  }
+
+  sorting(low, high) {
+    let arr = this.m_nodes;
+    this.m_node = arr[low];
+
+    while (low < high) {
+      while (low < high && arr[high].value >= this.m_node.value) {
+        --high;
+      }
+
+      arr[low] = arr[high];
+
+      while (low < high && arr[low].value <= this.m_node.value) {
+        ++low;
+      }
+
+      arr[high] = arr[low];
+    }
+
+    arr[low] = this.m_node;
+    return low;
+  }
+
+  snsort(low, high) {
+    if (low < high) {
+      let pos = this.sorting(low, high);
+      this.snsort(low, pos - 1);
+      this.snsort(pos + 1, high);
+    }
+  }
+
+  getNodesTotal() {
+    return this.m_nodesTotal;
+  }
+
+  getBegin() {
+    this.m_next = this.m_begin;
+    return this.m_begin;
+  }
+
+  getNext() {
+    if (this.m_next != null) {
+      this.m_next = this.m_next.next;
+    }
+
+    return this.m_next;
+  }
+
+  isEmpty() {
+    return this.m_nodesTotal < 1; // return this.m_begin == null;
+  }
+
+  addNode(node) {
+    if (node.prev == null && node.next == null) {
+      if (this.m_begin == null) {
+        this.m_end = this.m_begin = node;
+      } else {
+        if (this.m_end.prev != null) {
+          this.m_end.next = node;
+          node.prev = this.m_end;
+          this.m_end = node;
+        } else {
+          this.m_begin.next = node;
+          node.prev = this.m_end;
+          this.m_end = node;
+        }
+      }
+
+      this.m_end.next = null;
+      this.m_nodesTotal++;
+    }
+  }
+
+  removeNode(node) {
+    if (node.prev != null || node.next != null) {
+      if (node == this.m_begin) {
+        if (node == this.m_end) {
+          this.m_begin = this.m_end = null;
+        } else {
+          this.m_begin = node.next;
+          this.m_begin.prev = null;
+        }
+      } else if (node == this.m_end) {
+        this.m_end = node.prev;
+        this.m_end.next = null;
+      } else {
+        node.next.prev = node.prev;
+        node.prev.next = node.next;
+      }
+
+      node.prev = null;
+      node.next = null;
+      this.m_nodesTotal--;
+    }
+  }
+
+}
+
+exports.SortNodeLinker = SortNodeLinker;
+exports.default = SortNodeLinker;
 
 /***/ }),
 
@@ -50347,16 +54092,16 @@ class VaoVertexRenderObj extends VROBase_1.default {
   }
 
   run() {
-    if (this.m_rc.testVROUid(this.m_uid)) {
+    if (this.m_rc.testVROUid(this.m_uid) || this.indicesRes.test()) {
       // console.log("VaoVertexRenderObj::run(), rcuid: ",this.m_rc.getRCUid(),this.m_vtxUid, this.m_uid);
       this.m_rc.bindVertexArray(this.vao);
-
-      if (this.m_rc.testRIOUid(this.m_vtxUid) || VROBase_1.default.s_mid != this.m_mid) {
-        // if (this.m_rc.testRIOUid(this.m_vtxUid)) {
-        // console.log("VaoVertexRenderObj::run(), testRIOUid()..");
-        VROBase_1.default.s_mid = this.m_mid;
-        this.m_rc.bindEleBuf(this.ibuf);
-      }
+      this.indicesRes.bindToGPU(VROBase_1.default.s_mid != this.m_mid);
+      VROBase_1.default.s_mid = this.m_mid; // if (this.m_rc.testRIOUid(this.m_vtxUid) || VROBase.s_mid != this.m_mid) {
+      // // if (this.m_rc.testRIOUid(this.m_vtxUid)) {
+      //     // console.log("VaoVertexRenderObj::run(), testRIOUid()..");
+      //     this.m_rc.bindEleBuf(this.ibuf);
+      // }
+      // VROBase.s_mid = this.m_mid;
     }
   }
 
@@ -50365,9 +54110,9 @@ class VaoVertexRenderObj extends VROBase_1.default {
     VROBase_1.default.s_midMap.delete(this.m_mid);
     this.m_mid = 0;
     this.m_vtxUid = -1;
-    this.ibuf = null;
     this.vao = null;
     this.m_rc = null;
+    this.indicesRes = null;
   }
 
   restoreThis() {
@@ -50376,10 +54121,6 @@ class VaoVertexRenderObj extends VROBase_1.default {
     }
 
     VaoVertexRenderObj.Restore(this);
-  }
-
-  toString() {
-    return "VaoVertexRenderObj(uid = " + this.m_uid + ", type=" + this.m_mid + ")";
   }
 
   static HasMid(mid) {
@@ -50674,7 +54415,7 @@ exports.default = ShaderCodeBuffer;
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _setPublicPath__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__("1eb2");
-/* harmony import */ var _entry__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__("a176");
+/* harmony import */ var _entry__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__("a889");
 /* harmony import */ var _entry__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(_entry__WEBPACK_IMPORTED_MODULE_1__);
 /* harmony reexport (unknown) */ for(var __WEBPACK_IMPORT_KEY__ in _entry__WEBPACK_IMPORTED_MODULE_1__) if(["default"].indexOf(__WEBPACK_IMPORT_KEY__) < 0) (function(key) { __webpack_require__.d(__webpack_exports__, key, function() { return _entry__WEBPACK_IMPORTED_MODULE_1__[key]; }) }(__WEBPACK_IMPORT_KEY__));
 
@@ -51083,6 +54824,119 @@ exports.ThreadConfigure = ThreadConfigure;
 
 /***/ }),
 
+/***/ "fd5e":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+/***************************************************************************/
+
+/*                                                                         */
+
+/*  Copyright 2018-2022 by                                                 */
+
+/*  Vily(vily313@126.com)                                                  */
+
+/*                                                                         */
+
+/***************************************************************************/
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+class PassMaterialWrapper {
+  constructor() {
+    this.m_mt = null;
+    this.m_build = false;
+    this.rdataBuilder = null;
+    this.unit = null;
+    this.hostUnit = null;
+  }
+
+  isEnabled() {
+    if (this.m_build) {
+      let m = this.m_mt;
+      this.m_mt = null;
+      this.build(m);
+      this.m_build = !m.hasShaderData();
+
+      if (this.m_build) {
+        this.m_mt = m;
+      }
+    }
+
+    return this.m_mt && this.m_mt.hasShaderData();
+  }
+
+  build(m) {
+    if (m.hasShaderData()) {
+      if (this.m_mt != m) {
+        if (this.m_mt) {
+          this.m_mt.__$detachThis();
+        }
+
+        this.m_mt = m;
+        const builder = this.rdataBuilder;
+
+        if (this.m_mt) {
+          this.m_mt.__$attachThis();
+
+          if (this.unit == null) {
+            this.unit = builder.createRPOUnit();
+          }
+
+          let entity = this.hostUnit.rentity;
+
+          if (entity.getREType() < 12) {
+            builder.updateDispMaterial(this.unit, this.m_mt, entity.getDisplay());
+          }
+        } else {
+          if (this.unit) {
+            this.unit.destroy();
+            builder.restoreRPOUnit(this.unit);
+            this.unit = null;
+          }
+        }
+      }
+    }
+  }
+
+  bindMaterial(m) {
+    if (m != null) {
+      m.initializeByCodeBuf(m.getTextureAt(0) != null);
+      this.m_build = true;
+
+      if (m.hasShaderData()) {
+        this.build(m);
+      } else {
+        this.m_mt = m;
+      }
+    }
+  }
+
+  destroy() {
+    if (this.unit != null) {
+      this.unit.destroy();
+      this.rdataBuilder.restoreRPOUnit(this.unit);
+      this.unit = null;
+    }
+
+    this.m_build = false;
+    this.hostUnit = null;
+    this.rdataBuilder = null;
+
+    if (this.m_mt != null) {
+      this.m_mt = null;
+    }
+  }
+
+}
+
+exports.default = PassMaterialWrapper;
+
+/***/ }),
+
 /***/ "fe7f":
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -51158,13 +55012,131 @@ class BytesTextureProxy extends RawDataTextureProxy_1.default {
     super.getPixels(px, py, pw, ph, outBytes);
   }
 
-  toString() {
-    return "[BytesTextureProxy(width=" + this.getWidth() + ",height=" + this.getHeight() + ")]";
+}
+
+exports.default = BytesTextureProxy;
+
+/***/ }),
+
+/***/ "febe":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+/***************************************************************************/
+
+/*                                                                         */
+
+/*  Copyright 2018-2022 by                                                 */
+
+/*  Vily(vily313@126.com)                                                  */
+
+/*                                                                         */
+
+/***************************************************************************/
+
+var __importDefault = this && this.__importDefault || function (mod) {
+  return mod && mod.__esModule ? mod : {
+    "default": mod
+  };
+};
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const VtxBufConst_1 = __importDefault(__webpack_require__("8a0a"));
+
+const RenderConst_1 = __webpack_require__("e08e");
+
+class ROIVertexBuffer {
+  constructor(bufDataUsage = VtxBufConst_1.default.VTX_STATIC_DRAW) {
+    this.m_uid = 0;
+    this.m_layoutBit = 0;
+    this.m_irdTotal = 0;
+    this.m_irds = new Array(1);
+    this.m_bufDataUsage = 0;
+    this.m_ivsUnitBytes = 2;
+    this.layoutBit = 0x0;
+    this.vertexVer = 0;
+    this.indicesVer = 0;
+    this.version = 0;
+    this.drawMode = RenderConst_1.RenderDrawMode.ELEMENTS_TRIANGLES;
+    this.bufData = null;
+    this.m_uid = ROIVertexBuffer.s_uid++;
+    this.m_bufDataUsage = bufDataUsage;
+    this.m_irds.fill(null);
+  }
+
+  getUid() {
+    return this.m_uid;
+  }
+
+  getType() {
+    return 0;
+  }
+
+  setBufSortFormat(layoutBit) {
+    this.m_layoutBit = layoutBit;
+  }
+
+  getBufSortFormat() {
+    return this.m_layoutBit;
+  }
+
+  getBufDataUsage() {
+    return this.m_bufDataUsage;
+  }
+
+  getIvsDataAt(index = 0) {
+    // console.log("FFFFFFFFFF 0 getIvsDataAt(), index: ", index, ", this.m_irdTotal: ", this.m_irdTotal, this.m_irds);
+    if (index >= 0 && index < this.m_irdTotal) {
+      // console.log("FFFFFFFFFF 0 this.m_irds["+index+"]: ", this.m_irds[index]);
+      return this.m_irds[index];
+    }
+
+    return null;
+  }
+
+  setIVSDataAt(data, index = 0) {
+    // console.log("A index: ", index, ", XXXXX this.m_irds.length: ", this.m_irds.length);
+    if (index < this.m_irds.length) {
+      if (this.m_irds[index] != data) {
+        if (this.m_irds[index]) {
+          this.m_irds[index].destroy();
+        }
+
+        this.m_irds[index] = data;
+      } // console.log("A1 index: ", index, ", XXXXX  this.m_irds: ",  this.m_irds);
+
+    } else {
+      this.m_irds.push(data);
+    }
+
+    this.m_irdTotal = this.m_irds.length; // console.log("B index: ", index, ", XXXXX this.m_irdTotal: ", this.m_irdTotal);
+
+    this.indicesVer++;
+  }
+
+  getIvsDataTotal() {
+    return this.m_irdTotal;
+  }
+  /**
+   * this function is only an empty function.
+   */
+
+
+  destroy() {
+    this.m_layoutBit = 0;
+    this.m_irdTotal = 0;
+    this.m_irds.fill(null);
+    this.m_irds = [];
   }
 
 }
 
-exports.default = BytesTextureProxy;
+ROIVertexBuffer.s_uid = 0;
+exports.default = ROIVertexBuffer;
 
 /***/ }),
 
@@ -51201,12 +55173,6 @@ const Vector3D_1 = __importDefault(__webpack_require__("8e17"));
 
 class AABB {
   constructor() {
-    this.min = new Vector3D_1.default();
-    this.max = new Vector3D_1.default();
-    this.version = -1;
-    this.radius = 50;
-    this.radius2 = 2500;
-    this.center = new Vector3D_1.default(0.0, 0.0, 0.0);
     this.m_long = 100.0;
     this.m_width = 100.0;
     this.m_height = 100.0;
@@ -51214,6 +55180,12 @@ class AABB {
     this.m_halfWidth = 50.0;
     this.m_halfHeight = 50.0;
     this.m_tempV = new Vector3D_1.default();
+    this.version = -1;
+    this.radius = 50;
+    this.radius2 = 2500;
+    this.min = new Vector3D_1.default();
+    this.max = new Vector3D_1.default();
+    this.center = new Vector3D_1.default();
     this.reset();
   }
 
@@ -51230,10 +55202,10 @@ class AABB {
   }
 
   reset() {
-    let v = this.min;
-    v.x = v.y = v.z = MathConst_1.default.MATH_MAX_POSITIVE;
-    v = this.max;
-    v.x = v.y = v.z = MathConst_1.default.MATH_MIN_NEGATIVE;
+    const v0 = this.min;
+    const v1 = this.max;
+    v0.x = v0.y = v0.z = MathConst_1.default.MATH_MAX_POSITIVE;
+    v1.x = v1.y = v1.z = MathConst_1.default.MATH_MIN_NEGATIVE;
   }
 
   equals(ab) {
@@ -51243,16 +55215,13 @@ class AABB {
   setVolume(width, height, long) {
     this.m_width = width;
     this.m_height = height;
-    this.m_long = long; //
-
+    this.m_long = long;
     this.m_halfLong = 0.5 * this.m_long;
     this.m_halfWidth = 0.5 * this.m_width;
-    this.m_halfHeight = 0.5 * this.m_height; //
-
+    this.m_halfHeight = 0.5 * this.m_height;
     this.max.x = this.center.x + this.m_halfWidth;
     this.max.y = this.center.y + this.m_halfHeight;
-    this.max.z = this.center.z + this.m_halfLong; //
-
+    this.max.z = this.center.z + this.m_halfLong;
     this.min.x = this.center.x - this.m_halfWidth;
     this.min.y = this.center.y - this.m_halfHeight;
     this.min.z = this.center.z - this.m_halfLong;
@@ -51267,91 +55236,85 @@ class AABB {
   }
 
   addPosition(pv) {
-    if (this.min.x > pv.x) this.min.x = pv.x;
-    if (this.min.y > pv.y) this.min.y = pv.y;
-    if (this.min.z > pv.z) this.min.z = pv.z;
-    if (this.max.x < pv.x) this.max.x = pv.x;
-    if (this.max.y < pv.y) this.max.y = pv.y;
-    if (this.max.z < pv.z) this.max.z = pv.z;
+    this.addXYZ(pv.x, pv.y, pv.z);
+    return this;
   }
 
   addXYZ(pvx, pvy, pvz) {
-    if (this.min.x > pvx) this.min.x = pvx;
-    if (this.min.y > pvy) this.min.y = pvy;
-    if (this.min.z > pvz) this.min.z = pvz;
-    if (this.max.x < pvx) this.max.x = pvx;
-    if (this.max.y < pvy) this.max.y = pvy;
-    if (this.max.z < pvz) this.max.z = pvz;
+    const min = this.min;
+    const max = this.max;
+    if (min.x > pvx) min.x = pvx;
+    if (max.x < pvx) max.x = pvx;
+    if (min.y > pvy) min.y = pvy;
+    if (max.y < pvy) max.y = pvy;
+    if (min.z > pvz) min.z = pvz;
+    if (max.z < pvz) max.z = pvz;
   }
 
-  addXYZFloat32Arr(vs, step = 3) {
+  addFloat32Arr(vs, step = 3) {
     let len = vs.length;
-    let pvx = 0.0;
-    let pvy = 0.0;
-    let pvz = 0.0;
 
-    for (let i = 0; i < len;) {
-      pvx = vs[i];
-      pvy = vs[i + 1];
-      pvz = vs[i + 2];
-      i += step;
-      if (this.min.x > pvx) this.min.x = pvx;
-      if (this.min.y > pvy) this.min.y = pvy;
-      if (this.min.z > pvz) this.min.z = pvz;
-      if (this.max.x < pvx) this.max.x = pvx;
-      if (this.max.y < pvy) this.max.y = pvy;
-      if (this.max.z < pvz) this.max.z = pvz;
+    if (step >= 3) {
+      for (let i = 0; i < len;) {
+        this.addXYZ(vs[i], vs[i + 1], vs[i + 2]);
+        i += step;
+      }
+    }
+
+    if (step == 2) {
+      for (let i = 0; i < len;) {
+        this.addXYZ(vs[i], vs[i + 1], 0.0);
+        i += step;
+      }
     }
   }
 
-  addXYZFloat32AndIndicesArr(vs, indices) {
+  addFloat32AndIndices(vs, indices, step = 3) {
     let len = indices.length;
-    let pvx = 0.0;
-    let pvy = 0.0;
-    let pvz = 0.0;
     let i;
 
-    for (let k = 0; k < len; k++) {
-      i = k * 3;
-      pvx = vs[i++];
-      pvy = vs[i++];
-      pvz = vs[i];
-      if (this.min.x > pvx) this.min.x = pvx;
-      if (this.min.y > pvy) this.min.y = pvy;
-      if (this.min.z > pvz) this.min.z = pvz;
-      if (this.max.x < pvx) this.max.x = pvx;
-      if (this.max.y < pvy) this.max.y = pvy;
-      if (this.max.z < pvz) this.max.z = pvz;
+    if (step >= 3) {
+      for (let k = 0; k < len; k++) {
+        i = indices[k] * step;
+        this.addXYZ(vs[i++], vs[i++], vs[i]);
+      }
+    } else if (step == 2) {
+      for (let k = 0; k < len; k++) {
+        i = indices[k] * step;
+        this.addXYZ(vs[i++], vs[i], 0.0);
+      }
     }
   }
 
   getClosePosition(in_pos, out_pos, bias = 0.0) {
+    const min = this.min;
+    const max = this.max;
     out_pos.copyFrom(in_pos);
 
-    if (out_pos.x < this.min.x) {
-      out_pos.x = this.min.x + bias;
-    } else if (out_pos.x > this.max.x) {
-      out_pos.x = this.max.x - bias;
+    if (out_pos.x < min.x) {
+      out_pos.x = min.x + bias;
+    } else if (out_pos.x > max.x) {
+      out_pos.x = max.x - bias;
     }
 
-    if (out_pos.y < this.min.y) {
-      out_pos.y = this.min.y + bias;
-    } else if (out_pos.y > this.max.y) {
-      out_pos.y = this.max.y - bias;
+    if (out_pos.y < min.y) {
+      out_pos.y = min.y + bias;
+    } else if (out_pos.y > max.y) {
+      out_pos.y = max.y - bias;
     }
 
-    if (out_pos.z < this.min.z) {
-      out_pos.z = this.min.z + bias;
-    } else if (out_pos.z > this.max.z) {
-      out_pos.z = this.max.z - bias;
+    if (out_pos.z < min.z) {
+      out_pos.z = min.z + bias;
+    } else if (out_pos.z > max.z) {
+      out_pos.z = max.z - bias;
     }
   } // @param	v	Vector3D instance
 
 
   containsV(v) {
-    if (v.x < this.max.x || v.x > this.max.x) return false;
-    if (v.y < this.max.y || v.y > this.max.y) return false;
-    if (v.z < this.max.z || v.z > this.max.z) return false;
+    if (v.x < this.min.x || v.x > this.max.x) return false;
+    if (v.y < this.min.y || v.y > this.max.y) return false;
+    if (v.z < this.min.z || v.z > this.max.z) return false;
     return true;
   } // 是否包含某一点(同一坐标空间的点)
 
@@ -51415,10 +55378,7 @@ class AABB {
     this.m_halfHeight = this.center.y;
     this.radius2 = this.m_halfWidth * this.m_halfWidth + this.m_halfHeight * this.m_halfHeight + this.m_halfLong * this.m_halfLong;
     this.radius = Math.sqrt(this.radius2);
-    this.center.addBy(this.min); // this.center.x += this.min.x;
-    // this.center.y += this.min.y;
-    // this.center.z += this.min.z;
-
+    this.center.addBy(this.min);
     ++this.version;
   }
 
@@ -51527,6 +55487,14 @@ class TextureFormat {
         return gl.R8;
         break;
 
+      case tf.R16F:
+        return gl.R16F;
+        break;
+
+      case tf.R32F:
+        return gl.R32F;
+        break;
+
       case tf.RGB:
         return gl.RGB;
         break;
@@ -51591,6 +55559,8 @@ class TextureFormat {
 }
 
 TextureFormat.R8 = 101;
+TextureFormat.R16F = 102;
+TextureFormat.R32F = 102;
 TextureFormat.RGB = 110;
 TextureFormat.RED = 111;
 TextureFormat.RGBA = 121;
