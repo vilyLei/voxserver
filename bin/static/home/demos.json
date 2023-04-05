@@ -115,6 +115,22 @@
         {
             "name": "normalViewer",
             "info": "a 3d editor"
+        },
+        {
+            "name": "sphereOcclusion",
+            "info": "遮挡剔除Demo1(space occlusion demo1)"
+        },
+        {
+            "name": "boxOcclusion",
+            "info": "遮挡剔除Demo2(space occlusion demo2)"
+        },
+        {
+            "name": "boxWall2Occlusion",
+            "info": "遮挡剔除Demo3(space occlusion demo3)"
+        },
+        {
+            "name": "occPOVBuilding",
+            "info": "遮挡剔除Demo4(space occlusion demo4)"
         }
     ]
 }
