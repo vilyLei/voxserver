@@ -147,6 +147,10 @@
         {
             "name": "vtxDrawingInfo",
             "info": "几何操作Demo1(geometry operation demo1)"
+        },
+        {
+            "name": "timeClock2",
+            "info": "渲染管理容器工作流Demo1(rendering container workflow)"
         }
     ]
 }
