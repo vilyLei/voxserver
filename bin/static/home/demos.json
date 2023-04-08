@@ -150,7 +150,11 @@
         },
         {
             "name": "timeClock2",
-            "info": "渲染管理容器工作流Demo1(rendering container workflow)"
+            "info": "渲染容器工作流Demo1(rendering container workflow)"
+        },
+        {
+            "name": "renderingSort1",
+            "info": "渲染排序工作流Demo1(rendering sort workflow)"
         }
     ]
 }
