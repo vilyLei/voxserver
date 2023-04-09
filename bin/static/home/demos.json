@@ -155,6 +155,10 @@
         {
             "name": "renderingSort1",
             "info": "渲染排序工作流Demo1(rendering sort workflow)"
+        },
+        {
+            "name": "normalMapVerifier",
+            "info": "Normal Map 检查器(normal map verifier)"
         }
     ]
 }
