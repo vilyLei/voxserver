@@ -45,6 +45,10 @@
             "info": "跟随粒子Demo1(path following particle demo)"
         },
         {
+            "name": "followParticleShooter",
+            "info": "粒子发射器following particle shooter demo)"
+        },
+        {
             "name": "vsmShadow",
             "info": "阴影和雾(shadow and fog)"
         },
