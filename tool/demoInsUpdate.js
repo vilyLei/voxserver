@@ -1,4 +1,5 @@
 // 用法: node demoInsUpdate.js emptyRenderer
+// 用法: node demoInsUpdate.js normalViewer
 var arguments = process.argv;
 var params = [];
 arguments.forEach((val, index) => {
