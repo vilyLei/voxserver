@@ -86,7 +86,7 @@ function updateFileVer(path, fileName) {
 		if (err) throw err;
 
 		let verInfo = JSON.parse(data);
-		console.log("verInfo: ", verInfo);
+		// console.log("verInfo: ", verInfo);
 		console.log("fileName: ", fileName);
 		let demos = verInfo.demos;
 		console.log("demos.length: ", demos.length);
