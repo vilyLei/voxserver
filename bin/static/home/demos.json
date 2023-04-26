@@ -163,6 +163,10 @@
         {
             "name": "normalMapVerifier",
             "info": "Normal Map 检查器(normal map verifier)"
+        },
+        {
+            "name": "normalMapBuilder",
+            "info": "Normal Map 生成器(normal map builder)"
         }
     ]
 }
