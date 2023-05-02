@@ -96,7 +96,7 @@ function updateFileVer(path, fileName) {
 				console.log("XXX A ver: ", ver);
 				ver += 0.01;
 				console.log("XXX B ver: ", ver);
-				demos[i].ver = ver + "";
+				demos[i].ver = ver.toFixed(4) + "";
 				console.log("XXX C demos[i].ver = ver: ", demos[i].ver = ver);
 				break;
 			}
