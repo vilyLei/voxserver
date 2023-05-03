@@ -165,8 +165,8 @@
             "info": "Normal Map 检查器(normal map verifier)"
         },
         {
-            "name": "normalMapBuilder",
-            "info": "Normal Map 生成器(normal map builder)"
+            "name": "deferredManyLights2",
+            "info": "延迟光照demo(1024 dynamic lights with tile base light)"
         }
     ]
 }
