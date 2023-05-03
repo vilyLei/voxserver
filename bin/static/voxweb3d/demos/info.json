@@ -172,10 +172,6 @@
         {
             "name": "normalMapBuilder",
             "ver": 1.02
-        },
-        {
-            "name": "deferredManyLights2",
-            "ver": 1.00
         }
     ]
 }
