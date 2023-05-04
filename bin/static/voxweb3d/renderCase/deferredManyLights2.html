@@ -1,0 +1,269 @@
+$def with (clip)
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Vox Renderer Demo</title>
+    <style type="text/css">
+      hr{
+        display: block;
+        position: relative;
+        padding: 0;
+        margin: 0px auto;
+        height: 0;
+        width: 100%;
+        max-height: 0;
+        font-size: 1px;
+        line-height: 0;
+        clear: both;
+        border: none;
+        border-top: 1px solid #222222;
+        border-bottom: 1px solid #000000;
+     }
+      #glcanvas {
+        display: bolck;
+	      width: 100%;
+	      height: 100%;
+        left: 0px;
+        top: 0px;
+	      position: absolute;
+      }
+      #divBody
+      {
+          vertical-align:top;
+          padding: 0;
+          margin-left: auto;
+          margin-right: auto;
+          margin-top: 0;
+          display: block;
+          width: 900px;
+          height: 1000px;
+          position: absolute;
+          top: 0;
+          bottomArea: 0;
+          left: 0;
+          right: 0;
+          color:#efefef;
+          background-color: #050505;
+		  }
+      #divHead
+      {
+          display: bolck;
+          width:100%;height: 50px;
+          background-color:#0b0c10;
+          margin: auto;
+          position: absolute;
+      }
+      #divHeadMore
+      {
+          display: bolck;
+          width:28px;
+          height:80px;
+          color:#ffffff;
+          left: 900px;
+          top: 600px;
+          position: absolute;
+          background-color: #050505;
+          font-size:14;
+      }
+      #GlslPlayer
+      {
+          width: 800px;height: 640px;
+          left: 50px;
+          top: 50px;
+          position: absolute;
+      }
+      #GlslMenu
+      {
+          visibility:hidden;
+          width: 900px;height: 230px;
+          left: 0px;
+          top: 600px;
+          position: absolute;
+          background-color:#111111;
+          color:#555555;
+      }
+      #GlslMenuListLeft
+      {
+          width: 230px;height: 100px;
+          left: 80px;
+          top: 20px;
+          position: absolute;
+          color:#aaaaaa;
+      }
+      #GlslMenuListMiddle
+      {
+          width: 250px;height: 100px;
+          left: 350px;
+          top: 20px;
+          position: absolute;
+          color:#aaaaaa;
+      }
+      #GlslMenuListRight
+      {
+          width: 250px;height: 100px;
+          left: 610px;
+          top: 20px;
+          position: absolute;
+          color:#aaaaaa;
+      }
+      #GlslMenuPageList
+      {
+          width: 10px;height: 40px;
+          left: 50px;
+          top: 190px;
+          position: absolute;
+      }
+      #playerBottom
+      {
+          width:100%;height: 30px;
+          background-color:#010101;
+          left: 0px;
+          top: 570px;
+          position: absolute;
+      }
+      #playerBottomTitle
+      {
+          width:100;height: 30px;
+          background-color:#010101;
+          left: 0px;
+          top: 5px;
+          position: absolute;
+      }
+      #playerBottomFPS
+      {
+          width:100;height: 30px;
+          color:#555555;
+          left: 840px;
+          top: 5px;
+          position: absolute;
+      }
+      #pauseButton
+      {
+          visibility: visible;
+          background-color: Transparent;
+          background-repeat: no-repeat;
+          border: none;
+          cursor: pointer;
+          overflow: hidden;
+          outline: none;
+          left: 445px;
+          top: 3px;
+          position: absolute;
+      }
+      #playButton
+      {   visibility: hidden;
+          background-color: Transparent;
+          background-repeat: no-repeat;
+          border: none;
+          cursor: pointer;
+          overflow: hidden;
+          outline: none;
+          left: 445px;
+          top: 3px;
+          position: absolute;
+      }
+      #bottomArea
+      {
+          width:100%;height: 370px;background-color: #050505;
+          left: 0px;
+          top: 600px;
+          position: absolute;
+          font-size:14;
+      }
+      #codeDisp
+      {
+          color:rgb(169, 159, 194);
+          font-size:14;
+      }
+      #MainTitleText
+      { 
+        color: #efefef;
+      }
+      #fontTex {
+        background-color: transparent;
+        position: absolute;
+        left: 0px;
+        top: 0px;
+        z-index: 10;
+      }
+      #mandarin {
+        background-color: transparent;
+        position: absolute;
+        left: 0px;
+        top: 80px;
+        z-index: 11;
+        visibility: hidden;
+      }
+      #text {
+        background-color: transparent;
+        position: absolute;
+        z-index: 12;
+      }
+      a:link {
+        color: rgb(117, 10, 94);
+        text-decoration: none;
+      }
+      body {
+        border: 0;
+        background-color:#1a1a1d;
+      }
+    </style>
+    <script>
+        ////////////////////////////////////////////////////////////////
+        let arr = window.location.href.split("=");
+        var homeDir = arr[1].split("&")[0];
+        
+        function Module__runCall(rcs)
+        {
+            if(RenderModule != null)
+            {
+            }
+        }
+        function strFirstCharUpperCase(str)
+        {
+            return str = str.slice(0, 1).toUpperCase() + str.slice(1);
+        }
+        function showDemoName(demoNameStr)
+        {
+        }
+        function showAList(paramsArray,listIdns)
+        {
+        }
+        function hideAList(listIdns)
+        {
+        }
+        function hideList()
+        {
+        }
+    </script>
+  </head>
+
+  <body id="body">
+      <div id="divBody">
+        <div id="divHead">
+          <center/>
+          <p><font id="MainTitleText">Vox Renderer Demo</font></p>
+        </div>
+        <div id="GlslPlayer">
+            <canvas id="glcanvas"></canvas>
+        </div>
+        <div id="playerBottom">
+            <div id="playerBottomTitle">
+            </div>
+            <div id="playerBottomFPS">
+            </div>
+        </div>
+        <div id="divHeadMore">
+          <!--<a onclick="toDoS();" href="#">更多...</a>-->
+          <a href="javascript:showOrHideMenuList();"><br>&nbsp更<br>&nbsp多</a>
+        </div>
+        <div id="bottomArea">
+            <center><br/>Deferred Lighting: 2640 litghts
+            <center><br/>若加载比较慢请稍等片刻, 如果一段时间加载不到资源,请刷新页面再试
+        </div>
+      </div>
+      <canvas id="text" width="600" height="70"></canvas>
+  </body>
+  <script src="http://www.artvily.com:9090/static/voxweb3d/demos/deferredManyLights2.js"></script>
+</html>
