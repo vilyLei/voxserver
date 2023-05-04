@@ -9,11 +9,11 @@ import (
 )
 
 /*
-// ver 5.7以上修改root密码
-mysql -uroot
+// mysql 5.7 以上修改root密码
+// 首先使用旧密码进入mysql,接着执行如下命令
 use mysql;
 flush privileges;
-alter user 'root'@'localhost' identified by '你的密码';
+alter user 'root'@'localhost' identified by '123456';
 flush privileges;
 exit;
 */
