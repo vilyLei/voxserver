@@ -171,7 +171,6 @@ class DemoPostHttpReq {
 
     http.onreadystatechange = function () {
       if (http.readyState == 4 && http.status == 200) {
-        //alert(http.responseText);
         console.log("request success !!!");
       }else{
         console.log("request failure !!!, http.readyState: ", http.readyState, "http.status: ", http.status);
