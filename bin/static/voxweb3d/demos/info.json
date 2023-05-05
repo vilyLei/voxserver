@@ -172,6 +172,10 @@
         {
             "name": "normalMapBuilder",
             "ver": 1.02
+        },
+        {
+            "name": "obbIntersection",
+            "ver": 1.00
         }
     ]
 }
