@@ -1,5 +1,7 @@
 // 用法: node demoInsUpdate.js emptyRenderer
 // 用法: node demoInsUpdate.js normalViewer
+// 用法: node demoInsUpdate modelEditTransform voxwebui
+
 var arguments = process.argv;
 var params = [];
 arguments.forEach((val, index) => {
@@ -77,7 +79,15 @@ let srcCurrFilePath = "";
 let dstCurrFilePath = "";
 let dstCurrFileName = "";
 
-let file_srcDir = '../../voxweb3d/dist/';
+let srcDir = "voxweb3d";
+if (params.length > 3) {
+	srcDir = params[3];
+}
+
+let file_srcDir = `../../${srcDir}/dist/`;
+
+console.log("file_srcDir: ", file_srcDir);
+
 let file_dstDir = '../bin/static/voxweb3d/demos/';
 let verInfoFile = file_dstDir + "info.json";
 let filePath = file_dstDir;

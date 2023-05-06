@@ -12,7 +12,8 @@ pwin["VoxVerify"] = new VVF();
 ///////////////////////////////////////////////////////////////////////////////
 
 //  import {DemoBase as Demo} from "./demo/DemoBase";
- import {DemoPostHttpReq as Demo} from "./demo/DemoPostHttpReq";
+//  import {DemoPostHttpReq as Demo} from "./demo/DemoPostHttpReq";
+ import {DemoSock as Demo} from "./demo/DemoSock";
 
 document.title = "Vox APP";
 let ins = new Demo() as any;
