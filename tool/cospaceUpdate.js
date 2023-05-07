@@ -47,6 +47,8 @@ if (params.length > 2) {
 }
 
 let srcLibPath = `../../${srcLibPathDir}/public/static/cospace/`;
+console.log("srcLibPath: ", srcLibPath);
+
 let verInfoFilePath = "../bin/static/cospace/info.json";
 let versionInfo = {};
 let versionInfoMap = new Map();
