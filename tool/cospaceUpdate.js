@@ -1,8 +1,15 @@
 // 用法: node cospaceUpdate.js
+// 用法: node cospaceUpdate.js voxwebui
 
 const fs = require('fs');
 const crypto = require('crypto');
 const path = require("path");
+var arguments = process.argv;
+var params = [];
+arguments.forEach((val, index) => {
+	console.log(`${index}: ${val}`);
+	params.push(val + "");
+});
 
 function fsExistsSync(path) {
 	try {
@@ -34,7 +41,12 @@ function writeTxtFile(fUrl, txt) {
 		}
 	});
 }
+let srcLibPathDir = 'voxweb3d';
+if (params.length > 2) {
+	srcLibPathDir = params[2];
+}
 
+let srcLibPath = `../../${srcLibPathDir}/public/static/cospace/`;
 let verInfoFilePath = "../bin/static/cospace/info.json";
 let versionInfo = {};
 let versionInfoMap = new Map();
@@ -190,8 +202,11 @@ function updateAExistedFile(srcUrl, dstUrl, verItem, keyName) {
 		console.log("***找不到此文件的版本信息, url: ", srcUrl, ", keyName: ", keyName);
 	}
 }
+
+
+
 function updateLibs() {
-	walkSync('../../voxweb3d/public/static/cospace/', "../bin/static/", function (filePath, dstDir, stat) {
+	walkSync(srcLibPath, "../bin/static/", function (filePath, dstDir, stat) {
 		if (filePath.indexOf("umd.min.js") > 0) {
 			copyLibToServer(filePath, dstDir, true);
 		} else if (filePath.indexOf("\\dracoLib\\") > 0) {
