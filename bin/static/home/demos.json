@@ -172,6 +172,10 @@
         {
             "name": "obbIntersection",
             "info": "OBB相交测试(OBB Intersection)"
+        },
+        {
+            "name": "modelEditTransform",
+            "info": "3D模型缩放旋转平移操作(model transformation editing)"
         }
     ]
 }
