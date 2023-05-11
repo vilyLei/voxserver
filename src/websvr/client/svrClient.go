@@ -11,7 +11,6 @@ import (
 )
 
 // go mod init voxwebsvr.com/client
-// go mod edit -replace voxwebsvr.com/webfs=../webfs
 
 var unixEpochTime = time.Unix(0, 0)
 

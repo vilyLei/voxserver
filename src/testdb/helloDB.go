@@ -26,5 +26,6 @@ func main() {
 		fmt.Printf("open %s faild,err:%v\n", dsn, err)
 		return
 	}
+	fmt.Println("link cb success !!!")
 	fmt.Println("连接数据库成功~")
 }

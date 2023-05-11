@@ -27,6 +27,7 @@ import (
 // go mod init voxwebsvr.com/main
 // go mod edit -replace voxwebsvr.com/webfs=./webfs
 // go mod edit -replace voxwebsvr.com/client=./client
+// go mod tidy
 
 func SetRWriterStatus(w *http.ResponseWriter, code int) {
 	(*w).WriteHeader(code)
