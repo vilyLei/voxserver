@@ -28,7 +28,7 @@ func setupRouter() *gin.Engine {
 	r.GET("ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, "pong")
 	})
-
+	// ts 用此测试 post发送记录信息
 	userRepo := controllers.New()
 	r.POST("/users", userRepo.CreateUser)
 	r.GET("/users", userRepo.GetUsers)
