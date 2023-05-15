@@ -1,0 +1,246 @@
+{{ define "home/index.tmpl" }}
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>{{ .title }}</title>
+    <style type="text/css">
+        #divBody {
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            margin-left: auto;
+            margin-right: auto;
+            margin-top: 0;
+            display: block;
+            width: 900px;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            background-color: #676767;
+        }
+
+        #divHead {
+            display: bolck;
+            width: 100%;
+            height: 80px;
+            background-color: #404040;
+            margin: auto;
+            position: absolute;
+        }
+
+        #MainTitleText {
+            color: #efefef;
+        }
+
+        #playerDiv {
+            display: bolck;
+            width: 900px;
+            height: 350px;
+            left: 0px;
+            top: 0px;
+            position: absolute;
+        }
+
+        #preface {
+            width: 900px;
+            height: 350px;
+            left: 0px;
+            top: 0px;
+            position: absolute;
+            font-size: 20px;
+            color: #cccccc;
+            text-align: left;
+        }
+        .content_block {
+            width: 900px;
+            height: 300px;
+            position: absolute;
+            font-size: 20px;
+            color: #dddddd;
+            text-align: left;
+        }
+		#engineBlock {
+            left: 0px;
+            top: 350px;
+			background: url("static/home/block_02.jpg");
+			background-repeat: no-repeat;
+		}
+		#toolBlock {
+            left: 0px;
+            top: 650px;
+			background: url("static/home/block_03.jpg");
+			background-repeat: no-repeat;
+		}
+		#courseBlock {
+            left: 0px;
+            top: 950px;
+			background: url("static/home/block_00.jpg");
+			background-repeat: no-repeat;
+		}
+		#gameBlock {
+            left: 0px;
+            top: 1250px;
+			background: url("static/home/block_07.jpg");
+			background-repeat: no-repeat;
+		}
+		#wdesignBlock {
+            left: 0px;
+            top: 1550px;
+			background: url("static/home/block_04.jpg");
+			background-repeat: no-repeat;
+		}
+		#about {
+            width: 900px;
+            left: 0px;
+            top: 1850px;
+            position: absolute;
+            font-size: 16px;
+            color: #dddddd;
+            text-align: center;
+            background-color: #404040;
+        }
+
+        #a0 {
+            color: #46e942;
+        }
+
+        #link_demo {
+            color: #aabbbb;
+            font-size: 14pt;
+        }
+
+        #link_base {
+            color: #bbbbbb;
+            font-size: 14pt;
+        }
+
+        a:link {
+            color: #f04452;
+            text-decoration: none;
+        }
+
+        a:hover {
+            color: #ff0000;
+            text-decoration: underline;
+        }
+
+        body {
+            border: 0;
+            padding: 0;
+            background-image: url("static/assets/caustics_03d.jpg");
+        }
+    </style>
+    <script>
+        console.log("ArtVily Web Home.");
+		function applyPrefaceInfo() {
+			let str = `
+			<center />
+            <br/>
+            <br/>
+            <br/>
+            <br/>`;
+			if(navigator.language == "zh-CN") {
+				str += '<font color="#3838dd" size=5>保护环境<br/>关爱动物</font>';
+			}
+			else {
+				str += '<font color="#3838dd" size=5>Protect Environment<br/>Care for Animals</font>';
+			}
+			str +=
+			`
+			<br /><b><font color="#3807d7" size=7>RENDERING & ART</font></b>
+            <br />`;
+			if(navigator.language == "zh-CN") {
+				str += "欢&nbsp;&nbsp;&nbsp;迎"
+			}else {
+				str += "WELCOME"
+			}
+			let div = document.getElementById("preface");
+			div.innerHTML = str;
+		}
+		function bodyOnLoad() {
+			applyPrefaceInfo();
+		}
+        function load(purl) {
+            let codeLoader = new XMLHttpRequest();
+            codeLoader.open("GET", purl, true);
+            codeLoader.onerror = function (err) {
+                console.error("load error: ", err);
+            }
+            codeLoader.onprogress = (e) => { };
+            codeLoader.onload = () => {
+                let scriptEle = document.createElement("script");
+                scriptEle.onerror = (e) => { }
+                scriptEle.innerHTML = codeLoader.response;
+                document.head.appendChild(scriptEle);
+            }
+            codeLoader.send(null);
+        }
+		let host = "";
+        load(host + "static/home/index.js?ver=" + Math.random() + "vt" + Date.now());
+    </script>
+</head>
+
+<body id="body" onload="bodyOnLoad()">
+    <div id="divBody">
+		<center />
+        <div id="playerDiv"></div>
+        <div id="preface">
+        </div>
+        <div id="engineBlock" class="content_block" style="background-color: #336611;">
+			<center />
+            <br />
+            <br />
+            <br />
+            <br />
+			VOX 3D ENGINE
+            <br />
+        </div>
+        <div id="toolBlock" class="content_block" style="background-color: #332211;">
+			<center />
+            <br />
+            <br />
+            <br />
+            <br />
+			Tools
+            <br />
+        </div>
+        <div id="courseBlock" class="content_block" style="background-color: #332233;">
+			<center />
+            <br />
+            <br />
+            <br />
+            <br />
+			COURSE
+            <br />
+        </div>
+        <div id="gameBlock" class="content_block" style="background-color: #112233;">
+			<center />
+            <br />
+            <br />
+            <br />
+            <br />
+			Games
+            <br />
+        </div>
+        <div id="wdesignBlock" class="content_block" style="background-color: #152253;">
+			<center />
+            <br />
+            <br />
+            <br />
+            <br />
+			Web Page Feeling
+            <br />
+        </div>
+        <div id="about">
+			<center />
+			Contacts with me: vily313@126.com
+            <br />
+        </div>
+    </div>
+</body>
+</html>
+{{ end }}

@@ -25,6 +25,8 @@ func errorIs500Http(g *gin.Context) {
 	}()
 	g.Next()
 }
+
+// 404 error
 func NoRoute(g *gin.Context) {
 	g.String(http.StatusOK, fmt.Sprintf("It is a web page here. welcome back."))
 }
