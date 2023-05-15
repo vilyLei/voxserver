@@ -20,6 +20,9 @@ import (
 // export PATH=$PATH:/usr/local/go/bin
 // go build -o .\ ..\src\websvr\webserver.go
 // go build -o ../../bin/ webserver.go
+
+// go build -o ../../bin/ webresserver.go
+
 // go build ../src/websvr/webserver.go
 // go run ../src/websvr/webserver.go
 // go build -o ../../bin/ webserver.go
