@@ -55,6 +55,7 @@
             color: #cccccc;
             text-align: left;
         }
+
         .content_block {
             width: 900px;
             height: 300px;
@@ -63,37 +64,43 @@
             color: #dddddd;
             text-align: left;
         }
-		#engineBlock {
+
+        #engineBlock {
             left: 0px;
             top: 350px;
-			background: url("static/home/assets/block_02.jpg");
-			background-repeat: no-repeat;
-		}
-		#toolBlock {
+            background: url("static/home/assets/block_02.jpg");
+            background-repeat: no-repeat;
+        }
+
+        #toolBlock {
             left: 0px;
             top: 650px;
-			background: url("static/home/assets/block_03.jpg");
-			background-repeat: no-repeat;
-		}
-		#courseBlock {
+            background: url("static/home/assets/block_03.jpg");
+            background-repeat: no-repeat;
+        }
+
+        #courseBlock {
             left: 0px;
             top: 950px;
-			background: url("static/home/assets/block_00.jpg");
-			background-repeat: no-repeat;
-		}
-		#gameBlock {
+            background: url("static/home/assets/block_00.jpg");
+            background-repeat: no-repeat;
+        }
+
+        #gameBlock {
             left: 0px;
             top: 1250px;
-			background: url("static/home/assets/block_07.jpg");
-			background-repeat: no-repeat;
-		}
-		#wdesignBlock {
+            background: url("static/home/assets/block_07.jpg");
+            background-repeat: no-repeat;
+        }
+
+        #wdesignBlock {
             left: 0px;
             top: 1550px;
-			background: url("static/home/assets/block_04.jpg");
-			background-repeat: no-repeat;
-		}
-		#about {
+            background: url("static/home/assets/block_04.jpg");
+            background-repeat: no-repeat;
+        }
+
+        #about {
             width: 900px;
             left: 0px;
             top: 1850px;
@@ -136,34 +143,39 @@
     </style>
     <script>
         console.log("ArtVily Web Home.");
-		function applyPrefaceInfo() {
-			let str = `
+        function getDomain(url) {
+            var urlReg = /http:\/\/([^\/]+)/i;
+            domain = url.match(urlReg);
+            return ((domain != null && domain.length > 0) ? domain[0] : "");
+        }
+        function applyPrefaceInfo() {
+            let str = `
 			<center />
             <br/>
             <br/>
             <br/>
             <br/>`;
-			if(navigator.language == "zh-CN") {
-				str += '<font color="#3838dd" size=5>保护环境<br/>关爱动物</font>';
-			}
-			else {
-				str += '<font color="#3838dd" size=5>Protect Environment<br/>Care for Animals</font>';
-			}
-			str +=
-			`
+            if (navigator.language == "zh-CN") {
+                str += '<font color="#3838dd" size=5>保护环境<br/>关爱动物</font>';
+            }
+            else {
+                str += '<font color="#3838dd" size=5>Protect Environment<br/>Care for Animals</font>';
+            }
+            str +=
+                `
 			<br /><b><font color="#3807d7" size=7>RENDERING & ART</font></b>
             <br />`;
-			if(navigator.language == "zh-CN") {
-				str += "欢&nbsp;&nbsp;&nbsp;迎"
-			}else {
-				str += "WELCOME"
-			}
-			let div = document.getElementById("preface");
-			div.innerHTML = str;
-		}
-		function bodyOnLoad() {
-			applyPrefaceInfo();
-		}
+            if (navigator.language == "zh-CN") {
+                str += "欢&nbsp;&nbsp;&nbsp;迎"
+            } else {
+                str += "WELCOME"
+            }
+            let div = document.getElementById("preface");
+            div.innerHTML = str;
+        }
+        function bodyOnLoad() {
+            applyPrefaceInfo();
+        }
         function load(purl) {
             let codeLoader = new XMLHttpRequest();
             codeLoader.open("GET", purl, true);
@@ -179,68 +191,75 @@
             }
             codeLoader.send(null);
         }
-		let host = "";
+        let host = location.href;
+        console.log("A host: ", host);
+        host = getDomain(host);
+        console.log("B host: ", host);
+        let nsList = host.split(":");
+        host = nsList[0]+":"+nsList[1] + ":9090/";
+        console.log("C host: ", host);
         load(host + "static/home/index.js?ver=" + Math.random() + "vt" + Date.now());
     </script>
 </head>
 
 <body id="body" onload="bodyOnLoad()">
     <div id="divBody">
-		<center />
+        <center />
         <div id="playerDiv"></div>
         <div id="preface">
         </div>
         <div id="engineBlock" class="content_block" style="background-color: #336611;">
-			<center />
+            <center />
             <br />
             <br />
             <br />
             <br />
-			VOX 3D ENGINE
+            VOX 3D ENGINE
             <br />
         </div>
         <div id="toolBlock" class="content_block" style="background-color: #332211;">
-			<center />
+            <center />
             <br />
             <br />
             <br />
             <br />
-			Tools
+            Tools
             <br />
         </div>
         <div id="courseBlock" class="content_block" style="background-color: #332233;">
-			<center />
+            <center />
             <br />
             <br />
             <br />
             <br />
-			COURSE
+            COURSE
             <br />
         </div>
         <div id="gameBlock" class="content_block" style="background-color: #112233;">
-			<center />
+            <center />
             <br />
             <br />
             <br />
             <br />
-			Games
+            Games
             <br />
         </div>
         <div id="wdesignBlock" class="content_block" style="background-color: #152253;">
-			<center />
+            <center />
             <br />
             <br />
             <br />
             <br />
-			Web Page Feeling
+            Web Page Feeling
             <br />
         </div>
         <div id="about">
-			<center />
-			Contacts with me: vily313@126.com
+            <center />
+            Contacts with me: vily313@126.com
             <br />
         </div>
     </div>
 </body>
+
 </html>
 {{ end }}
