@@ -66,6 +66,8 @@ func queryMore(n int) {
 	}
 	// 3.一定要关闭rows
 	defer rows.Close()
+	// rowsTotal := len(*rows)
+	// fmt.Println("rowsTotal: ", rowsTotal)
 	// 4.循环取值
 	for rows.Next() {
 		var u1 user

@@ -11,6 +11,8 @@ import (
 	"os"
 )
 
+// go mod init voxwebsvr.com/webfs
+
 func LoadFile(path string) []string {
 	// 打开指定文件夹
 	f, err := os.OpenFile(path, os.O_RDONLY, os.ModeDir)

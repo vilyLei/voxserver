@@ -1,0 +1,29 @@
+{
+    "demos": [
+
+        {
+            "name": "slickRoad",
+            "info": "road model editor"
+        },
+        {
+            "name": "slickRoadViewer",
+            "info": "road model viewer"
+        },
+        {
+            "name": "renderingVerifier",
+            "info": "1000W+ triangles rendering verifier"
+        },
+        {
+            "name": "normalViewer",
+            "info": "模型法线问题查看器(model normal viewer)"
+        },
+        {
+            "name": "normalMapVerifier",
+            "info": "Normal Map 检查器(normal map verifier)"
+        },
+        {
+            "name": "pngtoy",
+            "info": "去除背景生成透明背景PNG图(build png from an image)"
+        }
+    ]
+}

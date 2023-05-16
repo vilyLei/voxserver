@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/gin-gonic/gin"
+	"voxwebsvr.com/database"
 	"voxwebsvr.com/svr"
 )
 
@@ -27,10 +28,14 @@ import (
 // go mod edit -replace voxwebsvr.com/webfs=./webfs
 // go mod edit -replace voxwebsvr.com/client=./client
 // go mod edit -replace voxwebsvr.com/svr=./svr
+// go mod edit -replace voxwebsvr.com/database=./database
 // go mod tidy
 
 func main() {
-
+	// thanks: https://gin-gonic.com/docs/examples/serving-static-files/
+	// router.Static("/static", "./static")
+	// router.StaticFS("/more_static", http.Dir("common_file_system"))
+	// router.StaticFile("/favicon.ico", "./resources/favicon.ico")
 	// for i ,v := range os.Args {
 	// 	fmt.Println(i, v)
 	// }
@@ -51,9 +56,20 @@ func main() {
 	fmt.Println("Web Server version 1.0.13")
 	fmt.Println("Web Server started at port: ", portStr)
 
+	fmt.Println("init database sys ...")
+	dbErr := database.InitWebPageStatusDB()
+	if dbErr != nil {
+		fmt.Printf("database sys init failed,err%v\n", err)
+	}
+	fmt.Println("init database sys success !!!")
+	database.QuerySitePageReqCountByID(1)
+	// database.UpdateSitePageReqCountByID(1, 1)
+
 	router := gin.Default()
 	svr.InitPages(router)
 	svr.ApplyStaticFileService(router, "./static")
+	// router.StaticFile("/favicon.ico", "./static/favicon.ico")
 
 	router.Run(":" + portStr)
+
 }
