@@ -15,17 +15,16 @@ import (
 	"voxwebsvr.com/client"
 )
 
-// strconv.Itoa
-// nohup ./webserver &
+// nohup ./webresserver &
 // export PATH=$PATH:/usr/local/go/bin
-// go build -o .\ ..\src\websvr\webserver.go
-// go build -o ../../bin/ webserver.go
+// go build -o .\ ..\src\websvr\webresserver.go
+// go build -o ../../bin/ webresserver.go
 
 // go build -o ../../bin/ webresserver.go
 
-// go build ../src/websvr/webserver.go
-// go run ../src/websvr/webserver.go
-// go build -o ../../bin/ webserver.go
+// go build ../src/websvr/webresserver.go
+// go run ../src/websvr/webresserver.go
+// go build -o ../../bin/ webresserver.go
 
 // go mod init voxwebsvr.com/main
 // go mod edit -replace voxwebsvr.com/webfs=./webfs
