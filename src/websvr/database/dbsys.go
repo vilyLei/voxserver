@@ -28,31 +28,6 @@ insert into pagestatus values(
 
 	1,'website',0,'non-src', 'web site all'
 	);
-
-insert into pagestatus values(
-
-	2,'website-engine',0,'non-src', 'web engine page'
-	);
-
-insert into pagestatus values(
-
-	3,'website-tool',0,'non-src', 'web tool page'
-	);
-
-insert into pagestatus values(
-
-	4,'website-game',0,'non-src', 'web game page'
-	);
-
-insert into pagestatus values(
-
-	5,'website-course',0,'non-src', 'web course page'
-	);
-
-insert into pagestatus values(
-
-	6,'website-renderCase',0,'non-src', 'web renderCase page'
-	);
 */
 type PageStatusNode struct {
 	id    int

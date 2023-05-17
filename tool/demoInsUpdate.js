@@ -1,5 +1,6 @@
 // 用法: node demoInsUpdate.js emptyRenderer
 // 用法: node demoInsUpdate.js normalViewer
+// 用法: node demoInsUpdate.js normalViewer
 // 用法: node demoInsUpdate modelEditTransform voxwebui
 
 var arguments = process.argv;
