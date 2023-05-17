@@ -69,7 +69,7 @@ func buildInsertPageStSQL(id int, name string) string {
 	idStr := strconv.Itoa(id)
 	// sqlStr := `insert into person(id, name, count, src, info) values(0,"Lucy","a sunshine woman.")`
 	sqlStr := `insert into pagestatus(id, name, count, src, info) values(`
-	sqlStr += idStr + `,"` + name + `", 0, "non-src", "demo ins page")`
+	sqlStr += idStr + `,"` + name + `", 0, "non-src", "demo ins page");`
 	return sqlStr
 }
 
@@ -109,7 +109,8 @@ func insertPageStRecord(id int, name string) {
 }
 func InitWebPageStatusDB() (err error) {
 
-	dsn := "root:123456@tcp(127.0.0.1:3306)/webpagestatus"
+	dsn := "root:123456@tcp(127.0.0.1:3306)/webpagestatus?multiStatements=true" // 可执行多条语句
+	// dsn := "root:123456@tcp(127.0.0.1:3306)/webpagestatus"
 
 	web_pst_db, err = sql.Open("mysql", dsn) // open不会检验用户名和密码
 	if err != nil {
@@ -257,7 +258,7 @@ func QuerySitePageReqCountByID(id int) {
 }
 
 func UpdateSitePageReqCountByID(count int, id int) {
-	sqlStr := `update pagestatus set count=? where id=?`
+	sqlStr := `update pagestatus set count=? where id=?;`
 	ret, err := web_pst_db.Exec(sqlStr, count, id)
 	if err != nil {
 		fmt.Printf("update failed ,err:%v\n", err)
