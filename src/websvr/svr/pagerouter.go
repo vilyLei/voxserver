@@ -54,7 +54,7 @@ func IndexPage(g *gin.Context) {
 	// 	// fmt.Println("req IndexPage() defer func call end...")
 	// }()
 	viewsTotalStr := strconv.Itoa(database.GetPageViewCountByName(ns) + 1)
-	allViewsTotStr := strconv.Itoa(database.GetPageViewsTotal())
+	allViewsTotStr := strconv.Itoa(database.GetPageViewsTotal() + 1)
 	defer func() {
 		database.IncreasePageViewCountByName(ns)
 	}()
