@@ -13,6 +13,9 @@ import (
 
 func InitPages(router *gin.Engine) {
 	InitTemplate(router)
+
+	router.NoRoute(NoRoute)
+
 	router.GET("/", IndexPage)
 
 	router.GET("/engine", EnginePage)
@@ -37,6 +40,11 @@ func InitPages(router *gin.Engine) {
 	router.GET("/updatePageInsStatus", UpdatePageInsStatusInfo)
 
 	router.GET("/renderCase", RenderCasePage)
+}
+
+// 404 error
+func NoRoute(g *gin.Context) {
+	g.String(http.StatusOK, fmt.Sprintf("404 page not found here."))
 }
 func InitTemplate(router *gin.Engine) {
 	router.LoadHTMLGlob("webdyndata/templates/**/*")
