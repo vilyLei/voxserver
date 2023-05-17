@@ -146,6 +146,23 @@
     </style>
 	<link rel="icon" href="/static/favicon.ico" type="image/x-icon" />
     <script>
+
+		let isLZHCN = navigator.language == "zh-CN";
+		var stils = [];
+		var CURR_PAGE_ST_INFO_LIST = stils;
+		function initPageST() {
+			let info2 = "Number of views"
+			let info1 = "Contacts with me";
+			if(isLZHCN) {
+				info2 = "浏览次数";
+				info1 = "联系我们";
+			}
+			info1 += "(vily313@126.com)";
+			info2 += "({{ .viewsTotal }})";
+			stils.push(info1, info2);
+		}
+		initPageST();
+
 		function getDomain(url) {
             var urlReg = /http:\/\/([^\/]+)/i;
             let domain = url.match(urlReg);
@@ -176,13 +193,11 @@
         }
 
         let host = getHostUrl();
-        load(host + "static/voxweb3d/tools/index.js?ver=" + Math.random() + "vt" + Date.now());
+        load(host + "static/voxweb3d/games/index.js?ver=" + Math.random() + "vt" + Date.now());
 
         function applyPrefaceInfo() {
             let str = `
 			<center />
-            <br/>
-            <br/>
             <br/>
             <br/>
             <br/>
@@ -203,7 +218,6 @@
         }
 
 		let pageHost = getHostUrl();
-		console.log("pageHost: ", pageHost);
 		function gotoHomePage() {
 			let url = pageHost;
 			console.log("goto home page url: ", url);

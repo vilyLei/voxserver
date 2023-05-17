@@ -1,0 +1,63 @@
+{{ define "renderCases/index.tmpl" }}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <meta charset="utf-8">
+    <title>{{ .title }}</title>
+	<script>
+
+		let isLZHCN = navigator.language == "zh-CN";
+		var stils = [];
+		var CURR_PAGE_ST_INFO_LIST = stils;
+		function initPageST() {
+			let info2 = "Number of views"
+			let info1 = "Contacts with me";
+			if(isLZHCN) {
+				info2 = "浏览次数";
+				info1 = "联系我们";
+			}
+			info1 += "(vily313@126.com)";
+			info2 += "({{ .viewsTotal }})";
+			let info3 = "insViewsTotal({{ .insViewsTotal }})";
+			stils.push(info1, info2, info3);
+		}
+		initPageST();
+
+		function getDomain(url) {
+            var urlReg = /http:\/\/([^\/]+)/i;
+            let domain = url.match(urlReg);
+            return ((domain != null && domain.length > 0) ? domain[0] : "");
+        }
+		function getHostUrl(port) {
+			let host = location.href;
+			let domain = getDomain(host);
+			let nsList = host.split(":");
+			host = nsList[0]+":"+nsList[1];
+			return port ? host + ":"+port+"/" : domain + "/";
+		}
+        function bodyOnLoad() {
+			let scriptEle = document.createElement("script");
+            scriptEle.onerror = (e) => {
+                console.error("module script onerror, e: ", e);
+            }
+			let sample = "{{ .sample }}";
+			// console.log("XXX XXX sample: ", sample);
+			let loader = "demoLoader11.js";
+			if(sample == "toolLoader") {
+				loader = "toolLoader10.js"
+			}
+			let url = getHostUrl("9090") + "static/voxweb3d/demos/" + loader;
+			// console.log("url: ", url);
+            scriptEle.src = url;
+            document.head.appendChild(scriptEle);
+        }
+	</script>
+</head>
+<body onload="bodyOnLoad()">
+  <div id="app"></div>
+</body>
+</html>
+{{ end }}

@@ -11,7 +11,7 @@
             padding: 0;
             margin: 0px auto;
             height: 0;
-            width: 100%;
+            width: 899px;
             max-height: 0;
             font-size: 1px;
             line-height: 0;
@@ -36,15 +36,6 @@
             left: 0;
             right: 0;
             background-color: #676767;
-        }
-
-        #divHead {
-            display: bolck;
-            width: 100%;
-            height: 80px;
-            background-color: #404040;
-            margin: auto;
-            position: absolute;
         }
 
         #MainTitleText {
@@ -146,6 +137,22 @@
     </style>
 	<link rel="icon" href="/static/favicon.ico" type="image/x-icon" />
     <script>
+
+		let isLZHCN = navigator.language == "zh-CN";
+		var stils = [];
+		var CURR_PAGE_ST_INFO_LIST = stils;
+		function initPageST() {
+			let info2 = "Number of views"
+			let info1 = "Contacts with me";
+			if(isLZHCN) {
+				info2 = "浏览次数";
+				info1 = "联系我们";
+			}
+			info1 += "(vily313@126.com)";
+			info2 += "({{ .viewsTotal }})";
+			stils.push(info1, info2);
+		}
+		initPageST();
 		function getDomain(url) {
             var urlReg = /http:\/\/([^\/]+)/i;
             let domain = url.match(urlReg);

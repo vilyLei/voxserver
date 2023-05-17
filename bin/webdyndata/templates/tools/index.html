@@ -150,6 +150,23 @@
     </style>
 	<link rel="icon" href="/static/favicon.ico" type="image/x-icon" />
     <script>
+
+		let isLZHCN = navigator.language == "zh-CN";
+		var stils = [];
+		var CURR_PAGE_ST_INFO_LIST = stils;
+		function initPageST() {
+			let info2 = "Number of views"
+			let info1 = "Contacts with me";
+			if(isLZHCN) {
+				info2 = "浏览次数";
+				info1 = "联系我们";
+			}
+			info1 += "(vily313@126.com)";
+			info2 += "({{ .viewsTotal }})";
+			stils.push(info1, info2);
+		}
+		initPageST();
+
 		function getDomain(url) {
             var urlReg = /http:\/\/([^\/]+)/i;
             let domain = url.match(urlReg);
@@ -192,7 +209,7 @@
             <br/>
 			<br /><b><font color="#3807d7" size=5>VOX TOOLS</font></b>
             <br /><br />`;
-            if (navigator.language == "zh-CN") {
+            if (isLZHCN) {
                 str += "欢&nbsp;&nbsp;&nbsp;迎"
             } else {
                 str += "WELCOME"
@@ -205,7 +222,6 @@
         }
 
 		let pageHost = getHostUrl();
-		console.log("pageHost: ", pageHost);
 		function gotoHomePage() {
 			let url = pageHost;
 			console.log("goto home page url: ", url);

@@ -59,38 +59,33 @@
             left: 0px;
             top: 350px;
             background: url("static/home/assets/block_02_b.jpg");
-            background-repeat: no-repeat;
         }
 
         #toolBlock {
             left: 0px;
             top: 650px;
             background: url("static/home/assets/block_03_b.jpg");
-            background-repeat: no-repeat;
         }
 
         #courseBlock {
             left: 0px;
             top: 950px;
             background: url("static/home/assets/block_07_b.jpg");
-            background-repeat: no-repeat;
         }
 
         #gameBlock {
             left: 0px;
             top: 1250px;
             background: url("static/home/assets/block_00_b.jpg");
-            background-repeat: no-repeat;
         }
 
         #wdesignBlock {
             left: 0px;
             top: 1550px;
             background: url("static/home/assets/block_08_b.jpg");
-            background-repeat: no-repeat;
         }
 
-        #about {
+        #aboutHome {
             width: 900px;
             left: 0px;
             top: 1850px;
@@ -111,7 +106,6 @@
 
         a:link {
             color: #6ac7ef;
-            /* text-decoration: none; */
             text-decoration: underline;
         }
 
@@ -129,15 +123,32 @@
 	<link rel="icon" href="/static/favicon.ico" type="image/x-icon" />
     <script>
         console.log("Welcome to ArtVily Web Home");
+
+		let isLZHCN = navigator.language == "zh-CN";
+		var stils = [];
+		var CURR_PAGE_ST_INFO_LIST = stils;
+		function initPageST() {
+			let info2 = "Number of views"
+			let info1 = "Contacts with me";
+			if(isLZHCN) {
+				info2 = "浏览次数";
+				info1 = "联系我们";
+			}
+			info1 += "(vily313@126.com)";
+			info2 += "({{ .viewsTotal }}/{{ .allViewsTotal }})";
+			stils.push(info1, info2);
+		}
+		initPageST();
+
         function getDomain(url) {
-            var urlReg = /http:\/\/([^\/]+)/i;
+            let urlReg = /http:\/\/([^\/]+)/i;
             let domain = url.match(urlReg);
             return ((domain != null && domain.length > 0) ? domain[0] : "");
         }
 		function getHostUrl(port) {
 			let host = location.href;
 			let domain = getDomain(host);
-			let nsList = host.split(":");
+			let nsList = domain.split(":");
 			host = nsList[0]+":"+nsList[1];
 			return port ? host + ":"+port+"/" : domain + "/";
 		}
@@ -148,7 +159,7 @@
             <br/>
             <br/>
             <br/>`;
-            if (navigator.language == "zh-CN") {
+            if (isLZHCN) {
                 str += '<font color="#3838dd" size=5>保护环境<br/>关爱动物</font>';
             }
             else {
@@ -158,7 +169,8 @@
                 `
 			<br /><b><font color="#3807d7" size=7>RENDERING & ART</font></b>
             <br /><font color="#4848dd" size=5>`;
-            if (navigator.language == "zh-CN") {
+
+            if (isLZHCN) {
                 str += "欢&nbsp;&nbsp;&nbsp;迎"
             } else {
                 str += "WELCOME"
@@ -167,6 +179,15 @@
 			</font>
 			`;
             let div = document.getElementById("preface");
+            div.innerHTML = str;
+
+			let info = stils[0] + " · " + stils[1];
+			str = `
+			<center />
+            ${info}
+            <br />
+			`;
+			div = document.getElementById("aboutHome");
             div.innerHTML = str;
         }
         function bodyOnLoad() {
@@ -218,7 +239,7 @@
             <br />
             VOX 3D ENGINE
             <br />
-			<a href="javascript:gotoBlockPage('engine');">>>>了解详情</a>
+			<a href="javascript:gotoBlockPage('engine');">>>>更多内容</a>
             <br />
         </div>
         <div id="toolBlock" class="content_block" style="background-color: #332211;">
@@ -230,7 +251,7 @@
             <br />
             Tools
             <br />
-			<a href="javascript:gotoBlockPage('tool');">>>>了解详情</a>
+			<a href="javascript:gotoBlockPage('tool');">>>>更多内容</a>
             <br />
         </div>
         <div id="courseBlock" class="content_block" style="background-color: #332233;">
@@ -242,7 +263,7 @@
             <br />
             COURSE
             <br />
-			<a href="javascript:gotoNonePage();">>>>了解详情</a>
+			<a href="javascript:gotoBlockPage('course');">>>>更多内容</a>
             <br />
         </div>
         <div id="gameBlock" class="content_block" style="background-color: #112233;">
@@ -253,7 +274,7 @@
             <br />
             Games
             <br />
-			<a href="javascript:gotoBlockPage('game');">>>>了解详情</a>
+			<a href="javascript:gotoBlockPage('game');">>>>更多内容</a>
             <br />
         </div>
         <div id="wdesignBlock" class="content_block" style="background-color: #152253;">
@@ -265,13 +286,10 @@
             <br />
             Web Page Feeling
             <br />
-			<a href="javascript:gotoNonePage();">>>>了解详情</a>
+			<a href="javascript:gotoNonePage();">>>>更多内容</a>
             <br />
         </div>
-        <div id="about">
-            <center />
-            Contacts with me: vily313@126.com
-            <br />
+        <div id="aboutHome">
         </div>
     </div>
 </body>

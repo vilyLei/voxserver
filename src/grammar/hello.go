@@ -26,6 +26,7 @@ func testMap() {
 	fmt.Println("m0.age: ", m0["age"])
 	fmt.Println("---------- test map end  --------------")
 }
+
 func main() {
 	fmt.Println("hello young man !")
 	var num int = 10

@@ -55,14 +55,15 @@ func main() {
 	fmt.Println("Web Server version 1.0.13")
 	fmt.Println("Web Server started at port: ", portStr)
 
-	fmt.Println("init database sys ...")
-	dbErr := database.InitWebPageStatusDB()
-	if dbErr != nil {
-		fmt.Printf("database sys init failed,err%v\n", err)
-	}
-	fmt.Println("init database sys success !!!")
-	database.QuerySitePageReqCountByID(1)
-	// database.UpdateSitePageReqCountByID(1, 1)
+	// fmt.Println("init database sys ...")
+	// dbErr := database.InitWebPageStatusDB()
+	// if dbErr != nil {
+	// 	fmt.Printf("database sys init failed,err%v\n", dbErr)
+	// }
+	// fmt.Println("init database sys success !!!")
+	// database.QuerySitePageReqCountByID(1)
+	// // database.UpdateSitePageReqCountByID(1, 1)
+	database.Init()
 
 	router := gin.Default()
 	svr.InitPages(router)
