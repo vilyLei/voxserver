@@ -62,32 +62,50 @@ func Init() {
 	}
 	fmt.Println("init database sys success !!!")
 	QuerySitePageReqCountByID(1)
-	// database.UpdateSitePageReqCountByID(1, 1)
 	initPageStInfoFromDB()
 	UpdatePageInsStatusInfo()
 }
-func insertPageStRecord(id int, name string) {
-	//5,'website-course',0,'non-src', 'web course page'
+func buildInsertPageStSQL(id int, name string) string {
 	idStr := strconv.Itoa(id)
 	// sqlStr := `insert into person(id, name, count, src, info) values(0,"Lucy","a sunshine woman.")`
 	sqlStr := `insert into pagestatus(id, name, count, src, info) values(`
 	sqlStr += idStr + `,"` + name + `", 0, "non-src", "demo ins page")`
-	// fmt.Println("insertPageStRecord sqlStr: ", sqlStr)
-	// ret, err := web_pst_db.Exec(sqlStr)
+	return sqlStr
+}
+
+func insertPageStRecordWithSQL(sqlStr string) {
+
 	_, err := web_pst_db.Exec(sqlStr)
 	if err != nil {
 		fmt.Printf("insertPageStRecord failed,err:%v\n", err)
-		return
-	} else {
-		fmt.Println("insertPageStRecord success !!!, name: ", name)
 	}
-	// // 如果是插入数据的操作，能够拿到插入数据的id
-	// pid, err := ret.LastInsertId()
-	// if err != nil {
-	// 	fmt.Printf("get id failed,err:%v\n", err)
-	// 	return
-	// }
-	// fmt.Println("pid", pid)
+}
+func insertPageStRecord(id int, name string) {
+	sql := buildInsertPageStSQL(id, name)
+	insertPageStRecordWithSQL(sql)
+	/*
+		//5,'website-course',0,'non-src', 'web course page'
+		idStr := strconv.Itoa(id)
+		// sqlStr := `insert into person(id, name, count, src, info) values(0,"Lucy","a sunshine woman.")`
+		sqlStr := `insert into pagestatus(id, name, count, src, info) values(`
+		sqlStr += idStr + `,"` + name + `", 0, "non-src", "demo ins page")`
+		// fmt.Println("insertPageStRecord sqlStr: ", sqlStr)
+		// ret, err := web_pst_db.Exec(sqlStr)
+		_, err := web_pst_db.Exec(sqlStr)
+		if err != nil {
+			fmt.Printf("insertPageStRecord failed,err:%v\n", err)
+			return
+		} else {
+			fmt.Println("insertPageStRecord success !!!, name: ", name)
+		}
+		// // 如果是插入数据的操作，能够拿到插入数据的id
+		// pid, err := ret.LastInsertId()
+		// if err != nil {
+		// 	fmt.Printf("get id failed,err:%v\n", err)
+		// 	return
+		// }
+		// fmt.Println("pid", pid)
+	*/
 }
 func InitWebPageStatusDB() (err error) {
 
@@ -225,29 +243,6 @@ func IncreasePageViewCountByName(ns string, flags ...int) int {
 	return 0
 }
 
-// func GetPageViewCountByID(id int) int {
-// 	return pageReqCounts[id]
-// }
-// func UpdatePageViewCountPlusOneByID(id int) {
-// 	pageReqCounts[id]++
-// 	UpdateSitePageReqCountByID(pageReqCounts[id], id)
-// }
-
-//	func GetHomePageViewCount() int {
-//		return pageReqCounts[homePageSTID]
-//	}
-//
-//	func UpdateHomePageViewCount() {
-//		QuerySitePageReqCountByID(1)
-//		pageReqCounts[homePageSTID]++
-//		UpdateSitePageReqCountByID(pageReqCounts[homePageSTID], homePageSTID)
-//	}
-//
-//	func UpdateHomePageViewCountPlusOne() {
-//		// QuerySitePageReqCountByID(1)
-//		pageReqCounts[homePageSTID]++
-//		UpdateSitePageReqCountByID(pageReqCounts[homePageSTID], homePageSTID)
-//	}
 func QuerySitePageReqCountByID(id int) {
 
 	sqlStr := "select id, name, count from pagestatus where id=?;"
