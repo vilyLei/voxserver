@@ -13,78 +13,6 @@ import (
 
 // go mod init voxwebsvr.com/svr
 
-/*
-type STDBChannelData struct {
-	stName string
-	stType int
-	flag   int
-}
-
-var stDBChannel chan STDBChannelData
-
-func appendSTDBData(name string, flags ...int) {
-	var st STDBChannelData
-	st.stName = name
-	st.stType = 1
-	st.flag = 0
-	fn := len(flags)
-	if fn > 0 {
-		st.stType = flags[0]
-		if fn > 1 {
-			st.flag = flags[1]
-		}
-	}
-	stDBChannel <- st
-}
-func updateSTDataToDB(in <-chan STDBChannelData) {
-	var total = 0
-	var ls [128]STDBChannelData
-	// var nsList [128]string
-	nsList := make([]string, 128)
-	for data := range in {
-		len := len(in)
-		// fmt.Printf("updateSTDataToDB() len=%v cap=%v\n", len(in), cap(in))
-		// fmt.Println("updateSTDataToDB() data.stName: ", data.stName, ", stType: ", data.stType)
-		if data.flag < 1 {
-			ls[total] = data
-			total++
-			// 先直接更新内存数据而不是数据库数据
-			database.IncreaseLogicPageViewCountByName(data.stName, data.stType)
-		}
-		// if len == 0 || total > 31 {
-		if data.flag > 0 || total > 15 {
-			if total > 0 {
-				// 整体一起修改数据库, 做合并操作，提升性能
-				// if total > 1 {
-				for i := 0; i < total; i++ {
-					nsList[i] = ls[i].stName
-				}
-				database.IncreaseLogicPageViewCountToDBByNames(nsList, total)
-			}
-			total = len
-			total = 0
-		}
-	}
-}
-func startupSTDataToDBTicker(out chan<- STDBChannelData) {
-
-	for range time.Tick(15 * time.Second) {
-		// fmt.Println("tick does...")
-		var st STDBChannelData
-		st.stName = "ticker_sender_data"
-		st.stType = 0
-		st.flag = 1
-		out <- st
-	}
-}
-func initChannel() {
-
-	stDBChannel = make(chan STDBChannelData, 128)
-	go updateSTDataToDB(stDBChannel)
-	go startupSTDataToDBTicker(stDBChannel)
-}
-//*/
-
 func InitPages(router *gin.Engine) {
 	InitTemplate(router)
 
@@ -104,7 +32,6 @@ func InitPages(router *gin.Engine) {
 
 	router.GET("/updatePageInsStatus", UpdatePageInsStatusInfo)
 
-	// initChannel()
 }
 
 var nonLetterAndNumber = regexp.MustCompile(`[^a-zA-Z0-9 ]+`)
