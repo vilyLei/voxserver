@@ -31,6 +31,77 @@ insert into pagestatus values(
 
 UPDATE pagestatus SET name = 'tt' , cont = '100'  WHERE id = 10;
 */
+
+type STDBChannelData struct {
+	stName string
+	stType int
+	flag   int
+}
+
+var stDBChannel chan STDBChannelData
+
+func AppendSTDBData(name string, flags ...int) {
+	var st STDBChannelData
+	st.stName = name
+	st.stType = 1
+	st.flag = 0
+	fn := len(flags)
+	if fn > 0 {
+		st.stType = flags[0]
+		if fn > 1 {
+			st.flag = flags[1]
+		}
+	}
+	stDBChannel <- st
+}
+func updateSTDataToDB(in <-chan STDBChannelData) {
+	var total = 0
+	var ls [128]STDBChannelData
+	// var nsList [128]string
+	nsList := make([]string, 128)
+	for data := range in {
+		len := len(in)
+		// fmt.Printf("updateSTDataToDB() len=%v cap=%v\n", len(in), cap(in))
+		// fmt.Println("updateSTDataToDB() data.stName: ", data.stName, ", stType: ", data.stType)
+		if data.flag < 1 {
+			ls[total] = data
+			total++
+			// 先直接更新内存数据而不是数据库数据
+			IncreaseLogicPageViewCountByName(data.stName, data.stType)
+		}
+		// if len == 0 || total > 31 {
+		if data.flag > 0 || total > 15 {
+			if total > 0 {
+				// 整体一起修改数据库, 做合并操作，提升性能
+				// if total > 1 {
+				for i := 0; i < total; i++ {
+					nsList[i] = ls[i].stName
+				}
+				IncreaseLogicPageViewCountToDBByNames(nsList, total)
+			}
+			total = len
+			total = 0
+		}
+	}
+}
+func startupSTDataToDBTicker(out chan<- STDBChannelData) {
+
+	for range time.Tick(15 * time.Second) {
+		// fmt.Println("tick does...")
+		var st STDBChannelData
+		st.stName = "ticker_sender_data"
+		st.stType = 0
+		st.flag = 1
+		out <- st
+	}
+}
+func initChannel() {
+
+	stDBChannel = make(chan STDBChannelData, 128)
+	go updateSTDataToDB(stDBChannel)
+	go startupSTDataToDBTicker(stDBChannel)
+}
+
 type PageStatusNode struct {
 	id       int
 	name     string
@@ -53,20 +124,27 @@ var homePageSTID = 1
 var pageSTNodeMap map[string]*PageStatusNode
 var pageSTNodesTotal = 0
 var pageViewsTotal = 0
+var initFlag = true
 
 func Init() {
 
-	pageSTNodeMap = make(map[string]*PageStatusNode)
+	if initFlag {
+		initFlag = false
 
-	fmt.Println("init database sys ...")
-	dbErr := InitWebPageStatusDB()
-	if dbErr != nil {
-		fmt.Printf("database sys init failed,err%v\n", dbErr)
+		pageSTNodeMap = make(map[string]*PageStatusNode)
+
+		fmt.Println("init database sys ...")
+		dbErr := InitWebPageStatusDB()
+		if dbErr != nil {
+			fmt.Printf("database sys init failed,err%v\n", dbErr)
+		}
+		fmt.Println("init database sys success !!!")
+		QuerySitePageReqCountByID(1)
+		initPageStInfoFromDB()
+		UpdatePageInsStatusInfo()
+
+		initChannel()
 	}
-	fmt.Println("init database sys success !!!")
-	QuerySitePageReqCountByID(1)
-	initPageStInfoFromDB()
-	UpdatePageInsStatusInfo()
 }
 func buildInsertPageStSQL(id int, name string) string {
 	idStr := strconv.Itoa(id)

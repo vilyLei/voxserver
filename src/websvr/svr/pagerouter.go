@@ -6,13 +6,14 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"voxwebsvr.com/database"
 )
 
 // go mod init voxwebsvr.com/svr
+
+/*
 type STDBChannelData struct {
 	stName string
 	stType int
@@ -76,6 +77,14 @@ func startupSTDataToDBTicker(out chan<- STDBChannelData) {
 		out <- st
 	}
 }
+func initChannel() {
+
+	stDBChannel = make(chan STDBChannelData, 128)
+	go updateSTDataToDB(stDBChannel)
+	go startupSTDataToDBTicker(stDBChannel)
+}
+//*/
+
 func InitPages(router *gin.Engine) {
 	InitTemplate(router)
 
@@ -95,9 +104,7 @@ func InitPages(router *gin.Engine) {
 
 	router.GET("/updatePageInsStatus", UpdatePageInsStatusInfo)
 
-	stDBChannel = make(chan STDBChannelData, 128)
-	go updateSTDataToDB(stDBChannel)
-	go startupSTDataToDBTicker(stDBChannel)
+	// initChannel()
 }
 
 var nonLetterAndNumber = regexp.MustCompile(`[^a-zA-Z0-9 ]+`)
@@ -239,7 +246,7 @@ func UpdatePageInsStatusInfo(g *gin.Context) {
 }
 
 func increasePageViewCountByName(pns string, flags ...int) {
-	appendSTDBData(pns, flags...)
+	database.AppendSTDBData(pns, flags...)
 }
 
 func getPageViewCountStrByName(ns string) string {
