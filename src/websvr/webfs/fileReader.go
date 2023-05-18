@@ -47,7 +47,7 @@ func FileReader(pathStr *string) *SendBufInfo {
 		}
 
 	} else {
-		fmt.Println("Error: ", err)
+		fmt.Printf("fileReader::FileReader() open file failed,error: %v\n", err)
 		success = false
 	}
 	contentType := http.DetectContentType(buf)

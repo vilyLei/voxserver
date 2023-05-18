@@ -28,13 +28,16 @@ insert into pagestatus values(
 
 	1,'website',0,'non-src', 'web site all'
 	);
+
+UPDATE pagestatus SET name = 'tt' , cont = '100'  WHERE id = 10;
 */
 type PageStatusNode struct {
-	id    int
-	name  string
-	count int
-	src   string
-	info  string
+	id       int
+	name     string
+	count    int
+	oldCount int
+	src      string
+	info     string
 }
 type InsInfoNode struct {
 	Name string `json:"name"`
@@ -109,7 +112,7 @@ func insertPageStRecord(id int, name string) {
 }
 func InitWebPageStatusDB() (err error) {
 
-	dsn := "root:123456@tcp(127.0.0.1:3306)/webpagestatus?multiStatements=true" // 可执行多条语句
+	dsn := "root:123456@tcp(127.0.0.1:3306)/webpagestatus?charset=utf8&multiStatements=true" // 可执行多条语句
 	// dsn := "root:123456@tcp(127.0.0.1:3306)/webpagestatus"
 
 	web_pst_db, err = sql.Open("mysql", dsn) // open不会检验用户名和密码
@@ -141,6 +144,7 @@ func initPageStInfoFromDB() {
 		var node PageStatusNode
 		rows.Scan(&node.id, &node.name, &node.count, &node.src, &node.info)
 		pageSTNodeMap[node.name] = &node
+		node.oldCount = node.count
 		pageSTNodesTotal++
 		fmt.Printf("initPageStInfoFromDB(), node:%#v\n", node)
 	}
@@ -157,19 +161,22 @@ func UpdatePageInsStatusInfo() {
 	var pageNSList = [...]string{"website", "website-engine", "website-tool", "website-course", "website-game", "website-renderCase"}
 	pagesTotal := len(pageNSList)
 	for i := 0; i < pagesTotal; i++ {
-		hasFlag := HasPageViewCountByName(pageNSList[i])
-		fmt.Println("UpdatePageInsStatusInfo() page name: ", pageNSList[i], ", hasFlag: ", hasFlag)
+		ns := pageNSList[i]
+		hasFlag := HasPageViewCountByName(ns)
+		fmt.Println("UpdatePageInsStatusInfo() page name: ", ns, ", hasFlag: ", hasFlag)
 		if hasFlag {
-			pageViewsTotal += GetPageViewCountByName(pageNSList[i])
+			pageViewsTotal += GetPageViewCountByName(ns)
 		} else {
-			ns := pageNSList[i]
 			insertPageStRecord(pageSTNodesTotal+1+i, ns)
 			var node PageStatusNode
 			node.name = ns
 			node.count = 0
-			pageSTNodeMap[node.name] = &node
+			node.oldCount = 0
+			pageSTNodeMap[ns] = &node
+
 			total++
 		}
+		pageSTNodeMap[ns].oldCount = pageSTNodeMap[ns].count
 	}
 	pageSTNodesTotal += total
 
@@ -204,7 +211,8 @@ func UpdatePageInsStatusInfo() {
 				var node PageStatusNode
 				node.name = ns
 				node.count = 0
-				pageSTNodeMap[node.name] = &node
+				node.oldCount = 0
+				pageSTNodeMap[ns] = &node
 				total++
 			}
 		}
@@ -238,10 +246,45 @@ func IncreasePageViewCountByName(ns string, flags ...int) int {
 			pageViewsTotal++
 		}
 		// fmt.Println("IncreasePageViewCountByName(), B pageViewsTotal: ", pageViewsTotal)
+		// 通过比较这oldCount和count的值来判断是否有更新
+		node.oldCount = node.count
 		UpdateSitePageReqCountByID(node.count, node.id)
 		return node.count
 	}
 	return 0
+}
+
+func IncreaseLogicPageViewCountByName(ns string, flag int) {
+	node, hasKey := pageSTNodeMap[ns]
+	if hasKey {
+		node.count++
+		if flag > 0 {
+			pageViewsTotal++
+		}
+	}
+}
+
+func IncreaseLogicPageViewCountToDBByNames(nsList []string, total int) {
+
+	sqlTot := 0
+	sqlStr := ""
+	for i := 0; i < total; i++ {
+		ns := nsList[i]
+		node, hasKey := pageSTNodeMap[ns]
+		if hasKey {
+			if node.oldCount != node.count {
+				node.oldCount = node.count
+				// fmt.Println("IncreaseLogicPageViewCountToDBByNames(), node.name: ", node.name)
+				// UpdateSitePageReqCountByID(node.count, node.id)
+				sqlStr += BuildUpdateSitePageReqCountByID(node.count, node.id)
+				sqlTot++
+			}
+		}
+	}
+	if sqlTot > 0 {
+		// fmt.Println("IncreaseLogicPageViewCountToDBByNames(), sqlStr: ", sqlStr)
+		UpdateSitePageReqCountBySQLStr(sqlStr)
+	}
 }
 
 func QuerySitePageReqCountByID(id int) {
@@ -256,15 +299,44 @@ func QuerySitePageReqCountByID(id int) {
 	// fmt.Printf("QuerySitePageReqCountByID(), st: %#v\n", st)
 	// fmt.Printf("QuerySitePageReqCountByID(), pageReqCounts[%d]: %#v\n", id, pageReqCounts[id])
 }
-
+func BuildUpdateSitePageReqCountByID(count int, id int) string {
+	sqlStr := `update pagestatus set count=` + strconv.Itoa(count) + ` where id=` + strconv.Itoa(id) + `;`
+	return sqlStr
+}
 func UpdateSitePageReqCountByID(count int, id int) {
-	sqlStr := `update pagestatus set count=? where id=?;`
-	ret, err := web_pst_db.Exec(sqlStr, count, id)
+	sqlStr := BuildUpdateSitePageReqCountByID(count, id)
+	_, err := web_pst_db.Exec(sqlStr)
 	if err != nil {
 		fmt.Printf("update failed ,err:%v\n", err)
 		return
 	}
-	n, _ := ret.RowsAffected()
-	n += 1
+	// n, _ := ret.RowsAffected()
+	// n += 1
+	// fmt.Printf("UpdateSitePageReqCountByID(), 更新了 %d 行数据\n", n)
+}
+func UpdateSitePageReqCountBySQLStr(sqlStr string) {
+	// sqlStr := BuildUpdateSitePageReqCountByID(count, id)
+	_, err := web_pst_db.Exec(sqlStr)
+	if err != nil {
+		fmt.Printf("update failed ,err:%v\n", err)
+		return
+	}
+	// else {
+	// 	fmt.Println("UpdateSitePageReqCountBySQLStr(), success !!!")
+	// }
+	// n, _ := ret.RowsAffected()
+	// n += 1
+	// fmt.Printf("UpdateSitePageReqCountByID(), 更新了 %d 行数据\n", n)
+}
+func UpdateSitePageReqCountByID2(count int, id int) {
+	sqlStr := `update pagestatus set count=? where id=?;`
+	// ret, err := web_pst_db.Exec(sqlStr, count, id)
+	_, err := web_pst_db.Exec(sqlStr, count, id)
+	if err != nil {
+		fmt.Printf("update failed ,err:%v\n", err)
+		return
+	}
+	// n, _ := ret.RowsAffected()
+	// n += 1
 	// fmt.Printf("UpdateSitePageReqCountByID(), 更新了 %d 行数据\n", n)
 }
