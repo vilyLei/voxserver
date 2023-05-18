@@ -7,7 +7,8 @@ import (
 
 func main() {
 
-	c1 := make(chan string)
+	var c1 chan string
+	c1 = make(chan string)
 	c2 := make(chan string)
 
 	go func() {

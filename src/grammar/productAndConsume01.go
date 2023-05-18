@@ -33,7 +33,8 @@ func consumer(in <-chan int) {
 
 func main() {
 	// 传参的时候显式类型像隐式类型转换，双向管道向单向管道转换
-	ch := make(chan int) //无缓冲channel
-	go producer(ch)      // 子go程作为生产者
-	consumer(ch)         // 主go程作为消费者
+	// ch := make(chan int)    //无缓冲channel
+	ch := make(chan int, 5) //有缓冲channel
+	go producer(ch)         // 子go程作为生产者
+	consumer(ch)            // 主go程作为消费者
 }
