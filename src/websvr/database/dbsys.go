@@ -86,29 +86,6 @@ func insertPageStRecordWithSQL(sqlStr string) {
 func insertPageStRecord(id int, name string) {
 	sql := buildInsertPageStSQL(id, name)
 	insertPageStRecordWithSQL(sql)
-	/*
-		//5,'website-course',0,'non-src', 'web course page'
-		idStr := strconv.Itoa(id)
-		// sqlStr := `insert into person(id, name, count, src, info) values(0,"Lucy","a sunshine woman.")`
-		sqlStr := `insert into pagestatus(id, name, count, src, info) values(`
-		sqlStr += idStr + `,"` + name + `", 0, "non-src", "demo ins page")`
-		// fmt.Println("insertPageStRecord sqlStr: ", sqlStr)
-		// ret, err := web_pst_db.Exec(sqlStr)
-		_, err := web_pst_db.Exec(sqlStr)
-		if err != nil {
-			fmt.Printf("insertPageStRecord failed,err:%v\n", err)
-			return
-		} else {
-			fmt.Println("insertPageStRecord success !!!, name: ", name)
-		}
-		// // 如果是插入数据的操作，能够拿到插入数据的id
-		// pid, err := ret.LastInsertId()
-		// if err != nil {
-		// 	fmt.Printf("get id failed,err:%v\n", err)
-		// 	return
-		// }
-		// fmt.Println("pid", pid)
-	*/
 }
 func InitWebPageStatusDB() (err error) {
 
@@ -275,7 +252,6 @@ func IncreaseLogicPageViewCountToDBByNames(nsList []string, total int) {
 			if node.oldCount != node.count {
 				node.oldCount = node.count
 				// fmt.Println("IncreaseLogicPageViewCountToDBByNames(), node.name: ", node.name)
-				// UpdateSitePageReqCountByID(node.count, node.id)
 				sqlStr += BuildUpdateSitePageReqCountByID(node.count, node.id)
 				sqlTot++
 			}
@@ -310,9 +286,6 @@ func UpdateSitePageReqCountByID(count int, id int) {
 		fmt.Printf("update failed ,err:%v\n", err)
 		return
 	}
-	// n, _ := ret.RowsAffected()
-	// n += 1
-	// fmt.Printf("UpdateSitePageReqCountByID(), 更新了 %d 行数据\n", n)
 }
 func UpdateSitePageReqCountBySQLStr(sqlStr string) {
 	// sqlStr := BuildUpdateSitePageReqCountByID(count, id)
@@ -330,13 +303,9 @@ func UpdateSitePageReqCountBySQLStr(sqlStr string) {
 }
 func UpdateSitePageReqCountByID2(count int, id int) {
 	sqlStr := `update pagestatus set count=? where id=?;`
-	// ret, err := web_pst_db.Exec(sqlStr, count, id)
 	_, err := web_pst_db.Exec(sqlStr, count, id)
 	if err != nil {
 		fmt.Printf("update failed ,err:%v\n", err)
 		return
 	}
-	// n, _ := ret.RowsAffected()
-	// n += 1
-	// fmt.Printf("UpdateSitePageReqCountByID(), 更新了 %d 行数据\n", n)
 }

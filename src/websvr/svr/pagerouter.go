@@ -42,7 +42,7 @@ func updateSTDataToDB(in <-chan STDBChannelData) {
 	nsList := make([]string, 128)
 	for data := range in {
 		len := len(in)
-		// fmt.Printf("长度 len=%v cap=%v\n", len(in), cap(in))
+		// fmt.Printf("updateSTDataToDB() len=%v cap=%v\n", len(in), cap(in))
 		// fmt.Println("updateSTDataToDB() data.stName: ", data.stName, ", stType: ", data.stType)
 		if data.flag < 1 {
 			ls[total] = data
@@ -52,23 +52,13 @@ func updateSTDataToDB(in <-chan STDBChannelData) {
 		}
 		// if len == 0 || total > 31 {
 		if data.flag > 0 || total > 15 {
-			// fmt.Println("updateSTDataToDB() for total: ", total, len)
-			// for i := 0; i < total; i++ {
-			// 	// fmt.Println("updateSTDataToDB() for data.stName: ", ls[i].stName, ", stType: ", ls[i].stType)
-			// 	database.IncreasePageViewCountByName(ls[i].stName, ls[i].stType)
-			// }
 			if total > 0 {
 				// 整体一起修改数据库, 做合并操作，提升性能
 				// if total > 1 {
 				for i := 0; i < total; i++ {
 					nsList[i] = ls[i].stName
-					// fmt.Println("updateSTDataToDB() for ls[i].stName: ", ls[i].stName, ", stType: ", ls[i].stType)
-					// database.IncreaseLogicPageViewCountByName(ls[i].stName, ls[i].stType)
 				}
 				database.IncreaseLogicPageViewCountToDBByNames(nsList, total)
-				// } else {
-				// 	database.IncreasePageViewCountByName(ls[0].stName, ls[0].stType)
-				// }
 			}
 			total = len
 			total = 0
@@ -227,15 +217,10 @@ func RenderCasePage(g *gin.Context) {
 	demo := g.DefaultQuery("demo", "non-demo")
 	demoName := "demo-ins-" + demo
 	// fmt.Println("RenderCasePage(), demoName: ", demoName)
-	// viewsTotalStr := strconv.Itoa(database.GetPageViewCountByName(ns) + 1)
-	// insViewsTotalStr := strconv.Itoa(database.GetPageViewCountByName(demoName) + 1)
 	viewsTotalStr := getPageViewCountStrByName(ns)
 	insViewsTotalStr := getPageViewCountStrByName(demoName)
 
 	defer func() {
-		// database.IncreasePageViewCountByName(ns, 0)
-		// database.IncreasePageViewCountByName(demoName)
-
 		increasePageViewCountByName(ns, 0)
 		increasePageViewCountByName(demoName)
 	}()
@@ -254,16 +239,9 @@ func UpdatePageInsStatusInfo(g *gin.Context) {
 }
 
 func increasePageViewCountByName(pns string, flags ...int) {
-	// fmt.Println("increasePageViewCountByName(), pns: ", pns)
 	appendSTDBData(pns, flags...)
-	// database.IncreasePageViewCountByName(pns, flags...)
 }
 
 func getPageViewCountStrByName(ns string) string {
 	return strconv.Itoa(database.GetPageViewCountByName(ns) + 1)
 }
-
-// func GetWebSiteStatus(g *gin.Context) {
-// 	// database.UpdatePageInsStatusInfo()
-// 	g.String(http.StatusOK, fmt.Sprintf("update some info,tks."))
-// }
