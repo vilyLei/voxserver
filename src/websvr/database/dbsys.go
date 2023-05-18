@@ -119,7 +119,6 @@ type InsInfoJson struct {
 }
 
 var web_pst_db *sql.DB = nil // 连接池对象
-var pageReqCounts [2048]int
 var homePageSTID = 1
 var pageSTNodeMap map[string]*PageStatusNode
 var pageSTNodesTotal = 0
@@ -134,12 +133,12 @@ func Init() {
 		pageSTNodeMap = make(map[string]*PageStatusNode)
 
 		fmt.Println("init database sys ...")
-		dbErr := InitWebPageStatusDB()
+		dbErr := initWebPageStatusDB()
 		if dbErr != nil {
 			fmt.Printf("database sys init failed,err%v\n", dbErr)
 		}
 		fmt.Println("init database sys success !!!")
-		QuerySitePageReqCountByID(1)
+		// QuerySitePageReqCountByID(1)
 		initPageStInfoFromDB()
 		UpdatePageInsStatusInfo()
 
@@ -165,7 +164,7 @@ func insertPageStRecord(id int, name string) {
 	sql := buildInsertPageStSQL(id, name)
 	insertPageStRecordWithSQL(sql)
 }
-func InitWebPageStatusDB() (err error) {
+func initWebPageStatusDB() (err error) {
 
 	dsn := "root:123456@tcp(127.0.0.1:3306)/webpagestatus?charset=utf8&multiStatements=true" // 可执行多条语句
 	// dsn := "root:123456@tcp(127.0.0.1:3306)/webpagestatus"
@@ -348,10 +347,6 @@ func QuerySitePageReqCountByID(id int) {
 
 	var st PageStatusNode
 	rowObj.Scan(&st.id, &st.name, &st.count)
-	// web_site_req_all_req_count = st.count
-	pageReqCounts[id] = st.count
-	// fmt.Printf("QuerySitePageReqCountByID(), st: %#v\n", st)
-	// fmt.Printf("QuerySitePageReqCountByID(), pageReqCounts[%d]: %#v\n", id, pageReqCounts[id])
 }
 func BuildUpdateSitePageReqCountByID(count int, id int) string {
 	sqlStr := `update pagestatus set count=` + strconv.Itoa(count) + ` where id=` + strconv.Itoa(id) + `;`

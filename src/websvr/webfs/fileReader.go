@@ -12,6 +12,7 @@ import (
 )
 
 // go mod init voxwebsvr.com/webfs
+var FileGZipEnabled = true
 
 func LoadFile(path string) []string {
 	// 打开指定文件夹
@@ -51,7 +52,7 @@ func FileReader(pathStr *string) *SendBufInfo {
 		success = false
 	}
 	contentType := http.DetectContentType(buf)
-	gzipEnabled := true
+	gzipEnabled := FileGZipEnabled
 	switch contentType {
 	case "image/jpeg", "image/png", "image/gif", "application/octet-stream", "image/x-icon":
 		gzipEnabled = false
