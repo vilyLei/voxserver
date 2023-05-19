@@ -30,6 +30,45 @@ insert into pagestatus values(
 	);
 
 UPDATE pagestatus SET name = 'tt' , cont = '100'  WHERE id = 10;
+
+create table pagemessage(
+	id int(4) auto_increment not null primary key,
+	name char(50) default 'message-page-name',
+	starCount int(8) default '0',
+	src varchar(50) default 'non-src',
+	message varchar(600) default 'please write your thinks here,thanks.',
+	dstUser varchar(30) default 'users',
+	creationtime datetime NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'creation time'
+	);
+insert into pagemessage
+	(name, message)
+	values
+	(
+	'user002','I need an inspection tool'
+	);
+
+
+时间操作:
+
+1. 添加 creationtime 设置默认时间 CURRENT_TIMESTAMP
+
+ALTER TABLE `pagemessage`
+ADD COLUMN  `creationtime` datetime NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'creation time' ;
+
+2. 修改 creationtime 设置默认时间 CURRENT_TIMESTAMP
+
+ALTER TABLE `pagemessage`
+MODIFY COLUMN  `creationtime` datetime NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间' ;
+
+3. 添加 updatetime 设置 默认时间 CURRENT_TIMESTAMP 设置更新时间为 ON UPDATE CURRENT_TIMESTAMP
+
+ALTER TABLE `pagemessage`
+ADD COLUMN `updatetime` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '创建时间' ;
+
+4. 修改 updatetime 设置 默认时间 CURRENT_TIMESTAMP 设置更新时间为 ON UPDATE CURRENT_TIMESTAMP
+
+ALTER TABLE `pagemessage`
+MODIFY COLUMN `updatetime` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAM;
 */
 
 type STDBChannelData struct {
