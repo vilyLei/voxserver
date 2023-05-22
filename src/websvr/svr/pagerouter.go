@@ -71,6 +71,8 @@ func InitTemplate(router *gin.Engine) {
 	router.LoadHTMLGlob("webdyndata/templates/**/*")
 }
 func IndexPage(g *gin.Context) {
+	host := g.Request.Host
+	fmt.Println("req HomePage info ...host: ", host)
 	ns := "website"
 	// g.String(http.StatusOK, fmt.Sprintf("It is a new web page here."))
 	// viewsTotalStr := strconv.Itoa(database.GetHomePageViewCount() + 1)

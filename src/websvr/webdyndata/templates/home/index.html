@@ -43,7 +43,10 @@
             position: absolute;
             font-size: 20px;
             color: #cccccc;
-            text-align: left;
+
+			display:flex;
+			align-items: center;
+			justify-content:center;
         }
 
         .content_block {
@@ -52,7 +55,10 @@
             position: absolute;
             font-size: 20px;
             color: #dddddd;
-            text-align: left;
+
+			display:flex;
+			align-items: center;
+			justify-content:center;
         }
 
         #engineBlock {
@@ -153,21 +159,10 @@
 			return port ? host + ":"+port+"/" : domain + "/";
 		}
         function applyPrefaceInfo() {
-            let str = `
-			<center />
-            <br/>
-            <br/>
-            <br/>
-            <br/>`;
-            if (isLZHCN) {
-                str += '<font color="#3838dd" size=5>保护环境<br/>关爱动物</font>';
-            }
-            else {
-                str += '<font color="#3838dd" size=5>Protect Environment<br/>Care for Animals</font>';
-            }
+            let str = `<center />`;
             str +=
                 `
-			<br /><b><font color="#3807d7" size=7>RENDERING & ART</font></b>
+			<b><font color="#3807d7" size=7>RENDERING & ART</font></b>
             <br /><font color="#4848dd" size=5>`;
 
             if (isLZHCN) {
@@ -183,7 +178,6 @@
 
 			let info = stils[0] + " · " + stils[1];
 			str = `
-			<center />
             ${info}
             <br />
 			`;
@@ -194,19 +188,18 @@
             applyPrefaceInfo();
         }
         function load(purl) {
-            let codeLoader = new XMLHttpRequest();
-            codeLoader.open("GET", purl, true);
-            codeLoader.onerror = function (err) {
+            let fl = new XMLHttpRequest();
+            fl.open("GET", purl, true);
+            fl.onerror = function (err) {
                 console.error("load error: ", err);
             }
-            codeLoader.onprogress = (e) => { };
-            codeLoader.onload = () => {
-                let scriptEle = document.createElement("script");
-                scriptEle.onerror = (e) => { }
-                scriptEle.innerHTML = codeLoader.response;
-                document.head.appendChild(scriptEle);
+            fl.onprogress = (e) => { };
+            fl.onload = () => {
+                let el = document.createElement("script");
+                el.innerHTML = fl.response;
+                document.head.appendChild(el);
             }
-            codeLoader.send(null);
+            fl.send(null);
         }
 
         let host = getHostUrl("9090");
@@ -226,68 +219,39 @@
 
 <body id="body" onload="bodyOnLoad()">
     <div id="divBody">
-        <center />
         <div id="playerDiv"></div>
         <div id="preface">
         </div>
         <div id="engineBlock" class="content_block" style="background-color: #336611;">
-            <center />
-            <br />
-            <br />
-            <br />
-            <br />
-            <br />
+			<center />
             VOX 3D ENGINE
             <br />
 			<a href="javascript:gotoBlockPage('engine');">>>>更多内容</a>
-            <br />
         </div>
         <div id="toolBlock" class="content_block" style="background-color: #332211;">
             <center />
-            <br />
-            <br />
-            <br />
-            <br />
-            <br />
             Tools
             <br />
 			<a href="javascript:gotoBlockPage('tool');">>>>更多内容</a>
-            <br />
         </div>
         <div id="courseBlock" class="content_block" style="background-color: #332233;">
             <center />
-            <br />
-            <br />
-            <br />
-            <br />
-            <br />
             COURSE
             <br />
 			<a href="javascript:gotoBlockPage('course');">>>>更多内容</a>
-            <br />
         </div>
         <div id="gameBlock" class="content_block" style="background-color: #112233;">
             <center />
             <br />
-            <br />
-            <br />
-            <br />
             Games
             <br />
 			<a href="javascript:gotoBlockPage('game');">>>>更多内容</a>
-            <br />
         </div>
         <div id="wdesignBlock" class="content_block" style="background-color: #152253;">
             <center />
-            <br />
-            <br />
-            <br />
-            <br />
-            <br />
             Web Page Feeling
             <br />
 			<a href="javascript:gotoNonePage();">>>>更多内容</a>
-            <br />
         </div>
         <div id="aboutHome">
         </div>
