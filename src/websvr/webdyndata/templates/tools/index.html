@@ -60,7 +60,9 @@
             position: absolute;
             font-size: 20px;
             color: #dddddd;
-            text-align: left;
+			display:flex;
+			align-items: center;
+			justify-content:center;
         }
 
         #blockNav {
@@ -192,14 +194,8 @@
 
         function applyPrefaceInfo() {
             let str = `
-			<center />
-            <br/>
-            <br/>
-            <br/>
-            <br/>
-            <br/>
-			<br /><b><font color="#3807d7" size=5>VOX TOOLS</font></b>
-            <br /><br />`;
+			<center /><b><font color="#3807d7" size=5>VOX TOOLS</font></b>
+            <br />`;
             if (isLZHCN) {
                 str += "欢&nbsp;&nbsp;&nbsp;迎"
             } else {
