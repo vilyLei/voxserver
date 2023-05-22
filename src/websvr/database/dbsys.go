@@ -19,7 +19,7 @@ create table pagestatus(
 
 	id int(4) auto_increment not null primary key,
 	name char(50) not null,
-	count int(8) not null,
+	count int(8) default '0',
 	src varchar(50) default 'non-module',
 	info varchar(80) default 'This is a page.'
 	);
