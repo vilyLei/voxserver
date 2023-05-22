@@ -50,9 +50,7 @@
 			if(sample == "toolLoader") {
 				loader = "toolLoader10.js"
 			}
-			let host = getHostUrl("9090");
-			host = "";
-			let url = host + "static/voxweb3d/demos/" + loader;
+			let url = getHostUrl("9090") + "static/voxweb3d/demos/" + loader;
 			// console.log("url: ", url);
             scriptEle.src = url;
             document.head.appendChild(scriptEle);

@@ -60,8 +60,9 @@
             position: absolute;
             font-size: 20px;
             color: #dddddd;
-            /*background: url("static/assets/camWalkRoad02.jpg");*/
-            text-align: left;
+			display:flex;
+			align-items: center;
+			justify-content:center;
         }
 
         #aboutvox {
@@ -210,16 +211,8 @@
 
         function applyPrefaceInfo() {
             let str = `
-			<center />
-            <br/>
-            <br/>
-            <br/>
-            <br/>
-            <br/>
-            <br/>
-            <br/>
-			<br /><b><font color="#3807d7" size=5><a href="javascript:gotoAPage();">VOX 3D ENGINE</a></font></b>
-            <br /><br />`;
+			<center /><b><font color="#3807d7" size=5><a href="javascript:gotoAPage();">VOX 3D ENGINE</a></font></b>
+            <br />`;
             if (navigator.language == "zh-CN") {
                 str += "欢&nbsp;&nbsp;&nbsp;迎"
             } else {
