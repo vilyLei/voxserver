@@ -7,9 +7,6 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql" // 导入包但不使用,相当于只调用init(
-	_ "github.com/go-sql-driver/mysql" // 导入包但不使用,相当于只调用init(
-	_ "github.com/go-sql-driver/mysql" // 导入包但不使用,相当于只调用init(
-	_ "github.com/go-sql-driver/mysql" // 导入包但不使用,相当于只调用init()初始化
 )
 
 // go mod init voxwebsvr.com/database
