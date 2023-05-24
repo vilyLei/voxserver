@@ -33,7 +33,6 @@ func main() {
 		var modelInfo ModelInfo
 		json.Unmarshal([]byte(jsonValue), &modelInfo)
 
-		// total := 0
 		models := modelInfo.Models
 		modelsTotal := len(models)
 		fmt.Println("modelsTotal: ", modelsTotal)
