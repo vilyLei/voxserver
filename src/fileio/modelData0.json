@@ -1,0 +1,14 @@
+{
+"models" : [
+	{
+		"id": "85167c35-4bbc-4fcb-9dfa-ca1beaaab96f",
+		"url": "bake/bakeClyData/model.ctm",
+		"additionalJson": {
+			"DisplayState": "1"
+		},
+		"materialInfos": [],
+		"withCredentials": false,
+		"transform": []
+	}
+]
+}

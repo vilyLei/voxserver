@@ -1,0 +1,314 @@
+{
+"models" : [
+	{
+		"id": "85167c35-4bbc-4fcb-9dfa-ca1beaaab96f",
+		"url": "bake/bakeClyData/model.ctm",
+		"uvScales": "",
+		"uvFactor": "4675.273384655511",
+		"additionalJson": {
+			"DisplayState": "1"
+		},
+		"materialInfos": [],
+		"withCredentials": false,
+		"graphicCrafts": [
+			{
+				"id": "1606514183017410561",
+				"textures": {
+					"normal": {
+						"crossOrigin": "use-credentials",
+						"url": "bake/bakeClyData/f35ac066014b22f252e20e3111dbe0ea.png",
+						"withCredentials": true
+					},
+					"diffuse": {
+						"crossOrigin": "use-credentials",
+						"url": "bake/bakeClyData/dbb2b732ef491b9907cac68cf56595f9.png",
+						"withCredentials": true
+					},
+					"height": {
+						"crossOrigin": "use-credentials",
+						"url": "bake/bakeClyData/08573cc6f501218b0bac85f8329ad54f.png",
+						"withCredentials": true
+					}
+				},
+				"craftJson": {
+					"property": {
+						"transparency": 1,
+						"useLock": false,
+						"flipU": false,
+						"flipV": false,
+						"cycleForm": 0,
+						"mean": 138.15310668945312,
+						"variance": 62.099983533246075,
+						"minValCurI": 138.15310668945312,
+						"maxValCurI": 115.84689331054688,
+						"std": 62.099983533246075,
+						"rotation": 0,
+						"craftType": 0,
+						"scaleX": 0.3,
+						"offsetX": 149.55066548902323,
+						"scaleY": 0.3,
+						"offsetY": -1000
+					},
+					"visible": true,
+					"patternCraftType": 0,
+					"crafts": {
+						"embroidered": {
+							"kHeightLevel": 1,
+							"kLuminance": 1,
+							"kNs": 0,
+							"kRs": 1,
+							"specularColor": [
+								0,
+								0,
+								0
+							],
+							"textureDirection": 0,
+							"useBackNormal": false,
+							"useSpecularColor": false
+						},
+						"screenPrinting": {
+							"kHeightLevel": 0,
+							"kLuminance": 1,
+							"kNs": 1,
+							"kRs": 1,
+							"specularColor": [
+								0,
+								0,
+								0
+							],
+							"useBackNormal": true,
+							"useSpecularColor": false
+						},
+						"selfDefine": {
+							"kHeightLevel": 0,
+							"kLuminance": 1,
+							"kNs": 0,
+							"kRs": 1,
+							"specularColor": [
+								0,
+								0,
+								0
+							],
+							"useBackNormal": true,
+							"useSpecularColor": false
+						},
+						"siliconPrinting": {
+							"kHeightLevel": 3,
+							"kLuminance": 1,
+							"kNs": 0,
+							"kRs": 0,
+							"specularColor": [
+								0,
+								0,
+								0
+							],
+							"useBackNormal": true,
+							"useSpecularColor": false
+						},
+						"flocking": {
+							"kHeightLevel": 3
+						},
+						"puffPrinting": {
+							"kHeightLevel": 3
+						}
+					}
+				},
+				"mappingModeInfo": {
+					"uv": {
+						"offsetX": 149.55066548902323,
+						"offsetY": -1000,
+						"scaleX": 0.3,
+						"rotation": 0
+					},
+					"shpere": {
+						"offsetX": 0,
+						"offsetY": 0,
+						"scaleX": 1,
+						"rotation": 0
+					},
+					"tube": {
+						"offsetX": 0,
+						"offsetY": 0,
+						"scaleX": 1,
+						"rotation": 0
+					},
+					"planeXOY": {
+						"offsetX": 0,
+						"offsetY": 0,
+						"scaleX": 1,
+						"rotation": 0
+					},
+					"planeXOZ": {
+						"offsetX": 0,
+						"offsetY": 0,
+						"scaleX": 1,
+						"rotation": 0
+					},
+					"planeYOZ": {
+						"offsetX": 0,
+						"offsetY": 0,
+						"scaleX": 1,
+						"rotation": 0
+					},
+					"box": {
+						"offsetX": 0,
+						"offsetY": 0,
+						"scaleX": 1,
+						"rotation": 0
+					},
+					"curMappingMode": 0
+				}
+			},
+			{
+				"id": "1606514183017410561",
+				"textures": {
+					"normal": {
+						"crossOrigin": "use-credentials",
+						"url": "bake/bakeClyData/f35ac066014b22f252e20e3111dbe0ea.png",
+						"withCredentials": true
+					},
+					"diffuse": {
+						"crossOrigin": "use-credentials",
+						"url": "bake/bakeClyData/dbb2b732ef491b9907cac68cf56595f9.png",
+						"withCredentials": true
+					},
+					"height": {
+						"crossOrigin": "use-credentials",
+						"url": "bake/bakeClyData/08573cc6f501218b0bac85f8329ad54f.png",
+						"withCredentials": true
+					}
+				},
+				"craftJson": {
+					"property": {
+						"transparency": 1,
+						"useLock": false,
+						"flipU": false,
+						"flipV": false,
+						"cycleForm": 0,
+						"mean": 138.15310668945312,
+						"variance": 62.099983533246075,
+						"minValCurI": 138.15310668945312,
+						"maxValCurI": 115.84689331054688,
+						"std": 62.099983533246075,
+						"rotation": 0,
+						"craftType": 0,
+						"scaleX": 0.3,
+						"offsetX": 1000,
+						"scaleY": 0.3,
+						"offsetY": 1000
+					},
+					"visible": true,
+					"patternCraftType": 0,
+					"crafts": {
+						"embroidered": {
+							"kHeightLevel": 1,
+							"kLuminance": 1,
+							"kNs": 0,
+							"kRs": 1,
+							"specularColor": [
+								0,
+								0,
+								0
+							],
+							"textureDirection": 0,
+							"useBackNormal": false,
+							"useSpecularColor": false
+						},
+						"screenPrinting": {
+							"kHeightLevel": 0,
+							"kLuminance": 1,
+							"kNs": 1,
+							"kRs": 1,
+							"specularColor": [
+								0,
+								0,
+								0
+							],
+							"useBackNormal": true,
+							"useSpecularColor": false
+						},
+						"selfDefine": {
+							"kHeightLevel": 0,
+							"kLuminance": 1,
+							"kNs": 0,
+							"kRs": 1,
+							"specularColor": [
+								0,
+								0,
+								0
+							],
+							"useBackNormal": true,
+							"useSpecularColor": false
+						},
+						"siliconPrinting": {
+							"kHeightLevel": 3,
+							"kLuminance": 1,
+							"kNs": 0,
+							"kRs": 0,
+							"specularColor": [
+								0,
+								0,
+								0
+							],
+							"useBackNormal": true,
+							"useSpecularColor": false
+						},
+						"flocking": {
+							"kHeightLevel": 3
+						},
+						"puffPrinting": {
+							"kHeightLevel": 3
+						}
+					}
+				},
+				"mappingModeInfo": {
+					"uv": {
+						"offsetX": 1000,
+						"offsetY": 1000,
+						"scaleX": 0.3,
+						"rotation": 0
+					},
+					"shpere": {
+						"offsetX": 0,
+						"offsetY": 0,
+						"scaleX": 1,
+						"rotation": 0
+					},
+					"tube": {
+						"offsetX": 0,
+						"offsetY": 0,
+						"scaleX": 1,
+						"rotation": 0
+					},
+					"planeXOY": {
+						"offsetX": 0,
+						"offsetY": 0,
+						"scaleX": 1,
+						"rotation": 0
+					},
+					"planeXOZ": {
+						"offsetX": 0,
+						"offsetY": 0,
+						"scaleX": 1,
+						"rotation": 0
+					},
+					"planeYOZ": {
+						"offsetX": 0,
+						"offsetY": 0,
+						"scaleX": 1,
+						"rotation": 0
+					},
+					"box": {
+						"offsetX": 0,
+						"offsetY": 0,
+						"scaleX": 1,
+						"rotation": 0
+					},
+					"curMappingMode": 0
+				}
+			}
+		],
+		"transform": []
+	}
+]
+}
