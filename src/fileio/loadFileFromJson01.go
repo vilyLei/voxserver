@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strings"
+	"time"
 )
 
 type ModelInfoNode struct {
@@ -14,6 +16,51 @@ type ModelInfoNode struct {
 }
 type ModelInfo struct {
 	Models []ModelInfoNode `json:"models"`
+}
+
+// loader_channel := make(chan int, 2)
+var loader_channel chan int
+
+func loadAFileWithURL(out chan<- int) bool {
+	imgUrl := "http://www.artvily.com/static/assets/color_023.jpg"
+
+	// Get the data
+	resp, loadErr := http.Get(imgUrl)
+	if loadErr != nil {
+		fmt.Printf("load a file failed, loadErr: %v\n", loadErr)
+		// panic(loadErr)
+
+		out <- 0
+		return false
+	}
+	defer resp.Body.Close()
+
+	data, wErr := ioutil.ReadAll(resp.Body)
+	if wErr != nil {
+		fmt.Printf("write a file failed,wErr: %v\n", wErr)
+
+		out <- 0
+		// panic(wErr)
+		return false
+	}
+	if len(data) < 300 {
+		fmt.Println("data: ", data)
+		fmt.Println("data len: ", len(data))
+		str := string(data)
+		fmt.Println("data to str: ", str)
+		strI := strings.Index(str, "Error:")
+		fmt.Println("strI: ", strI)
+		if strI > 0 {
+			out <- 0
+			panic("load error")
+			return false
+		}
+	}
+	ioutil.WriteFile("color_023.jpg", data, 0777)
+
+	fmt.Println("load a remote file success !!!")
+	out <- 1
+	return true
 }
 
 // loadFileFromJson01
@@ -41,22 +88,20 @@ func main() {
 			fmt.Println("model.Url: ", model.Url)
 		}
 	}
-	imgUrl := "http://www.artvily.com/static/assets/color_02.jpg"
+	loader_channel = make(chan int, 2)
 
-	// Get the data
-	resp, loadErr := http.Get(imgUrl)
-	if loadErr != nil {
-		fmt.Printf("load a file failed, loadErr: %v\n", loadErr)
-		panic(loadErr)
-	}
-	defer resp.Body.Close()
+	go loadAFileWithURL(loader_channel)
 
-	data, wErr := ioutil.ReadAll(resp.Body)
-	if wErr != nil {
-		fmt.Printf("write a file failed,wErr: %v\n", wErr)
-		panic(wErr)
+	for flag := range loader_channel {
+		len := len(loader_channel)
+		if len == 0 {
+			fmt.Println("loader_channel flag: ", flag)
+			close(loader_channel)
+		}
 	}
-	ioutil.WriteFile("color_02.jpg", data, 0777)
+
+	fmt.Println("loading finish ...")
+	time.Sleep(1 * time.Second)
 	fmt.Println("sys end ...")
 
 }
