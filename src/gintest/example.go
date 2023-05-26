@@ -14,5 +14,7 @@ func main() {
 			"message": "pong",
 		})
 	})
-	r.Run()
+	r.Run(":9091")
 }
+
+//go build -buildmode=c-shared -o example.dll example.go

@@ -32,6 +32,7 @@ func InitPages(router *gin.Engine) {
 
 	router.GET("/updatePageInsStatus", UpdatePageInsStatusInfo)
 
+	router.GET("/renderingTask", RenderingTask)
 }
 
 var nonLetterAndNumber = regexp.MustCompile(`[^a-zA-Z0-9 ]+`)
@@ -172,6 +173,21 @@ func UpdatePageInsStatusInfo(g *gin.Context) {
 	database.UpdatePageInsStatusInfo()
 	viewsTotStr := strconv.Itoa(database.GetPageViewsTotal())
 	g.String(http.StatusOK, fmt.Sprintf("update some info,tks. views total: "+viewsTotStr+"."))
+}
+func RenderingTask(g *gin.Context) {
+	infoStr := `{
+		"tasks":[
+			{
+				"name":"modelTask01",
+				"resUrl":"http://www.artvily.com/static/assets/obj/base.obj"
+			},
+			{
+				"name":"modelTask02",
+				"resUrl":"http://www.artvily.com/static/assets/obj/apple_01.obj"
+			}
+		]
+	}`
+	g.String(http.StatusOK, fmt.Sprintf(infoStr))
 }
 
 func increasePageViewCountByName(pns string, flags ...int) {
