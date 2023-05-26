@@ -22,6 +22,8 @@ import (
 
 // go build -o ../../bin/ webresserver.go
 
+// nohup ./webresserver 9090 &
+
 // go build ../src/websvr/webresserver.go
 // go run ../src/websvr/webresserver.go
 

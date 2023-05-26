@@ -22,6 +22,7 @@ import (
 
 // go run ../src/websvr/webserver.go
 // go build -o ../../bin/ webserver.go
+// nohup ./webserver 80 &
 
 // go mod init voxwebsvr.com/main
 // go mod edit -replace voxwebsvr.com/webfs=./webfs
