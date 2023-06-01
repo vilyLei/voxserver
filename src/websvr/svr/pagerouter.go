@@ -2,7 +2,9 @@ package svr
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -13,7 +15,37 @@ import (
 
 // go mod init voxwebsvr.com/svr
 
+var errorTemplate string = `
+<!DOCTYPE html>
+<html lang="en"><head></head>
+<body><p align="center">Error: illegal request !!!</p></body>
+`
+
+func readErrorHtmlFile(filePath string) (string, error) {
+	file, err := os.OpenFile(filePath, os.O_RDONLY, os.ModeDevice)
+	if err == nil {
+		defer file.Close()
+		content, _ := ioutil.ReadAll(file)
+		return string(content), nil
+	} else {
+		fmt.Printf("readRenderingStatusJson() failed, err: %v\n", err)
+	}
+	return "", err
+}
+func initFS() {
+	fcontent, err := readErrorHtmlFile("./webdyndata/common/html/canNotFindContent.html")
+	if err == nil {
+		fmt.Println("fcontent bytes: \n", len(fcontent))
+		errorTemplate = fcontent
+	} else {
+		fmt.Printf("readErrorHtmlFile() failed, err: %v", err)
+	}
+}
+
 func InitPages(router *gin.Engine) {
+
+	initFS()
+
 	InitTemplate(router)
 
 	router.NoRoute(NoRoute)
@@ -33,6 +65,8 @@ func InitPages(router *gin.Engine) {
 	router.GET("/updatePageInsStatus", UpdatePageInsStatusInfo)
 
 	router.GET("/renderingTask", RenderingTask)
+
+	router.GET("/errorRes", ErrorRes)
 }
 
 var nonLetterAndNumber = regexp.MustCompile(`[^a-zA-Z0-9 ]+`)
@@ -64,7 +98,8 @@ func NoRoute(g *gin.Context) {
 	case "game", "games":
 		GamePage(g)
 	default:
-		IndexPage(g)
+		// IndexPage(g)
+		CanNotFindContent(g)
 	}
 	// g.String(http.StatusOK, fmt.Sprintf("404 page not found here."))
 }
@@ -188,6 +223,28 @@ func RenderingTask(g *gin.Context) {
 		]
 	}`
 	g.String(http.StatusOK, fmt.Sprintf(infoStr))
+}
+
+func ErrorRes(g *gin.Context) {
+	// fmt.Println("ErrorRes call .")
+	ns := "websit-errorres"
+	defer func() {
+		increasePageViewCountByName(ns)
+	}()
+	infoStr := `{
+		"status":0
+	}`
+	g.String(http.StatusOK, fmt.Sprintf(infoStr))
+}
+func CanNotFindContent(g *gin.Context) {
+	ns := "websit-contentnotfind"
+	// viewsTotalStr := getPageViewCountStrByName(ns)
+	defer func() {
+		increasePageViewCountByName(ns)
+	}()
+	w := g.Writer
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, errorTemplate)
 }
 
 func increasePageViewCountByName(pns string, flags ...int) {

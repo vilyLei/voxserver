@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Rendering &amp; Art</title>
+    <style type="text/css">
+
+        #link_base {
+            color: #bbbbbb;
+            font-size: 14pt;
+        }
+
+        a:link {
+            color: #f04452;
+            text-decoration: none;
+            text-decoration: underline;
+        }
+
+        a:hover {
+            color: #ff0000;
+            text-decoration: underline;
+        }
+        body {
+            border: 0;
+            padding: 0;
+            background: #000000;
+        }
+        #infoBlock {
+			width: 100vw;
+			height: 100vh;
+			margin: 0px;
+            color: #00aa00;
+            font-size: 14pt;
+			text-align: center;
+			display: flex;
+			flex-direction: column;
+			justify-content: center;
+        }
+    </style>
+	<link rel="icon" href="/static/favicon.ico" type="image/x-icon" />
+    <script>
+		console.log("Error: illegal request !!!");
+		let isLZHCN = navigator.language == "zh-CN";
+        function applyPrefaceInfo() {
+			let cn_str = '抱歉，相关内容没能找到<br/>(∗ᵕ̴᷄◡ᵕ̴᷅∗)՞<br/><a href="http://www.artvily.com/">回到主页</a>';
+			let en_str = 'Sorry, the current content was not found<br/>(∗ᵕ̴᷄◡ᵕ̴᷅∗)՞<br/><a href="http://www.artvily.com/">Back to homepage</a>';
+			let str = cn_str;
+            if (!isLZHCN) {
+                str = en_str;
+            }
+            let div = document.getElementById("infoBlock");
+            div.innerHTML = str;
+        }
+        function bodyOnLoad() {
+            applyPrefaceInfo();
+        }
+    </script>
+</head>
+
+<body onload="bodyOnLoad()">
+    <div id="infoBlock">
+    </div>
+</body>
+</html>

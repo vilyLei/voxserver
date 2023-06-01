@@ -8,6 +8,10 @@ import (
 	"os"
 	"strconv"
 
+	_ "github.com/go-sql-driver/mysql" // 导入包但不使用,相当于只调用init(
+	_ "github.com/go-sql-driver/mysql" // 导入包但不使用,相当于只调用init(
+	_ "github.com/go-sql-driver/mysql" // 导入包但不使用,相当于只调用init(
+	_ "github.com/go-sql-driver/mysql" // 导入包但不使用,相当于只调用init(
 	_ "github.com/go-sql-driver/mysql" // 导入包但不使用,相当于只调用init()初始化
 )
 
@@ -92,7 +96,7 @@ func UpdatePageInsStatusInfo() {
 
 	pageViewsTotal = 0
 	total := 0
-	var pageNSList = [...]string{"website", "website-engine", "website-tool", "website-course", "website-game", "website-renderCase"}
+	var pageNSList = [...]string{"website", "website-engine", "website-tool", "website-course", "website-game", "website-renderCase", "websit-contentnotfind", "websit-errorres"}
 	pagesTotal := len(pageNSList)
 	for i := 0; i < pagesTotal; i++ {
 		ns := pageNSList[i]

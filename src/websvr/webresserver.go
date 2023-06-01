@@ -1,15 +1,12 @@
 package main
 
 import (
+	"io/ioutil"
 	"os"
 	"runtime"
-
 	// "path"
-
 	"fmt"
-
 	//"log"
-
 	"net/http"
 
 	"voxwebsvr.com/client"
@@ -51,12 +48,54 @@ func testCORS(w *http.ResponseWriter, r *http.Request) bool {
 
 var svrRootPath = "."
 
+var errorTemplate string = `
+<!DOCTYPE html>
+<html lang="en"><head></head>
+<body><p align="center">Error: illegal request !!!</p></body>
+`
+
+func readErrorHtmlFile(filePath string) (string, error) {
+	file, err := os.OpenFile(filePath, os.O_RDONLY, os.ModeDevice)
+	if err == nil {
+		defer file.Close()
+		content, _ := ioutil.ReadAll(file)
+		return string(content), nil
+	} else {
+		fmt.Printf("readRenderingStatusJson() failed, err: %v\n", err)
+	}
+	return "", err
+}
+func initFS() {
+	fcontent, err := readErrorHtmlFile("./webdyndata/common/html/canNotFindContent.html")
+	if err == nil {
+		fmt.Println("fcontent bytes: \n", len(fcontent))
+		errorTemplate = fcontent
+	} else {
+		fmt.Printf("readErrorHtmlFile() failed, err: %v", err)
+	}
+}
+func errorResReq() {
+	url := "http://localhost:80/errorRes"
+	resp, err := http.Get(url)
+	if err != nil {
+		fmt.Printf("errorResReq() get url failed, err: %v\n", err)
+	} else {
+		defer resp.Body.Close()
+	}
+}
 func handleRequest(w http.ResponseWriter, r *http.Request) {
 
 	if testCORS(&w, r) {
 
 		pathStr := svrRootPath + r.URL.Path
-		client.ReceiveRequest(&w, r, &pathStr)
+
+		flag := client.ReceiveRequest(&w, r, &pathStr)
+		if !flag {
+			go errorResReq()
+
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprintf(w, errorTemplate)
+		}
 	}
 }
 func main() {
@@ -66,9 +105,10 @@ func main() {
 	// }
 	rootPath, err := os.Getwd()
 	if err == nil {
-		//svrRootPath = rootPath
 		fmt.Println("rootPath: ", rootPath)
 	}
+	initFS()
+
 	var portStr string = "9090"
 	argsLen := len(os.Args)
 	// fmt.Println("argsLen: ", argsLen)

@@ -1,7 +1,6 @@
 package client
 
 import (
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -23,13 +22,7 @@ func setLastModified(w http.ResponseWriter, modtime time.Time) {
 	}
 }
 
-var errorTemplate string = `
-<!DOCTYPE html>
-<html lang="en"><head></head>
-<body><p align="center">Error: illegal request !!!</p></body>
-`
-
-func sendBytesToClient(w *http.ResponseWriter, siPtr *webfs.SendBufInfo) {
+func sendBytesToClient(w *http.ResponseWriter, siPtr *webfs.SendBufInfo) bool {
 
 	wr := (*w)
 	if siPtr.Success {
@@ -54,30 +47,27 @@ func sendBytesToClient(w *http.ResponseWriter, siPtr *webfs.SendBufInfo) {
 
 		wr.WriteHeader(http.StatusOK)
 		wr.Write((*(siPtr.BufPtr)))
-
+		return true
 	} else {
-
-		wr.WriteHeader(http.StatusOK)
-		fmt.Fprintf(wr, errorTemplate)
+		return false
 	}
 }
-func rangeFileResponse(w *http.ResponseWriter, pathStr *string, bytesPosList []int) {
+func rangeFileResponse(w *http.ResponseWriter, pathStr *string, bytesPosList []int) bool {
 
 	// fmt.Println("rangeFileResponse(), pathStr", *pathStr)
 	siPtr := webfs.ReadFileBySteps(pathStr, bytesPosList[0], bytesPosList[1])
-	sendBytesToClient(w, siPtr)
+	return sendBytesToClient(w, siPtr)
 }
 
-func fileResponse(w *http.ResponseWriter, pathStr *string) {
+func fileResponse(w *http.ResponseWriter, pathStr *string) bool {
 
 	// fmt.Println("fileResponse(), pathStr", *pathStr)
 	siPtr := webfs.FileReader(pathStr)
 	webfs.GzipSendBuf(siPtr)
 	// fmt.Println("fileResponse(),contentType: ", siPtr.ContentType, "siPtr.GzipEnabled: ", siPtr.GzipEnabled)
-	sendBytesToClient(w, siPtr)
-
+	return sendBytesToClient(w, siPtr)
 }
-func ReceiveRequest(w *http.ResponseWriter, r *http.Request, pathStrPtr *string) {
+func ReceiveRequest(w *http.ResponseWriter, r *http.Request, pathStrPtr *string) bool {
 	var rHeader = r.Header
 	var rangeList []string
 	rangeListSize := 0
@@ -100,8 +90,8 @@ func ReceiveRequest(w *http.ResponseWriter, r *http.Request, pathStrPtr *string)
 				}
 			}
 		}
-		rangeFileResponse(w, pathStrPtr, bytesPosList)
+		return rangeFileResponse(w, pathStrPtr, bytesPosList)
 	} else {
-		fileResponse(w, pathStrPtr)
+		return fileResponse(w, pathStrPtr)
 	}
 }
