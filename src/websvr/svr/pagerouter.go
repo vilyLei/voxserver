@@ -67,6 +67,8 @@ func InitPages(router *gin.Engine) {
 	router.GET("/renderingTask", RenderingTask)
 
 	router.GET("/errorRes", ErrorRes)
+
+	router.GET("/getPageStatus", GetPageStatusInfoJson)
 }
 
 var nonLetterAndNumber = regexp.MustCompile(`[^a-zA-Z0-9 ]+`)
@@ -209,6 +211,15 @@ func UpdatePageInsStatusInfo(g *gin.Context) {
 	viewsTotStr := strconv.Itoa(database.GetPageViewsTotal())
 	g.String(http.StatusOK, fmt.Sprintf("update some info,tks. views total: "+viewsTotStr+"."))
 }
+
+func GetPageStatusInfoJson(g *gin.Context) {
+	// infoJson := database.GetPageStJsonFromDB()
+	// g.String(http.StatusOK, fmt.Sprintf(infoJson))
+	infoObj := database.GetPageStObjFromDB()
+	// g.JSON(http.StatusOK, gin.H{"message": "hello world"})
+	g.JSON(http.StatusOK, infoObj)
+}
+
 func RenderingTask(g *gin.Context) {
 	infoStr := `{
 		"tasks":[

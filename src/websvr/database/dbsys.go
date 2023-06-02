@@ -183,7 +183,7 @@ func initWebPageStatusDB() (err error) {
 func IncreasePageViewCountByName(ns string, flags ...int) int {
 	node, hasKey := pageSTNodeMap[ns]
 	if hasKey {
-		node.count++
+		node.Count++
 		// fmt.Println("IncreasePageViewCountByName(), A pageViewsTotal: ", pageViewsTotal)
 		if len(flags) < 1 {
 			pageViewsTotal++
@@ -192,9 +192,9 @@ func IncreasePageViewCountByName(ns string, flags ...int) int {
 		}
 		// fmt.Println("IncreasePageViewCountByName(), B pageViewsTotal: ", pageViewsTotal)
 		// 通过比较这oldCount和count的值来判断是否有更新
-		node.oldCount = node.count
-		UpdateSitePageReqCountByID(node.count, node.id)
-		return node.count
+		node.OldCount = node.Count
+		UpdateSitePageReqCountByID(node.Count, node.Id)
+		return node.Count
 	}
 	return 0
 }
@@ -202,7 +202,7 @@ func IncreasePageViewCountByName(ns string, flags ...int) int {
 func IncreaseLogicPageViewCountByName(ns string, flag int) {
 	node, hasKey := pageSTNodeMap[ns]
 	if hasKey {
-		node.count++
+		node.Count++
 		if flag > 0 {
 			pageViewsTotal++
 		}
@@ -217,10 +217,10 @@ func IncreaseLogicPageViewCountToDBByNames(nsList []string, total int) {
 		ns := nsList[i]
 		node, hasKey := pageSTNodeMap[ns]
 		if hasKey {
-			if node.oldCount != node.count {
-				node.oldCount = node.count
+			if node.OldCount != node.Count {
+				node.OldCount = node.Count
 				// fmt.Println("IncreaseLogicPageViewCountToDBByNames(), node.name: ", node.name)
-				sqlStr += BuildUpdateSitePageReqCountByID(node.count, node.id)
+				sqlStr += BuildUpdateSitePageReqCountByID(node.Count, node.Id)
 				sqlTot++
 			}
 		}
@@ -237,7 +237,7 @@ func QuerySitePageReqCountByID(id int) {
 	rowObj := sys_web_pst_db.QueryRow(sqlStr, id)
 
 	var st PageStatusNode
-	rowObj.Scan(&st.id, &st.name, &st.count)
+	rowObj.Scan(&st.Id, &st.Name, &st.Count)
 }
 func BuildUpdateSitePageReqCountByID(count int, id int) string {
 	sqlStr := `update pagestatus set count=` + strconv.Itoa(count) + ` where id=` + strconv.Itoa(id) + `;`

@@ -8,22 +8,22 @@ import (
 	"os"
 	"strconv"
 
-	_ "github.com/go-sql-driver/mysql" // 导入包但不使用,相当于只调用init(
-	_ "github.com/go-sql-driver/mysql" // 导入包但不使用,相当于只调用init(
-	_ "github.com/go-sql-driver/mysql" // 导入包但不使用,相当于只调用init(
-	_ "github.com/go-sql-driver/mysql" // 导入包但不使用,相当于只调用init(
-	_ "github.com/go-sql-driver/mysql" // 导入包但不使用,相当于只调用init()初始化
+	_ "github.com/go-sql-driver/mysql"
 )
 
 // go mod init voxwebsvr.com/database
 
 type PageStatusNode struct {
-	id       int
-	name     string
-	count    int
-	oldCount int
-	src      string
-	info     string
+	Id       int    `json:"id"`
+	Name     string `json:"name"`
+	Count    int    `json:"count"`
+	OldCount int    `json:"oldCount"`
+	Src      string `json:"src"`
+	Info     string `json:"info"`
+}
+type PageStatus struct {
+	CountTotal int              `json:"countTotal"`
+	Nodes      []PageStatusNode `json:"nodes"`
 }
 type InsInfoNode struct {
 	Name string `json:"name"`
@@ -48,6 +48,9 @@ func initPageModule(db *sql.DB) {
 
 	initPageStInfoFromDB()
 	UpdatePageInsStatusInfo()
+
+	// for test
+	// GetPageStJsonFromDB()
 }
 func buildInsertPageStSQL(id int, name string) string {
 	idStr := strconv.Itoa(id)
@@ -68,7 +71,61 @@ func insertPageStRecord(id int, name string) {
 	sql := buildInsertPageStSQL(id, name)
 	insertPageStRecordWithSQL(sql)
 }
+func GetPageStJsonFromDB() string {
+	sqlStr := "select * from pagestatus;"
+	rows, err := webPage_st_db.Query(sqlStr)
+	if err != nil {
+		fmt.Printf("%s query failed,err:%v\n", sqlStr, err)
+		return ""
+	}
+	defer rows.Close()
 
+	var ps PageStatus
+	ps.CountTotal = 0
+	nodes := ps.Nodes
+	for rows.Next() {
+		var node PageStatusNode
+		rows.Scan(&node.Id, &node.Name, &node.Count, &node.Src, &node.Info)
+		ps.CountTotal += node.Count
+		nodes = append(nodes, node)
+	}
+	ps.Nodes = nodes
+	// fmt.Printf("GetPageStJsonFromDB(), nodes len: %d\n", len(nodes))
+	// fmt.Printf("GetPageStJsonFromDB(), ps.Nodes len: %d\n", len(ps.Nodes))
+
+	jsonBytes, err := json.Marshal(ps)
+	jsonStr := ""
+	if err == nil {
+		jsonStr = string(jsonBytes)
+	} else {
+		fmt.Printf("error: %v", err)
+	}
+	// fmt.Println(jsonStr)
+	return jsonStr
+}
+
+func GetPageStObjFromDB() *PageStatus {
+	sqlStr := "select * from pagestatus;"
+	rows, err := webPage_st_db.Query(sqlStr)
+	if err != nil {
+		fmt.Printf("%s query failed,err:%v\n", sqlStr, err)
+		return nil
+	}
+	defer rows.Close()
+
+	var ps PageStatus
+	ps.CountTotal = 0
+	nodes := ps.Nodes
+	for rows.Next() {
+		var node PageStatusNode
+		rows.Scan(&node.Id, &node.Name, &node.Count, &node.Src, &node.Info)
+		ps.CountTotal += node.Count
+		nodes = append(nodes, node)
+	}
+	ps.Nodes = nodes
+
+	return &ps
+}
 func initPageStInfoFromDB() {
 
 	sqlStr := "select * from pagestatus;"
@@ -78,11 +135,12 @@ func initPageStInfoFromDB() {
 		return
 	}
 	defer rows.Close()
+
 	for rows.Next() {
 		var node PageStatusNode
-		rows.Scan(&node.id, &node.name, &node.count, &node.src, &node.info)
-		pageSTNodeMap[node.name] = &node
-		node.oldCount = node.count
+		rows.Scan(&node.Id, &node.Name, &node.Count, &node.Src, &node.Info)
+		pageSTNodeMap[node.Name] = &node
+		node.OldCount = node.Count
 		pageSTNodesTotal++
 		fmt.Printf("initPageStInfoFromDB(), node:%#v\n", node)
 	}
@@ -107,14 +165,14 @@ func UpdatePageInsStatusInfo() {
 		} else {
 			insertPageStRecord(pageSTNodesTotal+1+i, ns)
 			var node PageStatusNode
-			node.name = ns
-			node.count = 0
-			node.oldCount = 0
+			node.Name = ns
+			node.Count = 0
+			node.OldCount = 0
 			pageSTNodeMap[ns] = &node
 
 			total++
 		}
-		pageSTNodeMap[ns].oldCount = pageSTNodeMap[ns].count
+		pageSTNodeMap[ns].OldCount = pageSTNodeMap[ns].Count
 	}
 	pageSTNodesTotal += total
 
@@ -147,9 +205,9 @@ func UpdatePageInsStatusInfo() {
 			} else {
 				insertPageStRecord(pageSTNodesTotal+1+i, ns)
 				var node PageStatusNode
-				node.name = ns
-				node.count = 0
-				node.oldCount = 0
+				node.Name = ns
+				node.Count = 0
+				node.OldCount = 0
 				pageSTNodeMap[ns] = &node
 				total++
 			}
@@ -169,7 +227,7 @@ func HasPageViewCountByName(ns string) bool {
 func GetPageViewCountByName(ns string) int {
 	node, hasKey := pageSTNodeMap[ns]
 	if hasKey {
-		return node.count
+		return node.Count
 	}
 	return 0
 }
