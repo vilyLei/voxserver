@@ -80,8 +80,8 @@ func InitTemplate(router *gin.Engine) {
 	router.LoadHTMLGlob("webdyndata/templates/**/*")
 }
 func IndexPage(g *gin.Context) {
-	host := g.Request.Host
-	fmt.Println("req HomePage info ...host: ", host)
+	// host := g.Request.Host
+	// fmt.Println("req HomePage info ...host: ", host)
 	ns := "website"
 	// g.String(http.StatusOK, fmt.Sprintf("It is a new web page here."))
 	// viewsTotalStr := strconv.Itoa(database.GetHomePageViewCount() + 1)
@@ -221,6 +221,9 @@ func ErrorRes(g *gin.Context) {
 	g.String(http.StatusOK, fmt.Sprintf(infoStr))
 }
 func CanNotFindContent(g *gin.Context) {
+	url := g.Request.URL.Path
+	fmt.Println("CanNotFindContent(), url: ", url)
+	database.AppendErrorPageInfo("non-page", url)
 	ns := "websit-contentnotfind"
 	// viewsTotalStr := getPageViewCountStrByName(ns)
 	defer func() {

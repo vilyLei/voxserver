@@ -59,6 +59,11 @@ func buildInsertPageStSQL(id int, name string) string {
 	sqlStr += idStr + `,"` + name + `", 0, "non-src", "demo ins page");`
 	return sqlStr
 }
+func buildErrorPageInfoSQL(name string, message string) string {
+	sqlStr := `insert into cannotfindpage(name, message) values(`
+	sqlStr += `"` + name + `","` + message + `");`
+	return sqlStr
+}
 
 func insertPageStRecordWithSQL(sqlStr string) {
 
@@ -66,6 +71,10 @@ func insertPageStRecordWithSQL(sqlStr string) {
 	if err != nil {
 		fmt.Printf("insertPageStRecord failed,err:%v\n", err)
 	}
+}
+func AppendErrorPageInfo(name string, message string) {
+	sql := buildErrorPageInfoSQL(name, message)
+	insertPageStRecordWithSQL(sql)
 }
 func insertPageStRecord(id int, name string) {
 	sql := buildInsertPageStSQL(id, name)

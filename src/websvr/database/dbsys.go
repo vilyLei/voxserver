@@ -37,13 +37,26 @@ create table pagemessage(
 	dstUser varchar(30) default 'users',
 	creationtime datetime NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'creation time'
 	);
+create table cannotfindpage(
+	id int(4) auto_increment not null primary key,
+	name char(50) default 'errorPage',
+	message varchar(300) default '/error',
+	creationtime datetime NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'creation time'
+	);
 insert into pagemessage
 	(name, message)
 	values
 	(
-	'user002','I need an inspection tool'
+	'non-page','/jojo'
 	);
 
+
+insert into cannotfindpage
+	(name, message)
+	values
+	(
+	'non-page','I need an inspection tool'
+	);
 
 时间操作:
 
