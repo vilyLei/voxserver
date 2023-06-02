@@ -167,7 +167,7 @@
         {
             "name": "deferredManyLights2",
             "info": "延迟光照demo(1024 dynamic lights with tile base deferred light)",
-            "url": "http://www.artvily.com/renderCase?sample=deferredManyLights2"
+            "url": "http://www.artvily.com:9080/renderCase?sample=deferredManyLights2"
         },
         {
             "name": "obbIntersection",
