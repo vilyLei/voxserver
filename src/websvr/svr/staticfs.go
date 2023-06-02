@@ -1,9 +1,11 @@
 package svr
 
 import (
-	"path"
-
+	"fmt"
+	"io/ioutil"
 	"net/http"
+	"os"
+	"path"
 
 	"github.com/gin-gonic/gin"
 	"voxwebsvr.com/client"
@@ -11,6 +13,32 @@ import (
 
 // go mod init voxwebsvr.com/svr
 
+var errorTemplate string = `
+<!DOCTYPE html>
+<html lang="en"><head></head>
+<body><p align="center">Error: illegal request !!!</p></body>
+`
+
+func readErrorHtmlFile(filePath string) (string, error) {
+	file, err := os.OpenFile(filePath, os.O_RDONLY, os.ModeDevice)
+	if err == nil {
+		defer file.Close()
+		content, _ := ioutil.ReadAll(file)
+		return string(content), nil
+	} else {
+		fmt.Printf("readRenderingStatusJson() failed, err: %v\n", err)
+	}
+	return "", err
+}
+func initFS() {
+	fcontent, err := readErrorHtmlFile("./webdyndata/common/html/canNotFindContent.html")
+	if err == nil {
+		fmt.Println("fcontent bytes: \n", len(fcontent))
+		errorTemplate = fcontent
+	} else {
+		fmt.Printf("readErrorHtmlFile() failed, err: %v", err)
+	}
+}
 func SetRWriterStatus(w *http.ResponseWriter, code int) {
 	(*w).WriteHeader(code)
 }
@@ -35,7 +63,12 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 	if testCORS(&w, r) {
 
 		pathStr := fsRootDir + r.URL.Path
-		client.ReceiveRequest(&w, r, &pathStr)
+		flag := client.ReceiveRequest(&w, r, &pathStr)
+		if !flag {
+			defer updateErrorResStatus()
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprintf(w, errorTemplate)
+		}
 	}
 }
 func useStaticFile(g *gin.Context) {

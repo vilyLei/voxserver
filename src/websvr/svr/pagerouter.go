@@ -2,9 +2,7 @@ package svr
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/http"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -14,33 +12,6 @@ import (
 )
 
 // go mod init voxwebsvr.com/svr
-
-var errorTemplate string = `
-<!DOCTYPE html>
-<html lang="en"><head></head>
-<body><p align="center">Error: illegal request !!!</p></body>
-`
-
-func readErrorHtmlFile(filePath string) (string, error) {
-	file, err := os.OpenFile(filePath, os.O_RDONLY, os.ModeDevice)
-	if err == nil {
-		defer file.Close()
-		content, _ := ioutil.ReadAll(file)
-		return string(content), nil
-	} else {
-		fmt.Printf("readRenderingStatusJson() failed, err: %v\n", err)
-	}
-	return "", err
-}
-func initFS() {
-	fcontent, err := readErrorHtmlFile("./webdyndata/common/html/canNotFindContent.html")
-	if err == nil {
-		fmt.Println("fcontent bytes: \n", len(fcontent))
-		errorTemplate = fcontent
-	} else {
-		fmt.Printf("readErrorHtmlFile() failed, err: %v", err)
-	}
-}
 
 func InitPages(router *gin.Engine) {
 
@@ -235,13 +206,15 @@ func RenderingTask(g *gin.Context) {
 	}`
 	g.String(http.StatusOK, fmt.Sprintf(infoStr))
 }
-
-func ErrorRes(g *gin.Context) {
-	// fmt.Println("ErrorRes call .")
+func updateErrorResStatus() {
 	ns := "websit-errorres"
 	defer func() {
 		increasePageViewCountByName(ns)
 	}()
+}
+func ErrorRes(g *gin.Context) {
+	// fmt.Println("ErrorRes call .")
+	updateErrorResStatus()
 	infoStr := `{
 		"status":0
 	}`
