@@ -58,6 +58,23 @@ func testCORS(w *http.ResponseWriter, r *http.Request) bool {
 
 var fsRootDir = "."
 
+// path value example: /static/assets/box.jpg
+func StaticFileRequest(w http.ResponseWriter, r *http.Request, path string) {
+
+	if testCORS(&w, r) {
+		if path == "" {
+			path = r.URL.Path
+		}
+		pathStr := fsRootDir + path
+		fmt.Println("StaticFileRequest(), pathStr: ", pathStr)
+		flag := client.ReceiveRequest(&w, r, &pathStr)
+		if !flag {
+			defer updateErrorResStatus()
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprintf(w, errorTemplate)
+		}
+	}
+}
 func handleRequest(w http.ResponseWriter, r *http.Request) {
 
 	if testCORS(&w, r) {

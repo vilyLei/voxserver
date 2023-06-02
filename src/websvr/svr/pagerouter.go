@@ -60,7 +60,7 @@ func NoRoute(g *gin.Context) {
 	url := r.URL.Path
 	fmt.Println("NoRoute(), Warn: 404 page not found here, url: ", url)
 	keyStr := getFirstKeyStr(url)
-	// fmt.Println("NoRoute(), keyStr: ", keyStr)
+	fmt.Println("NoRoute(), keyStr: ", keyStr)
 	switch keyStr {
 	case "engine", "engines":
 		EnginePage(g)
@@ -71,6 +71,12 @@ func NoRoute(g *gin.Context) {
 	case "game", "games":
 		GamePage(g)
 	default:
+		switch url {
+		case "/favicon.ico":
+			ReqFavicon(g)
+		default:
+			keyStr = ""
+		}
 		// IndexPage(g)
 		CanNotFindContent(g)
 	}
@@ -234,6 +240,9 @@ func CanNotFindContent(g *gin.Context) {
 	fmt.Fprintf(w, errorTemplate)
 }
 
+func ReqFavicon(g *gin.Context) {
+	StaticFileRequest(g.Writer, g.Request, "/static/favicon.ico")
+}
 func increasePageViewCountByName(pns string, flags ...int) {
 	database.AppendSTDBData(pns, flags...)
 }
