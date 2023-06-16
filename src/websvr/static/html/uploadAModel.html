@@ -5,13 +5,30 @@
     <title>XMLHttpRequest上传文件</title>
     <script type="text/javascript">
 		console.log("sys init ...");
-		let taskReqSvrUrl = "http://localhost:9090/renderingTask";
+        let hostUrl = "http://localhost:9090/"
+		let taskReqSvrUrl = hostUrl + "renderingTask";
 
 		let taskJsonObj = {}
 
-		// let testJsostr = `{"phase":"new","progress":0,"taskid":2001,"status":22}`
-		// var testJsostr_data = JSON.parse(testJsostr);
-		// console.log("testJsostr_data: ", testJsostr_data);
+        // filepath = "./static/rtUploadFiles/modelRTask2001/boomBox.glb"
+        // let i = filepath.lastIndexOf("/")
+        // imgUrl = hostUrl + filepath.slice(2, i+1) + "bld_rendering_mini.jpg"
+        // console.log("imgUrl: ", imgUrl);
+
+        function addMiniImg(filepath) {
+            if(filepath === undefined || filepath == "") {
+                filepath = "./static/rtUploadFiles/modelRTask2001/boomBox.glb"
+            }
+            let i = filepath.lastIndexOf("/")
+            imgUrl = hostUrl + filepath.slice(2, i+1) + "bld_rendering_mini.jpg"
+            console.log("imgUrl: ", imgUrl);
+
+            var div = document.getElementById("imgDiv");
+            let img = new Image()
+            img.src = imgUrl
+            div.appendChild(img);
+        }
+
 		let taskStatus = 0
 		function sendAGetReq(purl) {
 			let codeLoader = new XMLHttpRequest();
@@ -24,17 +41,30 @@
 				// console.log("sendAGetReq(), codeLoader.response: ", codeLoader.response);
 				var sendAGetReq_data = JSON.parse(codeLoader.response);
 				console.log("sendAGetReq(), sendAGetReq_data: ", sendAGetReq_data);
-				if (sendAGetReq_data.phase === "finish") {
-					if(sendAGetReq_data.progress == 100) {
-						taskStatus = 1;
-					}
-				}
+                // task_rendering_enter
+                
 				var div = document.getElementById("infoDiv");
-				if(taskStatus < 1) {
-					div.innerHTML = "task progress: " + sendAGetReq_data.progress + "%"
-				}else {
-					div.innerHTML = "rendering task finish !!!!"
-				}
+                let phase = sendAGetReq_data.phase;
+                switch(phase) {
+                    case "running":
+                        div.innerHTML = "task progress: " + sendAGetReq_data.progress + "%"
+                        break;
+                    case "new":
+                        div.innerHTML = "waiting a renderer ..."
+                        break;
+                    case "task_rendering_enter":
+                        div.innerHTML = "enter a renderer ..."
+                        break;
+                    case "finish":
+                        taskStatus = 1
+                        div.innerHTML = "rendering task finish !!!"
+                        addMiniImg(taskJsonObj.filepath)
+                        // let i = filepath.lastIndexof("/")
+                        // imgUrl = filepath.slice(0, i) + "bld_rendering_mini.jpg"
+                        //bld_rendering_mini.jpg
+                    default:
+                        break;
+                }
 			};
 			codeLoader.send(null);
 		}
@@ -178,5 +208,12 @@
 <div id="infoDiv">
 	task waiting ...
 </div>
+<br/>
+<div id="imgDiv">
+	...
+</div>
+<script type="text/javascript">
+    // addMiniImg("")
+</script>
 </body>
 </html>

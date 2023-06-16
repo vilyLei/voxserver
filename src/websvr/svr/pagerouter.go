@@ -15,6 +15,7 @@ import (
 
 type UploadReqDef struct {
 	TaskID   int64  `json:"taskid,int64"`
+	FilePath string `json:"filepath"`
 	TaskName string `json:"taskname"`
 	Success  bool   `json:"success,bool"`
 	Status   int    `json:"status,int"`
@@ -271,11 +272,19 @@ func RenderingTask(g *gin.Context) {
 	case "rtaskerror":
 		fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
 		g.String(http.StatusOK, fmt.Sprintf(infoStr))
+	case "rtaskreadydata":
+		if hasTaskFlag {
+			rtNode := rtTaskNodeMap[tid]
+			rtNode.Phase = "task_rendering_parse_data"
+		}
+		fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
+		g.String(http.StatusOK, fmt.Sprintf(infoStr))
 	case "reqanewrtask":
 		fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
 		total := len(rtWaitTaskNodes)
 		if total > 0 {
 			rtNode := rtWaitTaskNodes[0]
+			rtNode.Phase = "task_rendering_enter"
 			rtWaitTaskNodes = append(rtWaitTaskNodes[:0], rtWaitTaskNodes[1:]...)
 			jsonBytes, err := json.Marshal(rtNode)
 			if err != nil {
@@ -327,6 +336,7 @@ func UploadRenderingTaskData(g *gin.Context) {
 	filename := "none"
 	var status = 0
 	file, _ := g.FormFile("file")
+	filePath := ""
 	if file != nil {
 
 		status = 22
@@ -359,12 +369,16 @@ func UploadRenderingTaskData(g *gin.Context) {
 			fmt.Println("UploadRenderingTaskData(), len(rtWaitTaskNodes): ", len(rtWaitTaskNodes))
 			fmt.Println("UploadRenderingTaskData(), upload receive a new rendering task file name: ", filename)
 
-			g.SaveUploadedFile(file, rtNode.ResUrl)
+			filePath = rtNode.ResUrl
+			g.SaveUploadedFile(file, filePath)
+
 		case "finish":
+
 			fileDir := "./static/rtUploadFiles/" + taskname + "/"
+			filePath = fileDir + filename
 			fmt.Println("upload receive a rendering outpu pic file name: ", filename)
 
-			g.SaveUploadedFile(file, fileDir+filename)
+			g.SaveUploadedFile(file, filePath)
 
 			webfs.ResizeImgAndSave(fileDir, filename, 128, 128)
 		default:
@@ -380,6 +394,7 @@ func UploadRenderingTaskData(g *gin.Context) {
 	reqd.TaskID = tid
 	reqd.TaskName = taskname
 	reqd.Status = status
+	reqd.FilePath = filePath
 	jsonBytes, err := json.Marshal(reqd)
 	if err != nil {
 		fmt.Println("error:", err)
