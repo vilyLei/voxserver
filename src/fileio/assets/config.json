@@ -1,0 +1,19 @@
+{
+	"renderer-proc":"./renderer.exe",
+	"renderer-instance":
+		{
+			"name":"high-image-renderer",
+			"status":"stop"
+		},
+	"resource":
+		{
+			"type": "obj",
+			"models": ["apple_01.obj"]
+		},
+	"task":
+		{
+			"taskID": 1,
+			"times": 3,
+			"outputPath": ""
+		}
+	}

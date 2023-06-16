@@ -1,6 +1,7 @@
 package svr
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -10,6 +11,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"voxwebsvr.com/database"
 )
+
+type UploadReqDef struct {
+	Success  bool   `json:"success,string"`
+	Status   int16  `json:"status,string"`
+	FileName string `json:"fileName"`
+	UUID     string `json:"-"` //忽略输出
+}
 
 // go mod init voxwebsvr.com/svr
 
@@ -36,6 +44,7 @@ func InitPages(router *gin.Engine) {
 	router.GET("/updatePageInsStatus", UpdatePageInsStatusInfo)
 
 	router.GET("/renderingTask", RenderingTask)
+	router.POST("/uploadRTData", UploadRenderingTaskData)
 
 	router.GET("/errorRes", ErrorRes)
 
@@ -211,6 +220,34 @@ func RenderingTask(g *gin.Context) {
 		]
 	}`
 	g.String(http.StatusOK, fmt.Sprintf(infoStr))
+}
+func UploadRenderingTaskData(g *gin.Context) {
+	// infoStr := ``
+	// g.String(http.StatusOK, fmt.Sprintf(infoStr))
+
+	// single file uploading receive
+	filename := "none"
+	var status int16 = 0
+	file, _ := g.FormFile("file")
+	if file != nil {
+		status = 22
+		filename = file.Filename
+		fmt.Println("upload receive file name: ", filename)
+		dst := "./static/rtUploadFiles/" + filename
+		// 上传文件至指定的完整文件路径
+		g.SaveUploadedFile(file, dst)
+	}
+	var reqd UploadReqDef
+	reqd.Success = true
+	reqd.FileName = filename
+	reqd.Status = status
+	jsonBytes, err := json.Marshal(reqd)
+	if err != nil {
+		fmt.Println("error:", err)
+	}
+	jsonStr := string(jsonBytes)
+	// c.String(http.StatusOK, fmt.Sprintf("'%s' uploaded!", file.Filename))
+	g.String(http.StatusOK, fmt.Sprintf("%s", jsonStr))
 }
 func updateErrorResStatus() {
 	ns := "websit-errorres"
