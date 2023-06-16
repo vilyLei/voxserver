@@ -28,6 +28,16 @@ func testMap() {
 }
 
 func main() {
+	// slice := []int{1, 2, 3, 4, 5}
+	slice := []int{1}
+	fmt.Println("A slice: ", slice)
+	first := slice[0]
+	slice = append(slice[:0], slice[1:]...)
+	fmt.Println("B slice: ", slice)
+	fmt.Println("C first: ", first)
+}
+func main1() {
+
 	fmt.Println("hello young man !")
 	var num int = 10
 	num++
