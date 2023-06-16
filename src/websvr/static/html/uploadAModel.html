@@ -30,6 +30,18 @@
         }
 
 		let taskStatus = 0
+        function sendCurrentGetReq(purl) {
+			let codeLoader = new XMLHttpRequest();
+			codeLoader.open("GET", purl, true);
+			codeLoader.onerror = function(err) {
+				console.error("load error: ", err);
+			};
+			codeLoader.onprogress = e => {};
+			codeLoader.onload = evt => {
+				console.log("sendCurrentGetReq(), codeLoader.response: ", codeLoader.response);
+			};
+			codeLoader.send(null);
+		}
 		function sendAGetReq(purl) {
 			let codeLoader = new XMLHttpRequest();
 			codeLoader.open("GET", purl, true);
@@ -136,7 +148,10 @@
 			console.log("josn obj data: ", data);
             if(data.success) {
 				taskJsonObj = data
-                alert("上传成功！");
+                // alert("上传成功！");
+                //http://localhost:9092/rendering?taskType=new
+                url = "http://localhost:9092/rendering?taskType=new"
+                sendCurrentGetReq(url)
 				ptupdate();
             }else{
                 alert("上传失败！");
@@ -206,7 +221,7 @@
 <br/>
 <br/>
 <div id="infoDiv">
-	task waiting ...
+	...
 </div>
 <br/>
 <div id="imgDiv">
