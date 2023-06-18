@@ -6,6 +6,7 @@
     <script type="text/javascript">
 		console.log("sys init ...");
         let hostUrl = "http://localhost:9090/"
+        hostUrl = "/"
 		let taskReqSvrUrl = hostUrl + "renderingTask";
 
 		let taskJsonObj = {}
@@ -148,6 +149,7 @@
 			console.log("josn obj data: ", data);
             if(data.success) {
 				taskJsonObj = data
+                console.log("上传成功！");
                 // alert("上传成功！");
                 //http://localhost:9092/rendering?taskType=new
                 url = "http://localhost:9092/rendering?taskType=new"
