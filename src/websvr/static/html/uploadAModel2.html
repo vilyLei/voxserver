@@ -110,10 +110,6 @@
         }
         //图片上传
         var xhr;
-        //上传文件方法
-        function test() {
-            console.log("test");
-        }
         function uploadAFile() {
             var url = "http://localhost:9090/uploadRTData?phase=newrtask"; // 接收上传文件的后台地址
             console.log("UpladFile() call ...url: ", url);
@@ -152,9 +148,7 @@
                 taskJsonObj = data
                 console.log("上传成功！");
                 // alert("上传成功！");
-                // //http://localhost:9092/rendering?taskType=new
-                // url = "http://localhost:9092/rendering?taskType=new"
-                // sendCurrentGetReq(url)
+                
                 ptupdate();
             } else {
                 alert("上传失败！");
@@ -213,15 +207,7 @@
     <progress id="progressBar" value="0" max="100" style="width: 300px;"></progress>
     <span id="percentage"></span><span id="time"></span>
     <br /><br />
-    <input type="file" id="file" accept=".glb,.fbx,.obj" name="myfile" />
-    <!--
-	<input type="file" id="files" multiple/><br/><br/>
-<input type="button" οnclick="alert('dd')" value="上传" />
-<input type="button" οnclick="cancleUploadFile()" value="取消" />
--->
-    <button id="target0" onclick="uploadAFile()">上传</button>
-    <button id="target1" onclick="cancleUploadFile()">取消上传</button>
-    <button id="target" onclick="test()">test</button>
+    <input type="file" id="file" accept=".glb,.fbx,.obj" readonly="readonly" name="myfile" value="上传渲染模型" />
     <br />
     <br />
     <div id="infoDiv">
@@ -237,8 +223,8 @@
         inputObj.addEventListener("change", () => {
             // let files = Array.from(input.files);
             // this.m_dropController.initFilesLoad(files);
-            console.log(">&& inputObj change evt does ...")
-            // uploadAFile()
+            console.log(">>>-->> inputObj change evt does ...")
+            uploadAFile()
         });
     </script>
 </body>
