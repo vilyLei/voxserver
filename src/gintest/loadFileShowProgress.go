@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-var fileTotalBytes uint64 = 1.0
+var fileTotalBytes uint64 = 1
 
 // "github.com/dustin/go-humanize"
 // WriteCounter counts the number of bytes written to it. It implements to the io.Writer interface
