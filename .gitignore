@@ -34,3 +34,4 @@
 dist/
 node_modules/
 src/websvr/static/rtUploadFiles/
+bin/static/rtUploadFiles/

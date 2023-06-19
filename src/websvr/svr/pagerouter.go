@@ -421,7 +421,7 @@ func UploadRenderingTaskData(g *gin.Context) {
 	tid, _ := strconv.ParseInt(taskid, 10, 64)
 
 	var reqd UploadReqDef
-	reqd.Success = status != 22
+	reqd.Success = status == 22
 	reqd.FileName = filename
 	reqd.TaskID = tid
 	reqd.TaskName = taskname
