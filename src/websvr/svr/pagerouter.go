@@ -271,6 +271,10 @@ func RenderingTask(g *gin.Context) {
 		g.String(http.StatusOK, fmt.Sprintf(infoStr))
 	case "rtaskerror":
 		fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
+		if hasTaskFlag {
+			tnode := rtTaskNodeMap[tid]
+			tnode.Phase = phase
+		}
 		g.String(http.StatusOK, fmt.Sprintf(infoStr))
 	case "rtaskreadydata":
 		if hasTaskFlag {

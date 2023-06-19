@@ -2,231 +2,347 @@
 <html>
 
 <head>
-    <meta charset="UTF-8">
-    <title>XMLHttpRequest上传文件</title>
-    <script type="text/javascript">
-        console.log("sys init ...");
-        let hostUrl = "http://localhost:9090/"
-        hostUrl = "/"
-        let taskReqSvrUrl = hostUrl + "renderingTask";
+	<meta charset="UTF-8">
+	<title>渲染模型</title>
+	<style type="text/css">
+		.custom-file-upload {
+			display: inline-block;
+			padding: 6px 12px;
+			cursor: pointer;
+			font-size: 14px;
+			font-weight: bold;
+			color: #fff;
+			background-color: #337ab7;
+			border-color: #2e6da4;
+			border-radius: 4px;
+		}
 
-        let taskJsonObj = {}
+		.custom-file-upload:hover {
+			background-color: #286090;
+			border-color: #204d74;
+		}
 
-        // filepath = "./static/rtUploadFiles/modelRTask2001/boomBox.glb"
-        // let i = filepath.lastIndexOf("/")
-        // imgUrl = hostUrl + filepath.slice(2, i+1) + "bld_rendering_mini.jpg"
-        // console.log("imgUrl: ", imgUrl);
+		input[type="file"] {
+			display: none;
+		}
+	</style>
+	<script type="text/javascript">
+		console.log("sys init ...");
+		let hostUrl = "http://localhost:9090/"
+		hostUrl = "/"
+		let taskReqSvrUrl = hostUrl + "renderingTask";
 
-        function addMiniImg(filepath) {
-            if (filepath === undefined || filepath == "") {
-                filepath = "./static/rtUploadFiles/modelRTask2001/boomBox.glb"
-            }
-            let i = filepath.lastIndexOf("/")
-            imgUrl = hostUrl + filepath.slice(2, i + 1) + "bld_rendering_mini.jpg"
-            console.log("imgUrl: ", imgUrl);
+		let taskJsonObj = {}
+		let taskStatus = 0
+		let rt_phase = ""
+		let rt_phase_times = 0
+		function reset() {
+			taskJsonObj = {}
+			taskStatus = 0
+			rt_phase = ""
+			rt_phase_times = 0
+		}
+		function updatePage() {
+			location.reload();
+		}
+		function taskSuccess(filepath) {
+			if (filepath === undefined || filepath == "") {
+				filepath = "./static/rtUploadFiles/modelRTask2001/boomBox.glb"
+			}
+			let i = filepath.lastIndexOf("/")
+			let imgDirUrl = hostUrl + filepath.slice(2, i + 1);
+			imgUrl = imgDirUrl + "bld_rendering_mini.jpg"
+			console.log("imgUrl: ", imgUrl);
 
-            var div = document.getElementById("imgDiv");
-            let img = new Image()
-            img.src = imgUrl
-            div.appendChild(img);
-        }
+			var div = document.getElementById("imgDiv");
+			let img = new Image()
+			img.src = imgUrl
+			div.appendChild(img);
+			var br = document.createElement("br");
+			div.appendChild(br);
 
-        let taskStatus = 0
-        function sendCurrentGetReq(purl) {
-            let codeLoader = new XMLHttpRequest();
-            codeLoader.open("GET", purl, true);
-            codeLoader.onerror = function (err) {
-                console.error("load error: ", err);
-            };
-            codeLoader.onprogress = e => { };
-            codeLoader.onload = evt => {
-                console.log("sendCurrentGetReq(), codeLoader.response: ", codeLoader.response);
-            };
-            codeLoader.send(null);
-        }
-        function sendAGetReq(purl) {
-            let codeLoader = new XMLHttpRequest();
-            codeLoader.open("GET", purl, true);
-            codeLoader.onerror = function (err) {
-                console.error("load error: ", err);
-            };
-            codeLoader.onprogress = e => { };
-            codeLoader.onload = evt => {
-                // console.log("sendAGetReq(), codeLoader.response: ", codeLoader.response);
-                var sendAGetReq_data = JSON.parse(codeLoader.response);
-                console.log("sendAGetReq(), sendAGetReq_data: ", sendAGetReq_data);
-                // task_rendering_enter
+			imgUrl = imgDirUrl + "bld_rendering.jpg"
+			var link = document.createElement("a");
+			link.setAttribute("href", imgUrl);
+			link.setAttribute("target", "_blank");
+			link.innerHTML = "下载/查看渲染效果图";
+			div.appendChild(link);
 
-                var div = document.getElementById("infoDiv");
-                let phase = sendAGetReq_data.phase;
-                switch (phase) {
-                    case "running":
-                        div.innerHTML = "task progress: " + sendAGetReq_data.progress + "%"
-                        break;
-                    case "new":
-                        div.innerHTML = "waiting a free renderer ..."
-                        break;
-                    case "task_rendering_enter":
-                        div.innerHTML = "enter a renderer ..."
-                        break;
-                    case "finish":
-                        taskStatus = 1
-                        div.innerHTML = "rendering task finish !!!"
-                        addMiniImg(taskJsonObj.filepath)
-                    // let i = filepath.lastIndexof("/")
-                    // imgUrl = filepath.slice(0, i) + "bld_rendering_mini.jpg"
-                    //bld_rendering_mini.jpg
-                    default:
-                        break;
-                }
-            };
-            codeLoader.send(null);
-        }
-        function notifyTaskInfoToSvr(phase, progress, taskId, taskName) {
-            let url = taskReqSvrUrl + "?phase=" + phase + "&progress=" + progress
-            if (taskId > 0) {
-                url += "&taskid=" + taskId + "&taskname=" + taskName
-            }
-            sendAGetReq(url)
-        }
+			var br = document.createElement("br");
+			div.appendChild(br);
+			const span = document.createElement('span');
+			span.innerHTML = '/\\';
+			div.appendChild(span);
+			var br = document.createElement("br");
+			div.appendChild(br);
+			link = document.createElement("a");
+			link.innerHTML = "渲染其他模型";
+			link.href = "#";
+			link.addEventListener("click", updatePage);
+			div.appendChild(link);
+		}
 
-        let ptupdateTimes = 63
-        let timeoutId = -1;
-        function ptupdate() {
+		function taskFailure() {
+			var div = document.getElementById("imgDiv");
+			var br = document.createElement("br");
+			div.appendChild(br);
+			let link = document.createElement("a");
+			link.innerHTML = "渲染其他模型";
+			link.href = "#";
+			link.addEventListener("click", updatePage);
+			div.appendChild(link);
+		}
+		function taskTimeout() {
+			var div = document.getElementById("infoDiv");
+			div.innerHTML = "渲染任务超时,请重新提交渲染"
+			div = document.getElementById("imgDiv");
+			var br = document.createElement("br");
+			div.appendChild(br);
+			let link = document.createElement("a");
+			link.innerHTML = "渲染其他模型";
+			link.href = "#";
+			link.addEventListener("click", updatePage);
+			div.appendChild(link);
+		}
 
-            if (timeoutId > -1) {
-                clearTimeout(timeoutId);
-            }
-            // console.log("ptupdate() ... taskJsonObj: ", taskJsonObj)
-            if (taskStatus < 1) {
-                notifyTaskInfoToSvr("queryataskrst", 0, taskJsonObj.taskid, taskJsonObj.taskname)
-                ptupdateTimes--;
-                if (ptupdateTimes > 0) {
-                    timeoutId = setTimeout(ptupdate, 800);
-                }
-            } else {
-                console.log("task finin OK !!!!")
-            }
-        }
-        //图片上传
-        var xhr;
-        function uploadAFile() {
-            var url = "http://localhost:9090/uploadRTData?phase=newrtask"; // 接收上传文件的后台地址
-            console.log("UpladFile() call ...url: ", url);
-            var fileObj = document.getElementById("file").files[0]; // js 获取文件对象
-            console.log("fileObj: ", fileObj);
-            if (!fileObj) {
-                alert("the file dosen't exist !!!");
-                return;
-            }
-            var form = new FormData(); // FormData 对象
-            form.append("file", fileObj); // 文件对象
+		function sendCurrentGetReq(purl) {
+			let codeLoader = new XMLHttpRequest();
+			codeLoader.open("GET", purl, true);
+			codeLoader.onerror = function (err) {
+				console.error("load error: ", err);
+			};
+			codeLoader.onprogress = e => { };
+			codeLoader.onload = evt => {
+				console.log("sendCurrentGetReq(), codeLoader.response: ", codeLoader.response);
+			};
+			codeLoader.send(null);
+		}
+		function showSpecInfo(keyStr, times) {
 
-            xhr = new XMLHttpRequest();  // XMLHttpRequest 对象
-            xhr.open("post", url, true); //post方式，url为服务器请求地址，true 该参数规定请求是否异步处理。
-            xhr.onload = uploadComplete; //请求完成
-            xhr.onerror = uploadFailed; //请求失败
+			var div = document.getElementById("infoDiv");
+			let flag = times % 3
+			switch (flag) {
+				case 0:
+					div.innerHTML = keyStr + " ..."
+					break;
+				case 1:
+					div.innerHTML = keyStr + " ..&nbsp;"
+					break;
+				default:
+					div.innerHTML = keyStr + " .&nbsp;&nbsp;"
+					break;
+			}
+		}
+		function sendAGetReq(purl) {
+			let codeLoader = new XMLHttpRequest();
+			codeLoader.open("GET", purl, true);
+			codeLoader.onerror = function (err) {
+				console.error("load error: ", err);
+			};
+			codeLoader.onprogress = e => { };
+			codeLoader.onload = evt => {
+				// console.log("sendAGetReq(), codeLoader.response: ", codeLoader.response);
+				var sendAGetReq_data = JSON.parse(codeLoader.response);
+				console.log("sendAGetReq(), sendAGetReq_data: ", sendAGetReq_data);
+				// task_rendering_enter
 
-            xhr.upload.onprogress = progressFunction;//【上传进度调用方法实现】
-            xhr.upload.onloadstart = function () {//上传开始执行方法
-                ot = new Date().getTime();   //设置上传开始时间
-                oloaded = 0;//设置上传开始时，以上传的文件大小为0
-            };
+				var div = document.getElementById("infoDiv");
+				let phase = sendAGetReq_data.phase;
+				if (rt_phase != phase) {
+					rt_phase = phase
+					rt_phase_times = 0
+				}
+				let keyStr = ""
+				let flag = 0
+				switch (phase) {
+					case "running":
+						div.innerHTML = "正在进行渲染: " + sendAGetReq_data.progress + "%"
+						break;
+					case "new":
+						keyStr = "等待可用的渲染器"
+						showSpecInfo(keyStr, rt_phase_times)
+						break;
+					case "task_rendering_enter":
+						if (rt_phase_times > 2) {
+							showSpecInfo("配置渲染任务", rt_phase_times)
+						} else {
+							showSpecInfo("启动渲染任务", rt_phase_times)
+						}
+						break;
+					case "finish":
+						taskStatus = 1
+						div.innerHTML = "渲染结束"
+						taskSuccess(taskJsonObj.filepath)
+						break;
+					case "rtaskerror":
+						taskStatus = 2
+						div.innerHTML = "渲染失败"
+						taskFailure()
+					default:
+						break;
+				}
+				rt_phase_times++
+			};
+			codeLoader.send(null);
+		}
+		function notifyTaskInfoToSvr(phase, progress, taskId, taskName) {
+			let url = taskReqSvrUrl + "?phase=" + phase + "&progress=" + progress
+			if (taskId > 0) {
+				url += "&taskid=" + taskId + "&taskname=" + taskName
+			}
+			sendAGetReq(url)
+		}
 
-            xhr.send(form); //开始上传，发送form数据
-        }
+		let ptupdateTimes = 2100
+		let timeoutId = -1;
+		function ptupdate() {
 
-        // 上传成功响应
-        function uploadComplete(evt) {
+			if (timeoutId > -1) {
+				clearTimeout(timeoutId);
+			}
+			// console.log("ptupdate() ... taskJsonObj: ", taskJsonObj)
+			if (taskStatus < 1) {
+				notifyTaskInfoToSvr("queryataskrst", 0, taskJsonObj.taskid, taskJsonObj.taskname)
+				ptupdateTimes--;
+				if (ptupdateTimes > 0) {
+					timeoutId = setTimeout(ptupdate, 800);
+				}else {
 
-            // 服务断接收完文件返回的结果
-            let str = evt.target.responseText + "";
-            console.log("evt.target.responseText: ", str);
-            var data = JSON.parse(str);
-            console.log("josn obj data: ", data);
-            if (data.success) {
-                taskJsonObj = data
-                console.log("上传成功！");
-                // alert("上传成功！");
-                
-                ptupdate();
-            } else {
-                alert("上传失败！");
-            }
-        }
-        //上传失败
-        function uploadFailed(evt) {
-            alert("上传失败！");
-        }
-        //取消上传
-        function cancleUploadFile() {
-            console.log("cancleUploadFile() call ...");
-            xhr.abort();
-        }
+				}
+			} else {
+				console.log("task finin !!!!")
+			}
+		}
+		//图片上传
+		var xhr;
+		function uploadAFile() {
+			var url = "http://localhost:9090/uploadRTData?phase=newrtask"; // 接收上传文件的后台地址
+			console.log("UpladFile() call ...url: ", url);
+			var fileObj = document.getElementById("file_select").files[0]; // js 获取文件对象
+			console.log("fileObj: ", fileObj);
+			if (!fileObj) {
+				alert("the file dosen't exist !!!");
+				return;
+			}
+			var form = new FormData(); // FormData 对象
+			form.append("file", fileObj); // 文件对象
 
+			xhr = new XMLHttpRequest();  // XMLHttpRequest 对象
+			xhr.open("post", url, true); //post方式，url为服务器请求地址，true 该参数规定请求是否异步处理。
+			xhr.onload = uploadComplete; //请求完成
+			xhr.onerror = uploadFailed; //请求失败
 
-        //上传进度实现方法，上传过程中会频繁调用该方法
-        function progressFunction(evt) {
-            console.log("progressFunction() call ...");
-            var progressBar = document.getElementById("progressBar");
-            var percentageDiv = document.getElementById("percentage");
-            // event.total是需要传输的总字节，event.loaded是已经传输的字节。如果event.lengthComputable不为真，则event.total等于0
-            if (evt.lengthComputable) {//
-                progressBar.max = evt.total;
-                progressBar.value = evt.loaded;
-                percentageDiv.innerHTML = Math.round(evt.loaded / evt.total * 100) + "%";
-            }
-            var time = document.getElementById("time");
-            var nt = new Date().getTime();//获取当前时间
-            var pertime = (nt - ot) / 1000; //计算出上次调用该方法时到现在的时间差，单位为s
-            ot = new Date().getTime(); //重新赋值时间，用于下次计算
-            var perload = evt.loaded - oloaded; //计算该分段上传的文件大小，单位b
-            oloaded = evt.loaded;//重新赋值已上传文件大小，用以下次计算
-            //上传速度计算
-            var speed = perload / pertime;//单位b/s
-            var bspeed = speed;
-            var units = 'b/s';//单位名称
-            if (speed / 1024 > 1) {
-                speed = speed / 1024;
-                units = 'k/s';
-            }
-            if (speed / 1024 > 1) {
-                speed = speed / 1024;
-                units = 'M/s';
-            }
-            speed = speed.toFixed(1);
-            //剩余时间
-            var resttime = ((evt.total - evt.loaded) / bspeed).toFixed(1);
-            time.innerHTML = '，速度：' + speed + units + '，剩余时间：' + resttime + 's';
-            if (bspeed == 0) time.innerHTML = '上传已取消';
-        }
-    </script>
+			xhr.upload.onprogress = progressFunction;//【上传进度调用方法实现】
+			xhr.upload.onloadstart = function () {//上传开始执行方法
+				ot = new Date().getTime();   //设置上传开始时间
+				oloaded = 0;//设置上传开始时，以上传的文件大小为0
+			};
+
+			xhr.send(form); //开始上传，发送form数据
+		}
+
+		// 上传成功响应
+		function uploadComplete(evt) {
+
+			// 服务断接收完文件返回的结果
+			let str = evt.target.responseText + "";
+			console.log("evt.target.responseText: ", str);
+			var data = JSON.parse(str);
+			console.log("josn obj data: ", data);
+			if (data.success) {
+				taskJsonObj = data
+				console.log("上传成功！");
+				// alert("上传成功！");
+				ptupdate();
+			} else {
+				alert("上传失败！");
+			}
+		}
+		// 上传失败
+		function uploadFailed(evt) {
+			alert("上传失败！");
+		}
+		// 取消上传
+		function cancleUploadFile() {
+			xhr.abort();
+		}
+
+		//上传进度实现方法，上传过程中会频繁调用该方法
+		function progressFunction(evt) {
+			var progressBar = document.getElementById("progressBar");
+			var percentageDiv = document.getElementById("percentage");
+
+			if (evt.lengthComputable) {
+				progressBar.max = evt.total;
+				progressBar.value = evt.loaded;
+				percentageDiv.innerHTML = Math.round(evt.loaded / evt.total * 100) + "%";
+			}
+			var time = document.getElementById("time");
+			var nt = new Date().getTime();
+			var pertime = (nt - ot) / 1000;
+			ot = new Date().getTime();
+			var perload = evt.loaded - oloaded;
+			oloaded = evt.loaded;
+
+			var speed = perload / pertime;
+			var bspeed = speed;
+			var units = 'B/s';
+			if (speed / 1024 > 1) {
+				speed = speed / 1024;
+				units = 'K/s';
+			}
+			if (speed / 1024 > 1) {
+				speed = speed / 1024;
+				units = 'M/s';
+			}
+			speed = speed.toFixed(1);
+			var resttime = ((evt.total - evt.loaded) / bspeed).toFixed(1);
+			time.innerHTML = '上传速度：' + speed + units + '，剩余时间：' + resttime + 's';
+			if (bspeed == 0) time.innerHTML = '上传已取消';
+		}
+	</script>
 </head>
 
 <body>
-    <progress id="progressBar" value="0" max="100" style="width: 300px;"></progress>
-    <span id="percentage"></span><span id="time"></span>
-    <br /><br />
-    <input type="file" id="file" accept=".glb,.fbx,.obj" readonly="readonly" name="myfile" value="上传渲染模型" />
-    <br />
-    <br />
-    <div id="infoDiv">
-        ...
-    </div>
-    <br />
-    <div id="imgDiv">
-        ...
-    </div>
-    <script type="text/javascript">
-        // addMiniImg("")
-        var inputObj = document.getElementById("file")
-        inputObj.addEventListener("change", () => {
-            // let files = Array.from(input.files);
-            // this.m_dropController.initFilesLoad(files);
-            console.log(">>>-->> inputObj change evt does ...")
-            uploadAFile()
-        });
-    </script>
+	<center />
+	<br />
+	<progress id="progressBar" value="0" max="100" style="width: 300px;"></progress>
+	<br />
+	<span id="percentage"></span>
+	<br />
+	<span id="time"></span>
+
+	<div id="select_file_div">
+		<label id="file_select_label" for="file_select" class="custom-file-upload">
+			<i class="fa fa-cloud-upload"></i> 选择模型文件
+		</label>
+		<input type="file" id="file_select" accept=".glb,.fbx,.obj" readonly="readonly" name="myfile" value="上传渲染模型" />
+	</div>
+	<br />
+	<br />
+	<div id="infoDiv">
+	</div>
+	<br />
+	<div id="imgDiv">
+	</div>
+	<script type="text/javascript">
+		// taskSuccess("")
+		var inputObj = document.getElementById("file_select")
+		inputObj.addEventListener("change", () => {
+			// let files = Array.from(input.files);
+			// this.m_dropController.initFilesLoad(files);
+			console.log(">>>-->> inputObj change evt does ...")
+			// inputObj.style.display = "none";
+			// inputObj.style.display = "none";
+			// inputObj.style.visibility = "hidden";
+			// var labelGroup = document.getElementsByClassName("form-group")[0];
+			// var labelObj = document.getElementById("file_select_label");
+			// labelObj.style.visibility = "hidden";
+			uploadAFile()
+			let div = document.getElementById("select_file_div")
+			div.parentNode.removeChild(div);
+		});
+	</script>
 </body>
 
 </html>
