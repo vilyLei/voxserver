@@ -221,6 +221,7 @@ type RTaskInfoNode struct {
 }
 
 var rtTaskID int64 = 2001
+var rtTaskVer string = "v1"
 var rtWaitTaskNodes []*RTaskInfoNode
 
 // rendering task map
@@ -269,6 +270,13 @@ func RenderingTask(g *gin.Context) {
 			tnode.Progress, _ = strconv.Atoi(progress)
 		}
 		g.String(http.StatusOK, fmt.Sprintf(infoStr))
+	case "task_rendering_load_res", "task_rendering_begin":
+		fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
+		if hasTaskFlag {
+			tnode := rtTaskNodeMap[tid]
+			tnode.Phase = phase
+		}
+		g.String(http.StatusOK, fmt.Sprintf(infoStr))
 	case "rtaskerror":
 		fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
 		if hasTaskFlag {
@@ -303,7 +311,18 @@ func RenderingTask(g *gin.Context) {
 		fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
 		if hasTaskFlag {
 			tnode := rtTaskNodeMap[tid]
-			infoStr = `{"phase":"` + tnode.Phase + `","progress":` + strconv.Itoa(tnode.Progress) + `,"taskid":` + taskid + `,"status":22}`
+			teamIndex := 0
+			if tnode.Phase == "new" {
+				total := len(rtWaitTaskNodes)
+				for i := 0; i < total; i++ {
+					if rtWaitTaskNodes[i].Id == tid {
+						teamIndex = i + 1
+						break
+					}
+				}
+			}
+			infoStr = `{"phase":"` + tnode.Phase + `","progress":` + strconv.Itoa(tnode.Progress) + `,"taskid":` + taskid + `,"status":22, "teamIndex":` + strconv.Itoa(teamIndex) + `}`
+			//rtWaitTaskNodes
 			g.String(http.StatusOK, fmt.Sprintf(infoStr))
 		} else {
 			infoStr = `{"phase":"undefined","status":0}`
@@ -348,7 +367,7 @@ func UploadRenderingTaskData(g *gin.Context) {
 		switch phase {
 		case "newrtask":
 			taskid = strconv.FormatInt(rtTaskID, 10)
-			taskname = "modelRTask" + taskid
+			taskname = rtTaskVer + "ModelRTask" + taskid
 			fileDir := "./static/rtUploadFiles/" + taskname + "/"
 
 			var rtNode RTaskInfoNode

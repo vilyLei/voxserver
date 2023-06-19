@@ -3,7 +3,7 @@
 
 <head>
 	<meta charset="UTF-8">
-	<title>渲染模型</title>
+	<title>渲染模型示例</title>
 	<style type="text/css">
 		.custom-file-upload {
 			display: inline-block;
@@ -31,6 +31,8 @@
 		let hostUrl = "http://localhost:9090/"
 		hostUrl = "/"
 		let taskReqSvrUrl = hostUrl + "renderingTask";
+
+		let startTime = Date.now()
 
 		let taskJsonObj = {}
 		let taskStatus = 0
@@ -123,13 +125,13 @@
 			let flag = times % 3
 			switch (flag) {
 				case 0:
-					div.innerHTML = keyStr + " ..."
+					div.innerHTML = keyStr + " .&nbsp;&nbsp;"
 					break;
 				case 1:
 					div.innerHTML = keyStr + " ..&nbsp;"
 					break;
 				default:
-					div.innerHTML = keyStr + " .&nbsp;&nbsp;"
+					div.innerHTML = keyStr + " ..."
 					break;
 			}
 		}
@@ -141,13 +143,11 @@
 			};
 			codeLoader.onprogress = e => { };
 			codeLoader.onload = evt => {
-				// console.log("sendAGetReq(), codeLoader.response: ", codeLoader.response);
-				var sendAGetReq_data = JSON.parse(codeLoader.response);
-				console.log("sendAGetReq(), sendAGetReq_data: ", sendAGetReq_data);
-				// task_rendering_enter
+				var sdo = JSON.parse(codeLoader.response);
+				console.log("sendAGetReq(), sdo: ", sdo);
 
 				var div = document.getElementById("infoDiv");
-				let phase = sendAGetReq_data.phase;
+				let phase = sdo.phase;
 				if (rt_phase != phase) {
 					rt_phase = phase
 					rt_phase_times = 0
@@ -156,10 +156,10 @@
 				let flag = 0
 				switch (phase) {
 					case "running":
-						div.innerHTML = "正在进行渲染: " + sendAGetReq_data.progress + "%"
+						div.innerHTML = "正在进行渲染: " + sdo.progress + "%"
 						break;
 					case "new":
-						keyStr = "等待可用的渲染器"
+						keyStr = "排队(" + sdo.teamIndex + ")等待可用渲染器"
 						showSpecInfo(keyStr, rt_phase_times)
 						break;
 					case "task_rendering_enter":
@@ -169,7 +169,16 @@
 							showSpecInfo("启动渲染任务", rt_phase_times)
 						}
 						break;
+					case "task_rendering_load_res":
+						showSpecInfo("同步模型资源", rt_phase_times)
+						break;
+					case "task_rendering_begin":
+						showSpecInfo("准备渲染数据", rt_phase_times)
+						break;
 					case "finish":
+						let time_ms = (Date.now() - startTime)
+						let time_s = Math.round(time_ms / 1000.0)
+						console.log("loss time: ", time_s + "s(" + time_ms + "ms)");
 						taskStatus = 1
 						div.innerHTML = "渲染结束"
 						taskSuccess(taskJsonObj.filepath)
@@ -206,45 +215,43 @@
 				ptupdateTimes--;
 				if (ptupdateTimes > 0) {
 					timeoutId = setTimeout(ptupdate, 800);
-				}else {
+				} else {
 
 				}
 			} else {
-				console.log("task finin !!!!")
+				console.log("task finish !!!!")
 			}
 		}
-		//图片上传
+
 		var xhr;
 		function uploadAFile() {
-			var url = "http://localhost:9090/uploadRTData?phase=newrtask"; // 接收上传文件的后台地址
+			var url = "http://localhost:9090/uploadRTData?phase=newrtask";
 			console.log("UpladFile() call ...url: ", url);
-			var fileObj = document.getElementById("file_select").files[0]; // js 获取文件对象
+			var fileObj = document.getElementById("file_select").files[0];
 			console.log("fileObj: ", fileObj);
 			if (!fileObj) {
 				alert("the file dosen't exist !!!");
 				return;
 			}
-			var form = new FormData(); // FormData 对象
-			form.append("file", fileObj); // 文件对象
+			var form = new FormData();
+			form.append("file", fileObj);
 
-			xhr = new XMLHttpRequest();  // XMLHttpRequest 对象
-			xhr.open("post", url, true); //post方式，url为服务器请求地址，true 该参数规定请求是否异步处理。
-			xhr.onload = uploadComplete; //请求完成
-			xhr.onerror = uploadFailed; //请求失败
+			xhr = new XMLHttpRequest();
+			xhr.open("post", url, true);
+			xhr.onload = uploadComplete;
+			xhr.onerror = uploadFailed;
 
-			xhr.upload.onprogress = progressFunction;//【上传进度调用方法实现】
-			xhr.upload.onloadstart = function () {//上传开始执行方法
-				ot = new Date().getTime();   //设置上传开始时间
-				oloaded = 0;//设置上传开始时，以上传的文件大小为0
+			xhr.upload.onprogress = progressFunction;
+			xhr.upload.onloadstart = function () {
+				ot = new Date().getTime();
+				oloaded = 0;
 			};
 
-			xhr.send(form); //开始上传，发送form数据
+			xhr.send(form);
 		}
 
-		// 上传成功响应
 		function uploadComplete(evt) {
 
-			// 服务断接收完文件返回的结果
 			let str = evt.target.responseText + "";
 			console.log("evt.target.responseText: ", str);
 			var data = JSON.parse(str);
@@ -258,16 +265,13 @@
 				alert("上传失败！");
 			}
 		}
-		// 上传失败
 		function uploadFailed(evt) {
 			alert("上传失败！");
 		}
-		// 取消上传
 		function cancleUploadFile() {
 			xhr.abort();
 		}
 
-		//上传进度实现方法，上传过程中会频繁调用该方法
 		function progressFunction(evt) {
 			var progressBar = document.getElementById("progressBar");
 			var percentageDiv = document.getElementById("percentage");
@@ -326,18 +330,8 @@
 	<div id="imgDiv">
 	</div>
 	<script type="text/javascript">
-		// taskSuccess("")
 		var inputObj = document.getElementById("file_select")
 		inputObj.addEventListener("change", () => {
-			// let files = Array.from(input.files);
-			// this.m_dropController.initFilesLoad(files);
-			console.log(">>>-->> inputObj change evt does ...")
-			// inputObj.style.display = "none";
-			// inputObj.style.display = "none";
-			// inputObj.style.visibility = "hidden";
-			// var labelGroup = document.getElementsByClassName("form-group")[0];
-			// var labelObj = document.getElementById("file_select_label");
-			// labelObj.style.visibility = "hidden";
 			uploadAFile()
 			let div = document.getElementById("select_file_div")
 			div.parentNode.removeChild(div);
