@@ -229,7 +229,7 @@
 
 		var xhr;
 		function uploadAFile() {
-			var url = "http://localhost:9090/uploadRTData?phase=newrtask";
+			var url = hostUrl + "uploadRTData?phase=newrtask";
 			console.log("UpladFile() call ...url: ", url);
 			var fileObj = document.getElementById("file_select").files[0];
 			console.log("fileObj: ", fileObj);
