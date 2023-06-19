@@ -156,9 +156,9 @@
 				let flag = 0
 				switch (phase) {
 					case "running":
-						if(sdo.progress < 6) {
+						if (sdo.progress < 6) {
 							showSpecInfo("正在解析模型数据", rt_phase_times)
-						}else {
+						} else {
 							div.innerHTML = "正在进行渲染: " + sdo.progress + "%"
 						}
 						break;
@@ -180,17 +180,21 @@
 						showSpecInfo("准备渲染数据", rt_phase_times)
 						break;
 					case "finish":
-						let time_ms = (Date.now() - startTime)
-						let time_s = Math.round(time_ms / 1000.0)
-						console.log("loss time: ", time_s + "s(" + time_ms + "ms)");
-						taskStatus = 1
-						div.innerHTML = "渲染结束"
-						taskSuccess(taskJsonObj.filepath)
+						if (taskStatus < 1) {
+							taskStatus = 1
+							let time_ms = (Date.now() - startTime)
+							let time_s = Math.round(time_ms / 1000.0)
+							console.log("loss time: ", time_s + "s(" + time_ms + "ms)");
+							div.innerHTML = "渲染结束"
+							taskSuccess(taskJsonObj.filepath)
+						}
 						break;
 					case "rtaskerror":
-						taskStatus = 2
-						div.innerHTML = "渲染失败"
-						taskFailure()
+						if (taskStatus < 2) {
+							taskStatus = 2
+							div.innerHTML = "渲染失败"
+							taskFailure()
+						}
 					default:
 						break;
 				}
