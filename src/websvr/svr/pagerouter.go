@@ -362,41 +362,50 @@ func UploadRenderingTaskData(g *gin.Context) {
 	filePath := ""
 	if file != nil {
 
-		status = 22
 		filename = file.Filename
 		switch phase {
 		case "newrtask":
-			taskid = strconv.FormatInt(rtTaskID, 10)
-			taskname = rtTaskVer + "ModelRTask" + taskid
-			fileDir := "./static/rtUploadFiles/" + taskname + "/"
+			status = 22
+			// check file name suffix correctness
+			suffix := webfs.GetFileNameSuffix(filename)
 
-			var rtNode RTaskInfoNode
-			rtNode.Id = rtTaskID
-			rtNode.Name = taskname
-			rtNode.ResUrl = fileDir + filename
-			rtNode.Phase = "new"
-			rtNode.Progress = 0
-			rtWaitTaskNodes = append(rtWaitTaskNodes, &rtNode)
-			rtTaskNodeMap[rtTaskID] = &rtNode
+			switch suffix {
+			case "obj", "fbx", "glb", "usdz", "usdc", ".blend":
 
-			// jsonBytes, err := json.Marshal(rtNode)
-			// if err != nil {
-			// 	fmt.Println("error:", err)
-			// }
-			// jsonStr := string(jsonBytes)
-			// fmt.Println("UploadRenderingTaskData(), jsonStr: ", jsonStr)
+				taskid = strconv.FormatInt(rtTaskID, 10)
+				taskname = rtTaskVer + "ModelRTask" + taskid
+				fileDir := "./static/rtUploadFiles/" + taskname + "/"
 
-			rtTaskID += 1
+				var rtNode RTaskInfoNode
+				rtNode.Id = rtTaskID
+				rtNode.Name = taskname
+				rtNode.ResUrl = fileDir + filename
+				rtNode.Phase = "new"
+				rtNode.Progress = 0
+				rtWaitTaskNodes = append(rtWaitTaskNodes, &rtNode)
+				rtTaskNodeMap[rtTaskID] = &rtNode
 
-			fmt.Println("UploadRenderingTaskData(), taskname: ", taskname)
-			fmt.Println("UploadRenderingTaskData(), len(rtWaitTaskNodes): ", len(rtWaitTaskNodes))
-			fmt.Println("UploadRenderingTaskData(), upload receive a new rendering task file name: ", filename)
+				// jsonBytes, err := json.Marshal(rtNode)
+				// if err != nil {
+				// 	fmt.Println("error:", err)
+				// }
+				// jsonStr := string(jsonBytes)
+				// fmt.Println("UploadRenderingTaskData(), jsonStr: ", jsonStr)
 
-			filePath = rtNode.ResUrl
-			g.SaveUploadedFile(file, filePath)
+				rtTaskID += 1
+
+				fmt.Println("UploadRenderingTaskData(), taskname: ", taskname)
+				fmt.Println("UploadRenderingTaskData(), len(rtWaitTaskNodes): ", len(rtWaitTaskNodes))
+				fmt.Println("UploadRenderingTaskData(), upload receive a new rendering task file name: ", filename)
+
+				filePath = rtNode.ResUrl
+				g.SaveUploadedFile(file, filePath)
+			default:
+				//
+			}
 
 		case "finish":
-
+			status = 22
 			fileDir := "./static/rtUploadFiles/" + taskname + "/"
 			filePath = fileDir + filename
 			fmt.Println("upload receive a rendering outpu pic file name: ", filename)
@@ -412,7 +421,7 @@ func UploadRenderingTaskData(g *gin.Context) {
 	tid, _ := strconv.ParseInt(taskid, 10, 64)
 
 	var reqd UploadReqDef
-	reqd.Success = true
+	reqd.Success = status != 22
 	reqd.FileName = filename
 	reqd.TaskID = tid
 	reqd.TaskName = taskname
