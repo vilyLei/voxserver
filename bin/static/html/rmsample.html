@@ -25,6 +25,16 @@
 		input[type="file"] {
 			display: none;
 		}
+		.box {
+		   display: none;
+		   width: 110px;
+		   height: auto;
+		   background:#FFFFDF;
+		   /* border: 1px solid #333; */
+		   padding: 12px;
+		   text-align: center;
+		   position: absolute;
+	   }
 	</style>
 	<script type="text/javascript">
 		console.log("sys init ...");
@@ -58,17 +68,25 @@
 			console.log("imgUrl: ", imgUrl);
 
 			var div = document.getElementById("imgDiv");
-			let img = new Image()
-			img.src = imgUrl
-			div.appendChild(img);
-			var br = document.createElement("br");
-			div.appendChild(br);
+			// let img = new Image()
+			// img.src = imgUrl
+			// div.appendChild(img);
+			// var br = document.createElement("br");
+			// div.appendChild(br);
 
-			imgUrl = imgDirUrl + "bld_rendering.jpg"
+			let big_imgUrl = imgDirUrl + "bld_rendering.jpg"
 			var link = document.createElement("a");
-			link.setAttribute("href", imgUrl);
+			link.setAttribute("href", big_imgUrl);
 			link.setAttribute("target", "_blank");
-			link.innerHTML = "下载/查看渲染效果图";
+			link.onmouseover = () => {
+				display();
+			};
+			link.onmouseout = () => {
+				disappear();
+			}
+			// link.innerHTML = "下载/查看渲染效果图";
+			// <img class="s-problem" src="img/problem.png"/>
+			link.innerHTML = `<img src="`+imgUrl+`"/>`;
 			div.appendChild(link);
 
 			var br = document.createElement("br");
@@ -337,6 +355,12 @@
 			time.innerHTML = '上传速度：' + speed + units + '，剩余时间：' + resttime + 's';
 			if (bspeed == 0) time.innerHTML = '上传已取消';
 		}
+		function display() {
+			document.getElementById("box").style.display = "block";
+		}
+		function disappear() {
+			document.getElementById("box").style.display = "none";
+		}
 	</script>
 </head>
 
@@ -369,6 +393,7 @@
 	<br />
 	<div id="imgDiv">
 	</div>
+	<div id="box"class="box" >点击查看大图</div>
 	<script type="text/javascript">
 		resetSizeSelect();
 		var inputObj = document.getElementById("file_select")
