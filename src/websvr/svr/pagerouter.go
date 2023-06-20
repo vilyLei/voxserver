@@ -213,11 +213,12 @@ func GetPageStatusInfoJson(g *gin.Context) {
 }
 
 type RTaskInfoNode struct {
-	Id       int64  `json:"id"`
-	Name     string `json:"name"`
-	ResUrl   string `json:"resUrl"`
-	Phase    string
-	Progress int
+	Id         int64  `json:"id"`
+	Name       string `json:"name"`
+	ResUrl     string `json:"resUrl"`
+	Resolution [2]int `json:"resolution"`
+	Phase      string
+	Progress   int
 }
 
 var rtTaskID int64 = 2001
@@ -375,6 +376,7 @@ func UploadRenderingTaskData(g *gin.Context) {
 		filename = file.Filename
 		switch phase {
 		case "newrtask":
+			imgSizes := g.DefaultQuery("sizes", "512,512")
 			status = 22
 			// check file name suffix correctness
 			suffix := webfs.GetFileNameSuffix(filename)
@@ -391,6 +393,10 @@ func UploadRenderingTaskData(g *gin.Context) {
 				rtNode.Name = taskname
 				rtNode.ResUrl = fileDir + filename
 				rtNode.Phase = "new"
+				parts := strings.Split(imgSizes, ",")
+				iw, _ := strconv.Atoi(parts[0])
+				ih, _ := strconv.Atoi(parts[1])
+				rtNode.Resolution = [2]int{iw, ih}
 				rtNode.Progress = 0
 				rtWaitTaskNodes = append(rtWaitTaskNodes, &rtNode)
 				rtTaskNodeMap[rtTaskID] = &rtNode
@@ -404,7 +410,7 @@ func UploadRenderingTaskData(g *gin.Context) {
 
 				rtTaskID += 1
 
-				fmt.Println("UploadRenderingTaskData(), taskname: ", taskname)
+				fmt.Println("UploadRenderingTaskData(), taskname: ", taskname, ", rtNode.Resolution: ", rtNode.Resolution)
 				fmt.Println("UploadRenderingTaskData(), len(rtWaitTaskNodes): ", len(rtWaitTaskNodes))
 				fmt.Println("UploadRenderingTaskData(), upload receive a new rendering task file name: ", filename)
 
@@ -437,6 +443,7 @@ func UploadRenderingTaskData(g *gin.Context) {
 	reqd.TaskName = taskname
 	reqd.Status = status
 	reqd.FilePath = filePath
+
 	jsonBytes, err := json.Marshal(reqd)
 	if err != nil {
 		fmt.Println("error:", err)

@@ -25,9 +25,20 @@
 		input[type="file"] {
 			display: none;
 		}
+		.box {
+		   display: none;
+		   width: 110px;
+		   height: auto;
+		   background:#FFFFDF;
+		   /* border: 1px solid #333; */
+		   padding: 12px;
+		   text-align: center;
+		   position: absolute;
+	   }
 	</style>
 	<script type="text/javascript">
 		console.log("sys init ...");
+		let rimgSizes = [512, 512]
 		let hostUrl = "http://localhost:9090/"
 		hostUrl = "/"
 		let taskReqSvrUrl = hostUrl + "renderingTask";
@@ -57,17 +68,25 @@
 			console.log("imgUrl: ", imgUrl);
 
 			var div = document.getElementById("imgDiv");
-			let img = new Image()
-			img.src = imgUrl
-			div.appendChild(img);
-			var br = document.createElement("br");
-			div.appendChild(br);
+			// let img = new Image()
+			// img.src = imgUrl
+			// div.appendChild(img);
+			// var br = document.createElement("br");
+			// div.appendChild(br);
 
-			imgUrl = imgDirUrl + "bld_rendering.jpg"
+			let big_imgUrl = imgDirUrl + "bld_rendering.jpg"
 			var link = document.createElement("a");
-			link.setAttribute("href", imgUrl);
+			link.setAttribute("href", big_imgUrl);
 			link.setAttribute("target", "_blank");
-			link.innerHTML = "下载/查看渲染效果图";
+			link.onmouseover = () => {
+				display();
+			};
+			link.onmouseout = () => {
+				disappear();
+			}
+			// link.innerHTML = "下载/查看渲染效果图";
+			// <img class="s-problem" src="img/problem.png"/>
+			link.innerHTML = `<img src="`+imgUrl+`"/>`;
 			div.appendChild(link);
 
 			var br = document.createElement("br");
@@ -133,6 +152,21 @@
 				default:
 					div.innerHTML = keyStr + "&nbsp;..."
 					break;
+			}
+		}
+		function sizeHandleChange(btn) {
+			let vs = btn.value.split("x");
+			rimgSizes[0] = parseInt(vs[0]);
+			rimgSizes[1] = parseInt(vs[1]);
+			console.log("btn.value: ", btn.value,", rimgSizes: ", rimgSizes)
+		}
+		function resetSizeSelect() {
+			var checks = document.getElementsByName("size_select_radio");
+			for (let i = 0; i < checks.length; ++i) {
+				console.log("checks[i].value: ", checks[i].value);
+				if (checks[i].value == "512x512") {
+					checks[i].checked = true;
+				}
 			}
 		}
 		function sendAGetReq(purl) {
@@ -234,7 +268,8 @@
 
 		var xhr;
 		function uploadAFile() {
-			var url = hostUrl + "uploadRTData?phase=newrtask";
+			let sizes = rimgSizes + ""
+			var url = hostUrl + "uploadRTData?phase=newrtask&sizes=" + sizes;
 			console.log("UpladFile() call ...url: ", url);
 			var fileObj = document.getElementById("file_select").files[0];
 			console.log("fileObj: ", fileObj);
@@ -244,7 +279,7 @@
 				return;
 			}
 			let fileSize = Math.floor(fileObj.size / (1024 * 1024))
-			if(fileSize > 30) {
+			if (fileSize > 30) {
 				alert("模型文件超过30M, 带宽太小暂时不支持 !!!");
 				updatePage()
 				return;
@@ -320,6 +355,12 @@
 			time.innerHTML = '上传速度：' + speed + units + '，剩余时间：' + resttime + 's';
 			if (bspeed == 0) time.innerHTML = '上传已取消';
 		}
+		function display() {
+			document.getElementById("box").style.display = "block";
+		}
+		function disappear() {
+			document.getElementById("box").style.display = "none";
+		}
 	</script>
 </head>
 
@@ -331,7 +372,14 @@
 	<span id="percentage"></span>
 	<br />
 	<span id="time"></span>
-
+	<div id="select_img_size">
+		渲染效果图尺寸:&nbsp;
+		<input type="radio" name="size_select_radio" onclick="sizeHandleChange(this);" value="256x256">256x256</input>
+		<input type="radio" name="size_select_radio" onclick="sizeHandleChange(this);" value="512x512">512x512</input>
+		<input type="radio" name="size_select_radio" onclick="sizeHandleChange(this);" value="1024x1024">1024x1024</input>
+		<input type="radio" name="size_select_radio" onclick="sizeHandleChange(this);" value="2048x2048">2048x2048</input>
+	</div>
+	<br />
 	<div id="select_file_div">
 		<label id="file_select_label" for="file_select" class="custom-file-upload">
 			<i class="fa fa-cloud-upload"></i> 选择模型文件
@@ -345,7 +393,9 @@
 	<br />
 	<div id="imgDiv">
 	</div>
+	<div id="box"class="box" >点击查看大图</div>
 	<script type="text/javascript">
+		resetSizeSelect();
 		var inputObj = document.getElementById("file_select")
 		inputObj.addEventListener("change", () => {
 			uploadAFile()

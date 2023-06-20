@@ -28,6 +28,7 @@
 	</style>
 	<script type="text/javascript">
 		console.log("sys init ...");
+		let rimgSizes = [512, 512]
 		let hostUrl = "http://localhost:9090/"
 		hostUrl = "/"
 		let taskReqSvrUrl = hostUrl + "renderingTask";
@@ -135,6 +136,21 @@
 					break;
 			}
 		}
+		function sizeHandleChange(btn) {
+			let vs = btn.value.split("x");
+			rimgSizes[0] = parseInt(vs[0]);
+			rimgSizes[1] = parseInt(vs[1]);
+			console.log("btn.value: ", btn.value,", rimgSizes: ", rimgSizes)
+		}
+		function resetSizeSelect() {
+			var checks = document.getElementsByName("size_select_radio");
+			for (let i = 0; i < checks.length; ++i) {
+				console.log("checks[i].value: ", checks[i].value);
+				if (checks[i].value == "512x512") {
+					checks[i].checked = true;
+				}
+			}
+		}
 		function sendAGetReq(purl) {
 			let codeLoader = new XMLHttpRequest();
 			codeLoader.open("GET", purl, true);
@@ -234,12 +250,20 @@
 
 		var xhr;
 		function uploadAFile() {
-			var url = hostUrl + "uploadRTData?phase=newrtask";
+			let sizes = rimgSizes + ""
+			var url = hostUrl + "uploadRTData?phase=newrtask&sizes=" + sizes;
 			console.log("UpladFile() call ...url: ", url);
 			var fileObj = document.getElementById("file_select").files[0];
 			console.log("fileObj: ", fileObj);
 			if (!fileObj) {
 				alert("the file dosen't exist !!!");
+				updatePage()
+				return;
+			}
+			let fileSize = Math.floor(fileObj.size / (1024 * 1024))
+			if (fileSize > 30) {
+				alert("模型文件超过30M, 带宽太小暂时不支持 !!!");
+				updatePage()
 				return;
 			}
 			var form = new FormData();
@@ -324,7 +348,14 @@
 	<span id="percentage"></span>
 	<br />
 	<span id="time"></span>
-
+	<div id="select_img_size">
+		渲染效果图尺寸:&nbsp;
+		<input type="radio" name="size_select_radio" onclick="sizeHandleChange(this);" value="256x256">256x256</input>
+		<input type="radio" name="size_select_radio" onclick="sizeHandleChange(this);" value="512x512">512x512</input>
+		<input type="radio" name="size_select_radio" onclick="sizeHandleChange(this);" value="1024x1024">1024x1024</input>
+		<input type="radio" name="size_select_radio" onclick="sizeHandleChange(this);" value="2048x2048">2048x2048</input>
+	</div>
+	<br />
 	<div id="select_file_div">
 		<label id="file_select_label" for="file_select" class="custom-file-upload">
 			<i class="fa fa-cloud-upload"></i> 选择模型文件
@@ -339,6 +370,7 @@
 	<div id="imgDiv">
 	</div>
 	<script type="text/javascript">
+		resetSizeSelect();
 		var inputObj = document.getElementById("file_select")
 		inputObj.addEventListener("change", () => {
 			uploadAFile()
