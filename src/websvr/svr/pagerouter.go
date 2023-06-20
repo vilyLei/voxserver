@@ -218,6 +218,7 @@ type RTaskInfoNode struct {
 	ResUrl     string `json:"resUrl"`
 	Resolution [2]int `json:"resolution"`
 	Phase      string
+	Action     string
 	Progress   int
 }
 
@@ -318,6 +319,8 @@ func RenderingTask(g *gin.Context) {
 			infoStr = `{"phase":"` + phase + `", "task":` + jsonStr + `,"status":22}`
 		}
 		g.String(http.StatusOK, fmt.Sprintf(infoStr))
+	case "queryre-rendering-task":
+		fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
 	case "queryataskrst":
 		fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
 		if hasTaskFlag {
@@ -389,6 +392,7 @@ func UploadRenderingTaskData(g *gin.Context) {
 				fileDir := "./static/rtUploadFiles/" + taskname + "/"
 
 				var rtNode RTaskInfoNode
+				rtNode.Action = "new"
 				rtNode.Id = rtTaskID
 				rtNode.Name = taskname
 				rtNode.ResUrl = fileDir + filename
