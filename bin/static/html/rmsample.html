@@ -174,7 +174,8 @@
 						}
 						break;
 					case "task_rendering_load_res":
-						showSpecInfo("同步模型资源", rt_phase_times)
+						// showSpecInfo("同步模型资源", rt_phase_times)
+						div.innerHTML = "同步模型资源: " + sdo.progress + "%"
 						break;
 					case "task_rendering_begin":
 						showSpecInfo("准备渲染数据", rt_phase_times)

@@ -270,7 +270,17 @@ func RenderingTask(g *gin.Context) {
 			tnode.Progress, _ = strconv.Atoi(progress)
 		}
 		g.String(http.StatusOK, fmt.Sprintf(infoStr))
-	case "task_rendering_load_res", "task_rendering_begin":
+	case "task_rendering_load_res":
+		fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
+		if hasTaskFlag {
+			tnode := rtTaskNodeMap[tid]
+			tnode.Phase = phase
+			tnode.Progress, _ = strconv.Atoi(progress)
+			// infoStr = `{"phase":"` + phase + `","progress": ` + progress + `,"status":22}`
+		}
+		g.String(http.StatusOK, fmt.Sprintf(infoStr))
+
+	case "task_rendering_begin":
 		fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
 		if hasTaskFlag {
 			tnode := rtTaskNodeMap[tid]
