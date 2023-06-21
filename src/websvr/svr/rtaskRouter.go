@@ -19,7 +19,7 @@ func RenderingTask(g *gin.Context) {
 	taskname := g.DefaultQuery("taskname", "none")
 	srcType := g.DefaultQuery("srcType", "none")
 
-	fmt.Println("RenderingTask, phase: ", phase, ", progress: ", progress, ", taskid: ", taskid, ", taskname: ", taskname)
+	fmt.Println("RenderingTask, rTask("+taskid+"):"+phase, ", progress: ", progress, "%, taskname: ", taskname, " srcType: ", srcType)
 	infoStr := `{"phase":"` + phase + `","status":22}`
 	hasTaskFlag := false
 	tid, errInt64 := strconv.ParseInt(taskid, 10, 64)
@@ -37,7 +37,7 @@ func RenderingTask(g *gin.Context) {
 		default:
 			rtNode.Progress, _ = strconv.Atoi(progress)
 			rtNode.Phase = phase
-			fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
+			// fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
 			g.String(http.StatusOK, fmt.Sprintf(infoStr))
 			return
 		}
@@ -172,7 +172,7 @@ func UploadRenderingTaskData(g *gin.Context) {
 	taskname := g.DefaultQuery("taskname", "none")
 	srcType := g.DefaultQuery("srcType", "none")
 
-	fmt.Println("UploadRenderingTaskData, phase: ", phase, ", taskid: ", taskid, ", taskname: ", taskname)
+	fmt.Println("UploadRenderingTaskData, phase: ", phase, ", taskid: ", taskid, ", taskname: ", taskname, " srcType: ", srcType)
 	// single file uploading receive
 	filename := "none"
 	var status = 0
@@ -201,14 +201,18 @@ func UploadRenderingTaskData(g *gin.Context) {
 					fileDir := uploadDir + taskname + "/"
 
 					var rtNode RTaskInfoNode
-					rtNode.Action = "new"
-					rtNode.Phase = "new"
-					rtNode.Progress = 0
-					rtNode.RerenderingTimes = 0
-					parts := strings.Split(imgSizes, ",")
-					iw, _ := strconv.Atoi(parts[0])
-					ih, _ := strconv.Atoi(parts[1])
-					rtNode.Resolution = [2]int{iw, ih}
+					// rtNode.Action = "new"
+					// rtNode.Phase = "new"
+					// rtNode.Progress = 0
+					// rtNode.RerenderingTimes = 0
+					rtNode.Reset()
+
+					// parts := strings.Split(imgSizes, ",")
+					// iw, _ := strconv.Atoi(parts[0])
+					// ih, _ := strconv.Atoi(parts[1])
+					// rtNode.Resolution = [2]int{iw, ih}
+
+					rtNode.SetResolutionWithSizeStr(imgSizes)
 
 					rtNode.Id = rtTaskID
 					rtNode.Name = taskname
