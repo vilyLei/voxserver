@@ -33,5 +33,5 @@
 *.code-workspace
 dist/
 node_modules/
-src/websvr/static/rtUploadFiles/
+src/websvr/static/uploadFiles/
 bin/static/rtUploadFiles/

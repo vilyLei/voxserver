@@ -178,6 +178,8 @@ func UploadRenderingTaskData(g *gin.Context) {
 	filePath := ""
 	if file != nil {
 
+		uploadDir := "./static/uploadFiles/rtTask/"
+
 		filename = file.Filename
 		switch phase {
 		case "newrtask":
@@ -194,7 +196,7 @@ func UploadRenderingTaskData(g *gin.Context) {
 
 					taskid = strconv.FormatInt(rtTaskID, 10)
 					taskname = rtTaskVer + "ModelRTask" + taskid
-					fileDir := "./static/rtUploadFiles/" + taskname + "/"
+					fileDir := uploadDir + taskname + "/"
 
 					var rtNode RTaskInfoNode
 					rtNode.Action = "new"
@@ -234,7 +236,7 @@ func UploadRenderingTaskData(g *gin.Context) {
 
 		case "finish":
 			status = 22
-			fileDir := "./static/rtUploadFiles/" + taskname + "/"
+			fileDir := uploadDir + taskname + "/"
 			filePath = fileDir + filename
 			fmt.Println("upload receive a rendering outpu pic file name: ", filename)
 
