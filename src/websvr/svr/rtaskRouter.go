@@ -17,6 +17,7 @@ func RenderingTask(g *gin.Context) {
 	progress := g.DefaultQuery("progress", "0")
 	taskid := g.DefaultQuery("taskid", "0")
 	taskname := g.DefaultQuery("taskname", "none")
+	srcType := g.DefaultQuery("srcType", "none")
 
 	fmt.Println("RenderingTask, phase: ", phase, ", progress: ", progress, ", taskid: ", taskid, ", taskname: ", taskname)
 	infoStr := `{"phase":"` + phase + `","status":22}`
@@ -169,6 +170,7 @@ func UploadRenderingTaskData(g *gin.Context) {
 	phase := g.DefaultQuery("phase", "none")
 	taskid := g.DefaultQuery("taskid", "0")
 	taskname := g.DefaultQuery("taskname", "none")
+	srcType := g.DefaultQuery("srcType", "none")
 
 	fmt.Println("UploadRenderingTaskData, phase: ", phase, ", taskid: ", taskid, ", taskname: ", taskname)
 	// single file uploading receive

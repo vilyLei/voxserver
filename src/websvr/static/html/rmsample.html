@@ -134,10 +134,6 @@
 			link.href = "#";
 			link.addEventListener("click", updatePage);
 			div.appendChild(link);
-			//
-			// let sizes = rimgSizes + ""
-			// var url = hostUrl + "uploadRTData?phase=newrtask&sizes=" + sizes;
-			// let reRenderTaskUrl = taskReqSvrUrl + "?phase=query-re-rendering-task" +
 		}
 		function taskFailure() {
 			var div = document.getElementById("imgDiv");
@@ -305,7 +301,7 @@
 			codeLoader.send(null);
 		}
 		function notifyTaskInfoToSvr(phase, progress, taskId, taskName, otherInfo = "") {
-			let url = taskReqSvrUrl + "?phase=" + phase + "&progress=" + progress + otherInfo
+			let url = taskReqSvrUrl + "?srcType=viewer&&phase=" + phase + "&progress=" + progress + otherInfo
 			if (taskId > 0) {
 				url += "&taskid=" + taskId + "&taskname=" + taskName
 			}
@@ -334,7 +330,7 @@
 		var xhr;
 		function uploadAFile() {
 			let sizes = rimgSizes + ""
-			var url = hostUrl + "uploadRTData?phase=newrtask&sizes=" + sizes;
+			var url = hostUrl + "uploadRTData?srcType=viewer&&phase=newrtask&sizes=" + sizes;
 			console.log("UpladFile() call ...url: ", url);
 			var fileObj = document.getElementById("file_select").files[0];
 			console.log("fileObj: ", fileObj);
