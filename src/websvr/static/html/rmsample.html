@@ -117,20 +117,22 @@
 			div.appendChild(br);
 			br = document.createElement("br");
 			div.appendChild(br);
+
 			link = document.createElement("a");
-			link.innerHTML = "渲染其他模型";
+			link.innerHTML = "重新渲染当前模型";
 			link.href = "#";
-			link.addEventListener("click", updatePage);
+			link.addEventListener("click", rerendering);
 			div.appendChild(link);
+
 			br = document.createElement("br");
 			div.appendChild(br);
 			br = document.createElement("br");
 			div.appendChild(br);
 
 			link = document.createElement("a");
-			link.innerHTML = "重新渲染当前模型";
+			link.innerHTML = "渲染其他模型";
 			link.href = "#";
-			link.addEventListener("click", rerendering);
+			link.addEventListener("click", updatePage);
 			div.appendChild(link);
 			//
 			// let sizes = rimgSizes + ""
@@ -247,7 +249,7 @@
 						}
 						break;
 					case "new":
-						keyStr = `排队<b><font color="#880000">(` + sdo.teamIndex + `)</font></b>等待可用的空闲渲染器`
+						keyStr = `排队<b><font color="#880000">(` + sdo.teamIndex +"/" + sdo.teamLength+ `)</font></b>等待可用的空闲渲染器`
 						showSpecInfo(keyStr, rt_phase_times)
 						break;
 					case "task_rendering_enter":
@@ -270,7 +272,7 @@
 							let time_ms = (Date.now() - startTime)
 							let time_s = Math.round(time_ms / 1000.0)
 							console.log("loss time: ", time_s + "s(" + time_ms + "ms)");
-							div.innerHTML = "渲染完成"
+							div.innerHTML = `渲染完成<b>(耗时` + time_s + `s)</b>`
 							taskSuccess(taskJsonObj.filepath)
 						}
 						break;
@@ -287,6 +289,7 @@
 							ptupdateTimes = 2100
 							timeoutId = -1;
 							taskStatus = 0;
+							startTime = Date.now();
 							clearSTInfoDivEles();
 							reqstUpdate();
 						}
@@ -447,7 +450,7 @@
 		<label id="file_select_label" for="file_select" class="custom-file-upload">
 			<i class="fa fa-cloud-upload"></i> 选择模型文件
 		</label>
-		<input type="file" id="file_select" accept=".glb,.fbx,.obj" readonly="readonly" name="myfile" value="上传渲染模型" />
+		<input type="file" id="file_select" accept=".glb,.fbx,.obj,.usdz,.usdc" readonly="readonly" name="myfile" value="上传渲染模型" />
 		<br />
 		带宽小，上传的模型文件不能大于30M
 	</div>

@@ -1,23 +1,5 @@
 package svr
 
-// import (
-// 	"encoding/json"
-// 	"fmt"
-// 	"net/http"
-// 	"strconv"
-// 	"strings"
-//
-//
-//
-//
-//
-//
-//
-
-// 	"github.com/gin-gonic/gin"
-// 	"voxwebsvr.com/webfs"
-// )
-
 type UploadReqDef struct {
 	TaskID   int64  `json:"taskid,int64"`
 	FilePath string `json:"filepath"`

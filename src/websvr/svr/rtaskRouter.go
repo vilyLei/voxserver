@@ -128,18 +128,18 @@ func RenderingTask(g *gin.Context) {
 	case "queryataskrst":
 		fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
 		if hasTaskFlag {
-			// rtNode := rtTaskNodeMap[tid]
 			teamIndex := 0
+			teamLen := 0
 			if rtNode.Phase == "new" {
-				total := len(rtWaitTaskNodes)
-				for i := 0; i < total; i++ {
+				teamLen = len(rtWaitTaskNodes)
+				for i := 0; i < teamLen; i++ {
 					if rtWaitTaskNodes[i].Id == tid {
 						teamIndex = i + 1
 						break
 					}
 				}
 			}
-			infoStr = `{"phase":"` + rtNode.Phase + `","progress":` + strconv.Itoa(rtNode.Progress) + `,"taskid":` + taskid + `,"status":22, "teamIndex":` + strconv.Itoa(teamIndex) + `}`
+			infoStr = `{"phase":"` + rtNode.Phase + `","progress":` + strconv.Itoa(rtNode.Progress) + `,"taskid":` + taskid + `,"status":22, "teamIndex":` + strconv.Itoa(teamIndex) + `, "teamLength": ` + strconv.Itoa(teamLen) + `}`
 		} else {
 			infoStr = `{"phase":"undefined","status":0}`
 		}
@@ -185,48 +185,51 @@ func UploadRenderingTaskData(g *gin.Context) {
 			status = 22
 			// check file name suffix correctness
 			suffix := webfs.GetFileNameSuffix(filename)
+			if file.Size > 16 {
 
-			switch suffix {
-			case "obj", "fbx", "glb", "usdz", "usdc", ".blend":
+				switch suffix {
+				case "obj", "fbx", "glb", "usdz", "usdc", ".blend":
 
-				taskid = strconv.FormatInt(rtTaskID, 10)
-				taskname = rtTaskVer + "ModelRTask" + taskid
-				fileDir := "./static/rtUploadFiles/" + taskname + "/"
+					fmt.Println("UploadRenderingTaskData(), upload receive file.Size: ", file.Size, "bytes")
 
-				var rtNode RTaskInfoNode
-				rtNode.Action = "new"
-				rtNode.Phase = "new"
-				rtNode.Progress = 0
-				rtNode.RerenderingTimes = 0
-				parts := strings.Split(imgSizes, ",")
-				iw, _ := strconv.Atoi(parts[0])
-				ih, _ := strconv.Atoi(parts[1])
-				rtNode.Resolution = [2]int{iw, ih}
+					taskid = strconv.FormatInt(rtTaskID, 10)
+					taskname = rtTaskVer + "ModelRTask" + taskid
+					fileDir := "./static/rtUploadFiles/" + taskname + "/"
 
-				rtNode.Id = rtTaskID
-				rtNode.Name = taskname
-				rtNode.ResUrl = fileDir + filename
-				rtTaskNodeMap[rtTaskID] = &rtNode
+					var rtNode RTaskInfoNode
+					rtNode.Action = "new"
+					rtNode.Phase = "new"
+					rtNode.Progress = 0
+					rtNode.RerenderingTimes = 0
+					parts := strings.Split(imgSizes, ",")
+					iw, _ := strconv.Atoi(parts[0])
+					ih, _ := strconv.Atoi(parts[1])
+					rtNode.Resolution = [2]int{iw, ih}
 
-				rtWaitTaskNodes = append(rtWaitTaskNodes, &rtNode)
+					rtNode.Id = rtTaskID
+					rtNode.Name = taskname
+					rtNode.ResUrl = fileDir + filename
+					rtTaskNodeMap[rtTaskID] = &rtNode
 
-				// jsonBytes, err := json.Marshal(rtNode)
-				// if err != nil {
-				// 	fmt.Println("error:", err)
-				// }
-				// jsonStr := string(jsonBytes)
-				// fmt.Println("UploadRenderingTaskData(), jsonStr: ", jsonStr)
+					rtWaitTaskNodes = append(rtWaitTaskNodes, &rtNode)
 
-				rtTaskID += 1
+					// jsonBytes, err := json.Marshal(rtNode)
+					// if err != nil {
+					// 	fmt.Println("error:", err)
+					// }
+					// jsonStr := string(jsonBytes)
+					// fmt.Println("UploadRenderingTaskData(), jsonStr: ", jsonStr)
 
-				fmt.Println("UploadRenderingTaskData(), taskname: ", taskname, ", rtNode.Resolution: ", rtNode.Resolution)
-				fmt.Println("UploadRenderingTaskData(), len(rtWaitTaskNodes): ", len(rtWaitTaskNodes))
-				fmt.Println("UploadRenderingTaskData(), upload receive a new rendering task file name: ", filename)
+					rtTaskID += 1
 
-				filePath = rtNode.ResUrl
-				g.SaveUploadedFile(file, filePath)
-			default:
-				//
+					fmt.Println("UploadRenderingTaskData(), taskname: ", taskname, ", rtNode.Resolution: ", rtNode.Resolution)
+					fmt.Println("UploadRenderingTaskData(), len(rtWaitTaskNodes): ", len(rtWaitTaskNodes))
+					fmt.Println("UploadRenderingTaskData(), upload receive a new rendering task file name: ", filename)
+
+					filePath = rtNode.ResUrl
+					g.SaveUploadedFile(file, filePath)
+				default:
+				}
 			}
 
 		case "finish":
