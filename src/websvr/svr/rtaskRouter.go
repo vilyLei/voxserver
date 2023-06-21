@@ -32,8 +32,6 @@ func RenderingTask(g *gin.Context) {
 		switch phase {
 		case "reqanewrtask", "rtaskreadydata", "queryataskrst", "query-re-rendering-task":
 			tempRTNode.Phase = phase
-		// case "queryataskrst":
-		// 	tempRTNode.Phase = phase
 		default:
 			rtNode.Progress, _ = strconv.Atoi(progress)
 			rtNode.Phase = phase
@@ -43,41 +41,6 @@ func RenderingTask(g *gin.Context) {
 		}
 	}
 	switch phase {
-	// case "running":
-	// 	fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
-	// 	// if hasTaskFlag {
-	// 	// 	rtNode := rtTaskNodeMap[tid]
-	// 	// 	rtNode.Phase = phase
-	// 	// 	rtNode.Progress, _ = strconv.Atoi(progress)
-	// 	// 	fmt.Println("rTask rtNode.Progress: ", rtNode.Progress)
-	// 	// }
-	// 	g.String(http.StatusOK, fmt.Sprintf(infoStr))
-	// case "finish":
-	// 	fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
-	// 	// if hasTaskFlag {
-	// 	// 	rtNode := rtTaskNodeMap[tid]
-	// 	// 	rtNode.Phase = phase
-	// 	// 	rtNode.Progress, _ = strconv.Atoi(progress)
-	// 	// }
-	// 	g.String(http.StatusOK, fmt.Sprintf(infoStr))
-	// case "task_rendering_load_res":
-	// 	fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
-	// 	g.String(http.StatusOK, fmt.Sprintf(infoStr))
-	// case "task_rendering_begin":
-	// 	fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
-	// 	// if hasTaskFlag {
-	// 	// 	rtNode := rtTaskNodeMap[tid]
-	// 	// 	rtNode.Phase = phase
-	// 	// }
-	// 	g.String(http.StatusOK, fmt.Sprintf(infoStr))
-	// case "rtaskerror":
-	// 	fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
-	// 	// if hasTaskFlag {
-	// 	// 	rtNode := rtTaskNodeMap[tid]
-	// 	// 	rtNode.Phase = phase
-	// 	// }
-	// 	g.String(http.StatusOK, fmt.Sprintf(infoStr))
-	/////////////////////////////////////////////////////////////////////////////////////////////////////////
 	case "query-re-rendering-task":
 		fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
 		// failureFlag := true
