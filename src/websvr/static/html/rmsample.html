@@ -205,6 +205,9 @@
 			let index0 = ckInfo.indexOf("rtTaskInfo=");
 			if(index0 >= 0) {
 				let index1 = ckInfo.indexOf(";", index0 + 1)
+				if(index1 < 0) {
+					index1 = ckInfo.length
+				}
 				kvalue = ckInfo.slice(index0, index1);
 				kvalue = kvalue.split("=")[1]
 				// console.log("kvalue: ", kvalue);
