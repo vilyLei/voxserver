@@ -12,6 +12,7 @@ import (
 )
 
 func RenderingTask(g *gin.Context) {
+
 	phase := g.DefaultQuery("phase", "none")
 	progress := g.DefaultQuery("progress", "0")
 	taskid := g.DefaultQuery("taskid", "0")
@@ -24,61 +25,95 @@ func RenderingTask(g *gin.Context) {
 	if errInt64 == nil {
 		hasTaskFlag = HasRTTaskNodeByID(tid)
 	}
-
+	var rtNode *RTaskInfoNode = &tempRTNode
+	if hasTaskFlag {
+		rtNode = rtTaskNodeMap[tid]
+		switch phase {
+		case "reqanewrtask", "rtaskreadydata", "queryataskrst", "query-re-rendering-task":
+			tempRTNode.Phase = phase
+		// case "queryataskrst":
+		// 	tempRTNode.Phase = phase
+		default:
+			rtNode.Progress, _ = strconv.Atoi(progress)
+			rtNode.Phase = phase
+			fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
+			g.String(http.StatusOK, fmt.Sprintf(infoStr))
+			return
+		}
+	}
 	switch phase {
-	case "running":
+	// case "running":
+	// 	fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
+	// 	// if hasTaskFlag {
+	// 	// 	rtNode := rtTaskNodeMap[tid]
+	// 	// 	rtNode.Phase = phase
+	// 	// 	rtNode.Progress, _ = strconv.Atoi(progress)
+	// 	// 	fmt.Println("rTask rtNode.Progress: ", rtNode.Progress)
+	// 	// }
+	// 	g.String(http.StatusOK, fmt.Sprintf(infoStr))
+	// case "finish":
+	// 	fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
+	// 	// if hasTaskFlag {
+	// 	// 	rtNode := rtTaskNodeMap[tid]
+	// 	// 	rtNode.Phase = phase
+	// 	// 	rtNode.Progress, _ = strconv.Atoi(progress)
+	// 	// }
+	// 	g.String(http.StatusOK, fmt.Sprintf(infoStr))
+	// case "task_rendering_load_res":
+	// 	fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
+	// 	g.String(http.StatusOK, fmt.Sprintf(infoStr))
+	// case "task_rendering_begin":
+	// 	fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
+	// 	// if hasTaskFlag {
+	// 	// 	rtNode := rtTaskNodeMap[tid]
+	// 	// 	rtNode.Phase = phase
+	// 	// }
+	// 	g.String(http.StatusOK, fmt.Sprintf(infoStr))
+	// case "rtaskerror":
+	// 	fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
+	// 	// if hasTaskFlag {
+	// 	// 	rtNode := rtTaskNodeMap[tid]
+	// 	// 	rtNode.Phase = phase
+	// 	// }
+	// 	g.String(http.StatusOK, fmt.Sprintf(infoStr))
+	/////////////////////////////////////////////////////////////////////////////////////////////////////////
+	case "query-re-rendering-task":
 		fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
+		// failureFlag := true
 		if hasTaskFlag {
-			tnode := rtTaskNodeMap[tid]
-			tnode.Phase = phase
-			tnode.Progress, _ = strconv.Atoi(progress)
-			fmt.Println("rTask tnode.Progress: ", tnode.Progress)
-		}
-		g.String(http.StatusOK, fmt.Sprintf(infoStr))
-	case "finish":
-		fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
-		if hasTaskFlag {
-			tnode := rtTaskNodeMap[tid]
-			tnode.Phase = phase
-			tnode.Progress, _ = strconv.Atoi(progress)
-		}
-		g.String(http.StatusOK, fmt.Sprintf(infoStr))
-	case "task_rendering_load_res":
-		fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
-		if hasTaskFlag {
-			tnode := rtTaskNodeMap[tid]
-			tnode.Phase = phase
-			tnode.Progress, _ = strconv.Atoi(progress)
-			// infoStr = `{"phase":"` + phase + `","progress": ` + progress + `,"status":22}`
-		}
-		g.String(http.StatusOK, fmt.Sprintf(infoStr))
+			if rtNode.Phase == "finish" {
+				imgSizes := g.DefaultQuery("sizes", "512,512")
+				fmt.Println("rTask("+taskid+"):"+phase+", ready re-rendering, imgSizes: ", imgSizes)
+				rtNode.Action = phase
+				rtNode.Phase = "new"
+				rtNode.Progress = 0
+				rtNode.RerenderingTimes++
+				parts := strings.Split(imgSizes, ",")
+				iw, _ := strconv.Atoi(parts[0])
+				ih, _ := strconv.Atoi(parts[1])
+				rtNode.Resolution = [2]int{iw, ih}
+				rtWaitTaskNodes = append(rtWaitTaskNodes, rtNode)
 
-	case "task_rendering_begin":
-		fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
-		if hasTaskFlag {
-			tnode := rtTaskNodeMap[tid]
-			tnode.Phase = phase
-		}
-		g.String(http.StatusOK, fmt.Sprintf(infoStr))
-	case "rtaskerror":
-		fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
-		if hasTaskFlag {
-			tnode := rtTaskNodeMap[tid]
-			tnode.Phase = phase
+			} else {
+				infoStr = `{"phase":"` + phase + `","status":11}`
+			}
+		} else {
+			infoStr = `{"phase":"` + phase + `","status":0}`
 		}
 		g.String(http.StatusOK, fmt.Sprintf(infoStr))
 	case "rtaskreadydata":
-		if hasTaskFlag {
-			rtNode := rtTaskNodeMap[tid]
-			rtNode.Phase = "task_rendering_parse_data"
-		}
+		// if hasTaskFlag {
+		// 	rtNode := rtTaskNodeMap[tid]
+		// 	rtNode.Phase = "task_rendering_parse_data"
+		// }
+		rtNode.Phase = "task_rendering_parse_data"
 		fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
 		g.String(http.StatusOK, fmt.Sprintf(infoStr))
 	case "reqanewrtask":
 		fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
 		total := len(rtWaitTaskNodes)
 		if total > 0 {
-			rtNode := rtWaitTaskNodes[0]
+			rtNode = rtWaitTaskNodes[0]
 			rtNode.Phase = "task_rendering_enter"
 			rtWaitTaskNodes = append(rtWaitTaskNodes[:0], rtWaitTaskNodes[1:]...)
 			jsonBytes, err := json.Marshal(rtNode)
@@ -90,14 +125,12 @@ func RenderingTask(g *gin.Context) {
 			infoStr = `{"phase":"` + phase + `", "task":` + jsonStr + `,"status":22}`
 		}
 		g.String(http.StatusOK, fmt.Sprintf(infoStr))
-	case "queryre-rendering-task":
-		fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
 	case "queryataskrst":
 		fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
 		if hasTaskFlag {
-			tnode := rtTaskNodeMap[tid]
+			// rtNode := rtTaskNodeMap[tid]
 			teamIndex := 0
-			if tnode.Phase == "new" {
+			if rtNode.Phase == "new" {
 				total := len(rtWaitTaskNodes)
 				for i := 0; i < total; i++ {
 					if rtWaitTaskNodes[i].Id == tid {
@@ -106,13 +139,11 @@ func RenderingTask(g *gin.Context) {
 					}
 				}
 			}
-			infoStr = `{"phase":"` + tnode.Phase + `","progress":` + strconv.Itoa(tnode.Progress) + `,"taskid":` + taskid + `,"status":22, "teamIndex":` + strconv.Itoa(teamIndex) + `}`
-			//rtWaitTaskNodes
-			g.String(http.StatusOK, fmt.Sprintf(infoStr))
+			infoStr = `{"phase":"` + rtNode.Phase + `","progress":` + strconv.Itoa(rtNode.Progress) + `,"taskid":` + taskid + `,"status":22, "teamIndex":` + strconv.Itoa(teamIndex) + `}`
 		} else {
 			infoStr = `{"phase":"undefined","status":0}`
-			g.String(http.StatusOK, fmt.Sprintf(infoStr))
 		}
+		g.String(http.StatusOK, fmt.Sprintf(infoStr))
 	default:
 		infoStr = `{
 			"tasks":[
@@ -164,17 +195,20 @@ func UploadRenderingTaskData(g *gin.Context) {
 
 				var rtNode RTaskInfoNode
 				rtNode.Action = "new"
-				rtNode.Id = rtTaskID
-				rtNode.Name = taskname
-				rtNode.ResUrl = fileDir + filename
 				rtNode.Phase = "new"
+				rtNode.Progress = 0
+				rtNode.RerenderingTimes = 0
 				parts := strings.Split(imgSizes, ",")
 				iw, _ := strconv.Atoi(parts[0])
 				ih, _ := strconv.Atoi(parts[1])
 				rtNode.Resolution = [2]int{iw, ih}
-				rtNode.Progress = 0
-				rtWaitTaskNodes = append(rtWaitTaskNodes, &rtNode)
+
+				rtNode.Id = rtTaskID
+				rtNode.Name = taskname
+				rtNode.ResUrl = fileDir + filename
 				rtTaskNodeMap[rtTaskID] = &rtNode
+
+				rtWaitTaskNodes = append(rtWaitTaskNodes, &rtNode)
 
 				// jsonBytes, err := json.Marshal(rtNode)
 				// if err != nil {

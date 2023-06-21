@@ -6,6 +6,13 @@ package svr
 // 	"net/http"
 // 	"strconv"
 // 	"strings"
+//
+//
+//
+//
+//
+//
+//
 
 // 	"github.com/gin-gonic/gin"
 // 	"voxwebsvr.com/webfs"
@@ -22,18 +29,21 @@ type UploadReqDef struct {
 }
 
 type RTaskInfoNode struct {
-	Id         int64  `json:"id"`
-	Name       string `json:"name"`
-	ResUrl     string `json:"resUrl"`
-	Resolution [2]int `json:"resolution"`
-	Phase      string
-	Action     string
-	Progress   int
+	Id               int64  `json:"id"`
+	Name             string `json:"name"`
+	ResUrl           string `json:"resUrl"`
+	Resolution       [2]int `json:"resolution"`
+	Phase            string `json:"phase"`
+	Action           string `json:"action"`
+	Progress         int
+	RerenderingTimes int
 }
 
 var rtTaskID int64 = 2001
 var rtTaskVer string = "v1"
 var rtWaitTaskNodes []*RTaskInfoNode
+
+var tempRTNode RTaskInfoNode
 
 // rendering task map
 var rtTaskNodeMap map[int64]*RTaskInfoNode

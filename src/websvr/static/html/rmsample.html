@@ -25,16 +25,17 @@
 		input[type="file"] {
 			display: none;
 		}
+
 		.box {
-		   display: none;
-		   width: 110px;
-		   height: auto;
-		   background:#FFFFDF;
-		   /* border: 1px solid #333; */
-		   padding: 12px;
-		   text-align: center;
-		   position: absolute;
-	   }
+			display: none;
+			width: 110px;
+			height: auto;
+			background: #dadab4;
+			/* border: 1px solid #333; */
+			padding: 12px;
+			text-align: center;
+			position: absolute;
+		}
 	</style>
 	<script type="text/javascript">
 		console.log("sys init ...");
@@ -43,6 +44,10 @@
 		hostUrl = "/"
 		let taskReqSvrUrl = hostUrl + "renderingTask";
 
+
+
+		let ptupdateTimes = 2100
+		let timeoutId = -1;
 		let startTime = Date.now()
 
 		let taskJsonObj = {}
@@ -58,6 +63,19 @@
 		function updatePage() {
 			location.reload();
 		}
+
+		function rerendering() {
+			console.log("重新渲染当前模型");
+			notifyTaskInfoToSvr("query-re-rendering-task", 0, taskJsonObj.taskid, taskJsonObj.taskname, "&sizes=" + rimgSizes);
+
+		}
+		function clearDivAllEles(div) {
+			div.replaceChildren();
+		}
+		function clearSTInfoDivEles() {
+			var div = document.getElementById("imgDiv");
+			clearDivAllEles(div)
+		}
 		function taskSuccess(filepath) {
 			if (filepath === undefined || filepath == "") {
 				filepath = "./static/rtUploadFiles/modelRTask2001/boomBox.glb"
@@ -68,6 +86,7 @@
 			console.log("imgUrl: ", imgUrl);
 
 			var div = document.getElementById("imgDiv");
+			clearDivAllEles(div)
 			// let img = new Image()
 			// img.src = imgUrl
 			// div.appendChild(img);
@@ -86,7 +105,7 @@
 			}
 			// link.innerHTML = "下载/查看渲染效果图";
 			// <img class="s-problem" src="img/problem.png"/>
-			link.innerHTML = `<img src="`+imgUrl+`"/>`;
+			link.innerHTML = `<img src="` + imgUrl + `"/>`;
 			div.appendChild(link);
 
 			var br = document.createElement("br");
@@ -94,17 +113,33 @@
 			const span = document.createElement('span');
 			span.innerHTML = '/\\';
 			div.appendChild(span);
-			var br = document.createElement("br");
+			br = document.createElement("br");
+			div.appendChild(br);
+			br = document.createElement("br");
 			div.appendChild(br);
 			link = document.createElement("a");
 			link.innerHTML = "渲染其他模型";
 			link.href = "#";
 			link.addEventListener("click", updatePage);
 			div.appendChild(link);
-		}
+			br = document.createElement("br");
+			div.appendChild(br);
+			br = document.createElement("br");
+			div.appendChild(br);
 
+			link = document.createElement("a");
+			link.innerHTML = "重新渲染当前模型";
+			link.href = "#";
+			link.addEventListener("click", rerendering);
+			div.appendChild(link);
+			//
+			// let sizes = rimgSizes + ""
+			// var url = hostUrl + "uploadRTData?phase=newrtask&sizes=" + sizes;
+			// let reRenderTaskUrl = taskReqSvrUrl + "?phase=query-re-rendering-task" +
+		}
 		function taskFailure() {
 			var div = document.getElementById("imgDiv");
+			clearDivAllEles(div)
 			var br = document.createElement("br");
 			div.appendChild(br);
 			let link = document.createElement("a");
@@ -158,14 +193,28 @@
 			let vs = btn.value.split("x");
 			rimgSizes[0] = parseInt(vs[0]);
 			rimgSizes[1] = parseInt(vs[1]);
-			console.log("btn.value: ", btn.value,", rimgSizes: ", rimgSizes)
+			// console.log("btn.value: ", btn.value, ", rimgSizes: ", rimgSizes)
+			document.cookie = "rtTaskInfo="+rimgSizes[0]+"x"+rimgSizes[1]+";"
 		}
 		function resetSizeSelect() {
+			let ckInfo = document.cookie + ""
+			// console.log("resetSizeSelect(), ckInfo: ", ckInfo);
+			let kvalue = "512x512";
+			let index0 = ckInfo.indexOf("rtTaskInfo=");
+			if(index0 >= 0) {
+				let index1 = ckInfo.indexOf(";", index0 + 1)
+				kvalue = ckInfo.slice(index0, index1);
+				kvalue = kvalue.split("=")[1]
+				// console.log("kvalue: ", kvalue);
+			}else {
+				document.cookie = "rtTaskInfo="+rimgSizes[0]+"x"+rimgSizes[1]+";"
+			}
 			var checks = document.getElementsByName("size_select_radio");
 			for (let i = 0; i < checks.length; ++i) {
-				console.log("checks[i].value: ", checks[i].value);
-				if (checks[i].value == "512x512") {
+				// console.log("checks[i].value: ", checks[i].value);
+				if (checks[i].value == kvalue) {
 					checks[i].checked = true;
+					sizeHandleChange(checks[i])
 				}
 			}
 		}
@@ -179,6 +228,7 @@
 			codeLoader.onload = evt => {
 				var sdo = JSON.parse(codeLoader.response);
 				console.log("sendAGetReq(), sdo: ", sdo);
+				let status = sdo.status
 
 				var div = document.getElementById("infoDiv");
 				let phase = sdo.phase;
@@ -193,11 +243,11 @@
 						if (sdo.progress < 6) {
 							showSpecInfo("正在解析模型数据", rt_phase_times)
 						} else {
-							div.innerHTML = "正在进行渲染: " + sdo.progress + "%"
+							div.innerHTML = `正在进行渲染: <b><font color="#008800">` + sdo.progress + `%</font></b>`
 						}
 						break;
 					case "new":
-						keyStr = "排队(" + sdo.teamIndex + ")等待可用渲染器"
+						keyStr = `排队<b><font color="#880000">(` + sdo.teamIndex + `)</font></b>等待可用的空闲渲染器`
 						showSpecInfo(keyStr, rt_phase_times)
 						break;
 					case "task_rendering_enter":
@@ -209,7 +259,7 @@
 						break;
 					case "task_rendering_load_res":
 						// showSpecInfo("同步模型资源", rt_phase_times)
-						div.innerHTML = "同步模型资源: " + sdo.progress + "%"
+						div.innerHTML = `同步模型资源: <b><font color="#008800">` + sdo.progress + `%</font></b>`
 						break;
 					case "task_rendering_begin":
 						showSpecInfo("准备渲染数据", rt_phase_times)
@@ -220,16 +270,27 @@
 							let time_ms = (Date.now() - startTime)
 							let time_s = Math.round(time_ms / 1000.0)
 							console.log("loss time: ", time_s + "s(" + time_ms + "ms)");
-							div.innerHTML = "渲染结束"
+							div.innerHTML = "渲染完成"
 							taskSuccess(taskJsonObj.filepath)
 						}
 						break;
 					case "rtaskerror":
 						if (taskStatus < 2) {
 							taskStatus = 2
-							div.innerHTML = "渲染失败"
+							div.innerHTML = "渲染失败(模型数据不能正确解析)"
 							taskFailure()
 						}
+
+					case "query-re-rendering-task":
+						console.log("query-re-rendering-task, status: ", status);
+						if(status == 22) {
+							ptupdateTimes = 2100
+							timeoutId = -1;
+							taskStatus = 0;
+							clearSTInfoDivEles();
+							reqstUpdate();
+						}
+						break;
 					default:
 						break;
 				}
@@ -237,27 +298,25 @@
 			};
 			codeLoader.send(null);
 		}
-		function notifyTaskInfoToSvr(phase, progress, taskId, taskName) {
-			let url = taskReqSvrUrl + "?phase=" + phase + "&progress=" + progress
+		function notifyTaskInfoToSvr(phase, progress, taskId, taskName, otherInfo = "") {
+			let url = taskReqSvrUrl + "?phase=" + phase + "&progress=" + progress + otherInfo
 			if (taskId > 0) {
 				url += "&taskid=" + taskId + "&taskname=" + taskName
 			}
 			sendAGetReq(url)
 		}
 
-		let ptupdateTimes = 2100
-		let timeoutId = -1;
-		function ptupdate() {
+		function reqstUpdate() {
 
 			if (timeoutId > -1) {
 				clearTimeout(timeoutId);
 			}
-			// console.log("ptupdate() ... taskJsonObj: ", taskJsonObj)
+			// console.log("reqstUpdate() ... taskJsonObj: ", taskJsonObj)
 			if (taskStatus < 1) {
-				notifyTaskInfoToSvr("queryataskrst", 0, taskJsonObj.taskid, taskJsonObj.taskname)
+				notifyTaskInfoToSvr("queryataskrst", 0, taskJsonObj.taskid, taskJsonObj.taskname, "")
 				ptupdateTimes--;
 				if (ptupdateTimes > 0) {
-					timeoutId = setTimeout(ptupdate, 800);
+					timeoutId = setTimeout(reqstUpdate, 800);
 				} else {
 
 				}
@@ -311,7 +370,7 @@
 				taskJsonObj = data
 				console.log("上传成功！");
 				// alert("上传成功！");
-				ptupdate();
+				reqstUpdate();
 			} else {
 				alert("上传失败！");
 			}
@@ -367,17 +426,21 @@
 <body>
 	<center />
 	<br />
-	<progress id="progressBar" value="0" max="100" style="width: 300px;"></progress>
-	<br />
 	<span id="percentage"></span>
 	<br />
+	<progress id="progressBar" value="0" max="100" style="width: 300px;"></progress>
+	<br />
 	<span id="time"></span>
+	<br />
+	<br />
 	<div id="select_img_size">
-		渲染效果图尺寸:&nbsp;
+		选择渲染图尺寸:&nbsp;
 		<input type="radio" name="size_select_radio" onclick="sizeHandleChange(this);" value="256x256">256x256</input>
 		<input type="radio" name="size_select_radio" onclick="sizeHandleChange(this);" value="512x512">512x512</input>
-		<input type="radio" name="size_select_radio" onclick="sizeHandleChange(this);" value="1024x1024">1024x1024</input>
-		<input type="radio" name="size_select_radio" onclick="sizeHandleChange(this);" value="2048x2048">2048x2048</input>
+		<input type="radio" name="size_select_radio" onclick="sizeHandleChange(this);"
+			value="1024x1024">1024x1024</input>
+		<input type="radio" name="size_select_radio" onclick="sizeHandleChange(this);"
+			value="2048x2048">2048x2048</input>
 	</div>
 	<br />
 	<div id="select_file_div">
@@ -386,7 +449,7 @@
 		</label>
 		<input type="file" id="file_select" accept=".glb,.fbx,.obj" readonly="readonly" name="myfile" value="上传渲染模型" />
 		<br />
-		带宽小，模型文件大小不能大于30M
+		带宽小，上传的模型文件不能大于30M
 	</div>
 	<br />
 	<br />
@@ -395,13 +458,14 @@
 	<br />
 	<div id="imgDiv">
 	</div>
-	<div id="box"class="box" >点击查看大图</div>
+	<div id="box" class="box">点击查看大图</div>
 	<script type="text/javascript">
 		resetSizeSelect();
 		var inputObj = document.getElementById("file_select")
 		inputObj.addEventListener("change", () => {
 			uploadAFile()
 			let div = document.getElementById("select_file_div")
+			console.log("div.parentNode: ", div.parentNode)
 			div.parentNode.removeChild(div);
 		});
 	</script>
