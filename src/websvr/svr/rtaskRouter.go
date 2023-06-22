@@ -40,6 +40,7 @@ func RenderingTask(g *gin.Context) {
 			return
 		}
 	}
+
 	switch phase {
 	case "query-re-rendering-task":
 		fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
@@ -64,12 +65,10 @@ func RenderingTask(g *gin.Context) {
 		} else {
 			infoStr = `{"phase":"` + phase + `","status":0}`
 		}
-		g.String(http.StatusOK, fmt.Sprintf(infoStr))
 
 	case "rtaskreadydata":
 		rtNode.Phase = "task_rendering_parse_data"
 		fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
-		g.String(http.StatusOK, fmt.Sprintf(infoStr))
 
 	case "reqanewrtask":
 		fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
@@ -80,7 +79,6 @@ func RenderingTask(g *gin.Context) {
 			rtWaitTaskNodes = append(rtWaitTaskNodes[:0], rtWaitTaskNodes[1:]...)
 			infoStr = rtNode.GetTaskJsonStr()
 		}
-		g.String(http.StatusOK, fmt.Sprintf(infoStr))
 	case "queryataskrst":
 		fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
 		if hasTaskFlag {
@@ -99,7 +97,6 @@ func RenderingTask(g *gin.Context) {
 		} else {
 			infoStr = `{"phase":"undefined","status":0}`
 		}
-		g.String(http.StatusOK, fmt.Sprintf(infoStr))
 	default:
 		infoStr = `{
 			"tasks":[
@@ -115,8 +112,8 @@ func RenderingTask(g *gin.Context) {
 				}
 			]
 		}`
-		g.String(http.StatusOK, fmt.Sprintf(infoStr))
 	}
+	g.String(http.StatusOK, fmt.Sprintf(infoStr))
 }
 
 func UploadRenderingTaskData(g *gin.Context) {
