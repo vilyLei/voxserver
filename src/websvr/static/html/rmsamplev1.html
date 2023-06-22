@@ -40,6 +40,7 @@
 	<script type="text/javascript">
 		console.log("sys init ...");
 		let rimgSizes = [512, 512]
+		let rtBGTransparent = false
 		let hostUrl = "http://localhost:9090/"
 		hostUrl = "/"
 		let taskReqSvrUrl = hostUrl + "renderingTask";
@@ -192,28 +193,38 @@
 			rimgSizes[0] = parseInt(vs[0]);
 			rimgSizes[1] = parseInt(vs[1]);
 			// console.log("btn.value: ", btn.value, ", rimgSizes: ", rimgSizes)
-			document.cookie = "rtTaskInfo=" + rimgSizes[0] + "x" + rimgSizes[1] + ";"
+			// document.cookie = "rtTaskInfo=" + rimgSizes[0] + "x" + rimgSizes[1] + ";"
+			let cname = "rtTaskInfo";
+			let kvalue = rimgSizes[0] + "x" + rimgSizes[1];
+			setCookieByName(cname, kvalue)
 		}
 
-		function bgTransparentHandleChange(btn) {
+		function setBGTransRBtnSt(valueStr) {
+
+			// rtBGTransparent = btn.value == "true"
+			rtBGTransparent = valueStr == "true"
+			// btn.checked = rtBGTransparent;
+			btn = document.getElementById("bg_transparent_select_radio_btn")
+			btn.checked = rtBGTransparent
+			btn.value = valueStr
+			document.getElementById("b-t-s-r").innerHTML = rtBGTransparent ? "是" : "否"
+		}
+		function rtBGTransparentHandleChange(btn) {
 
 			if (btn.value == "false") {
 				btn.value = "true"
 			} else if (btn.value == "true") {
 				btn.value = "false"
 			}
-			btn.checked = btn.value == "true";
-			// btn.textContent = btn.checked ? "是":"否"
-			// btn.innerHTML = btn.value == "true" ? "是" : "否"
-			// btn.title = btn.value == "true" ? "是" : "否"
-			console.log("bgTransparentHandleChange(), btn.checked: ", btn.checked)
-			// // document.cookie = "rtTaskInfo="+rimgSizes[0]+"x"+rimgSizes[1]+";"
-			//
-			document.getElementById("b-t-s-r").innerHTML = btn.checked ? "是":"否"
+			setBGTransRBtnSt(btn.value);
+
+			let cname = "rtBGTransparent";
+			let kvalue = btn.value;
+			setCookieByName(cname, kvalue)
 		}
 		function getCookieByName(cname) {
 			let ckInfo = document.cookie + ""
-			let index0 = ckInfo.indexOf(cname+"=");
+			let index0 = ckInfo.indexOf(cname + "=");
 			if (index0 >= 0) {
 				let index1 = ckInfo.indexOf(";", index0 + 1)
 				if (index1 < 0) {
@@ -225,31 +236,17 @@
 			}
 			return ""
 		}
-		function setCookieByName(cname,value) {
+		function setCookieByName(cname, value) {
 			document.cookie = cname + "=" + value + ";"
 		}
-		function resetSizeSelect() {
-			let ckInfo = document.cookie + ""
-			// console.log("resetSizeSelect(), ckInfo: ", ckInfo);
-			// let kvalue = "512x512";
-			// let index0 = ckInfo.indexOf("rtTaskInfo=");
-			// if (index0 >= 0) {
-			// 	let index1 = ckInfo.indexOf(";", index0 + 1)
-			// 	if (index1 < 0) {
-			// 		index1 = ckInfo.length
-			// 	}
-			// 	kvalue = ckInfo.slice(index0, index1);
-			// 	kvalue = kvalue.split("=")[1]
-			// 	// console.log("kvalue: ", kvalue);
-			// } else {
-			// 	document.cookie = "rtTaskInfo=" + rimgSizes[0] + "x" + rimgSizes[1] + ";"
-			// }
+		function initConfig() {
+			
 			let kvalue = rimgSizes[0] + "x" + rimgSizes[1];
 			let cname = "rtTaskInfo";
 			let cvalue = getCookieByName(cname)
-			if(cvalue != "") {
+			if (cvalue != "") {
 				kvalue = cvalue
-			}else {
+			} else {
 				setCookieByName(cname, kvalue)
 			}
 			var checks = document.getElementsByName("size_select_radio");
@@ -260,6 +257,16 @@
 					sizeHandleChange(checks[i])
 				}
 			}
+
+			kvalue = rtBGTransparent ? "true" : "false";
+			cname = "rtBGTransparent";
+			cvalue = getCookieByName(cname)
+			if (cvalue != "") {
+				kvalue = cvalue
+			} else {
+				setCookieByName(cname, kvalue)
+			}
+			setBGTransRBtnSt(kvalue);
 		}
 		function sendAGetReq(purl) {
 			let codeLoader = new XMLHttpRequest();
@@ -482,11 +489,14 @@
 		渲染图尺寸:&nbsp;
 		<input type="radio" name="size_select_radio" onclick="sizeHandleChange(this);" value="256x256">256x256</input>
 		<input type="radio" name="size_select_radio" onclick="sizeHandleChange(this);" value="512x512">512x512</input>
-		<input type="radio" name="size_select_radio" onclick="sizeHandleChange(this);" value="1024x1024">1024x1024</input>
-		<input type="radio" name="size_select_radio" onclick="sizeHandleChange(this);" value="2048x2048">2048x2048</input>
+		<input type="radio" name="size_select_radio" onclick="sizeHandleChange(this);"
+			value="1024x1024">1024x1024</input>
+		<input type="radio" name="size_select_radio" onclick="sizeHandleChange(this);"
+			value="2048x2048">2048x2048</input>
 		<br />
-		背景透明:&nbsp;
-		<input type="radio" name="bg_transparent_select_radio" onclick="bgTransparentHandleChange(this);" value="false"><span id="b-t-s-r">否</span></input>
+		渲染图背景透明:&nbsp;
+		<input type="radio" id="bg_transparent_select_radio_btn" name="bg_transparent_select_radio" onclick="rtBGTransparentHandleChange(this);"
+			value="false"><span id="b-t-s-r">否</span></input>
 	</div>
 	<br />
 	<div id="select_file_div">
@@ -507,7 +517,7 @@
 	</div>
 	<div id="box" class="box">点击查看大图</div>
 	<script type="text/javascript">
-		resetSizeSelect();
+		initConfig();
 		var inputObj = document.getElementById("file_select")
 		inputObj.addEventListener("change", () => {
 			uploadAFile()
