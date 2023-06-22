@@ -211,11 +211,9 @@
 			//
 			document.getElementById("b-t-s-r").innerHTML = btn.checked ? "是":"否"
 		}
-		function resetSizeSelect() {
+		function getCookieByName(cname) {
 			let ckInfo = document.cookie + ""
-			// console.log("resetSizeSelect(), ckInfo: ", ckInfo);
-			let kvalue = "512x512";
-			let index0 = ckInfo.indexOf("rtTaskInfo=");
+			let index0 = ckInfo.indexOf(cname+"=");
 			if (index0 >= 0) {
 				let index1 = ckInfo.indexOf(";", index0 + 1)
 				if (index1 < 0) {
@@ -223,9 +221,36 @@
 				}
 				kvalue = ckInfo.slice(index0, index1);
 				kvalue = kvalue.split("=")[1]
-				// console.log("kvalue: ", kvalue);
-			} else {
-				document.cookie = "rtTaskInfo=" + rimgSizes[0] + "x" + rimgSizes[1] + ";"
+				return kvalue;
+			}
+			return ""
+		}
+		function setCookieByName(cname,value) {
+			document.cookie = cname + "=" + value + ";"
+		}
+		function resetSizeSelect() {
+			let ckInfo = document.cookie + ""
+			// console.log("resetSizeSelect(), ckInfo: ", ckInfo);
+			// let kvalue = "512x512";
+			// let index0 = ckInfo.indexOf("rtTaskInfo=");
+			// if (index0 >= 0) {
+			// 	let index1 = ckInfo.indexOf(";", index0 + 1)
+			// 	if (index1 < 0) {
+			// 		index1 = ckInfo.length
+			// 	}
+			// 	kvalue = ckInfo.slice(index0, index1);
+			// 	kvalue = kvalue.split("=")[1]
+			// 	// console.log("kvalue: ", kvalue);
+			// } else {
+			// 	document.cookie = "rtTaskInfo=" + rimgSizes[0] + "x" + rimgSizes[1] + ";"
+			// }
+			let kvalue = rimgSizes[0] + "x" + rimgSizes[1];
+			let cname = "rtTaskInfo";
+			let cvalue = getCookieByName(cname)
+			if(cvalue != "") {
+				kvalue = cvalue
+			}else {
+				setCookieByName(cname, kvalue)
 			}
 			var checks = document.getElementsByName("size_select_radio");
 			for (let i = 0; i < checks.length; ++i) {
