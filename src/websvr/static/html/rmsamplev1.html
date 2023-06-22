@@ -201,9 +201,7 @@
 
 		function setBGTransRBtnSt(valueStr) {
 
-			// rtBGTransparent = btn.value == "true"
 			rtBGTransparent = valueStr == "true"
-			// btn.checked = rtBGTransparent;
 			btn = document.getElementById("bg_transparent_select_radio_btn")
 			btn.checked = rtBGTransparent
 			btn.value = valueStr
@@ -211,10 +209,10 @@
 		}
 		function rtBGTransparentHandleChange(btn) {
 
-			if (btn.value == "false") {
-				btn.value = "true"
-			} else if (btn.value == "true") {
+			if (btn.value === "true") {
 				btn.value = "false"
+			} else {
+				btn.value = "true"
 			}
 			setBGTransRBtnSt(btn.value);
 
@@ -273,6 +271,10 @@
 			codeLoader.open("GET", purl, true);
 			codeLoader.onerror = function (err) {
 				console.error("load error: ", err);
+				taskStatus = 3;
+				alert("服务器无法正常访问 !!!");
+				updatePage()
+				return;
 			};
 			codeLoader.onprogress = e => { };
 			codeLoader.onload = evt => {
