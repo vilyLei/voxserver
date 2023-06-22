@@ -1,6 +1,8 @@
 package svr
 
 import (
+	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 )
@@ -51,6 +53,16 @@ func (self *RTaskInfoNode) GetViewStatusInfo(teamIndex int, teamLength int) stri
 	}
 	infoStr += `}`
 	return infoStr
+}
+func (self *RTaskInfoNode) GetTaskJsonStr() string {
+	jsonBytes, err := json.Marshal(self)
+	if err != nil {
+		fmt.Println("error:", err)
+	}
+	jsonStr := string(jsonBytes)
+	// fmt.Println("RenderingTask(), jsonStr: ", jsonStr)
+	jsonStr = `{"phase":"` + self.Phase + `", "task":` + jsonStr + `,"status":22}`
+	return jsonStr
 }
 
 var rtTaskID int64 = 2001

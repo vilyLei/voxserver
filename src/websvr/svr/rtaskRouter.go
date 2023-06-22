@@ -65,14 +65,12 @@ func RenderingTask(g *gin.Context) {
 			infoStr = `{"phase":"` + phase + `","status":0}`
 		}
 		g.String(http.StatusOK, fmt.Sprintf(infoStr))
+
 	case "rtaskreadydata":
-		// if hasTaskFlag {
-		// 	rtNode := rtTaskNodeMap[tid]
-		// 	rtNode.Phase = "task_rendering_parse_data"
-		// }
 		rtNode.Phase = "task_rendering_parse_data"
 		fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
 		g.String(http.StatusOK, fmt.Sprintf(infoStr))
+
 	case "reqanewrtask":
 		fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
 		total := len(rtWaitTaskNodes)
@@ -80,13 +78,7 @@ func RenderingTask(g *gin.Context) {
 			rtNode = rtWaitTaskNodes[0]
 			rtNode.Phase = "task_rendering_enter"
 			rtWaitTaskNodes = append(rtWaitTaskNodes[:0], rtWaitTaskNodes[1:]...)
-			jsonBytes, err := json.Marshal(rtNode)
-			if err != nil {
-				fmt.Println("error:", err)
-			}
-			jsonStr := string(jsonBytes)
-			fmt.Println("RenderingTask(), jsonStr: ", jsonStr)
-			infoStr = `{"phase":"` + phase + `", "task":` + jsonStr + `,"status":22}`
+			infoStr = rtNode.GetTaskJsonStr()
 		}
 		g.String(http.StatusOK, fmt.Sprintf(infoStr))
 	case "queryataskrst":
