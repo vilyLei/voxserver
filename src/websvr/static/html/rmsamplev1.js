@@ -433,3 +433,19 @@ function display() {
 function disappear() {
 	document.getElementById("box").style.display = "none";
 }
+function createViewerDiv(px, py, pw, ph) {
+	let div = document.createElement("div");
+	div.style.width = pw + "px";
+	div.style.height = ph + "px";
+	// document.body.appendChild(div);
+	div.style.display = "bolck";
+	div.style.left = px + "px";
+	div.style.top = py + "px";
+	div.style.position = "absolute";
+	div.style.display = "bolck";
+	div.style.position = "absolute";
+	return div;
+}
+function initModelViewer(div) {
+	console.log("init mnodel view")
+}
