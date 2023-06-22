@@ -339,12 +339,17 @@ function reqstUpdate() {
 }
 
 var xhr;
+var fileObj = null;
+function readyUploadAFile() {
+	fileObj = document.getElementById("file_select").files[0];
+	console.log("A01 fileObj: ", fileObj);
+}
 function uploadAFile() {
 	let sizes = rimgSizes + ""
 	var url = hostUrl + "uploadRTData?srcType=viewer&&phase=newrtask&sizes=" + sizes;
 	console.log("UpladFile() call ...url: ", url);
-	var fileObj = document.getElementById("file_select").files[0];
-	console.log("fileObj: ", fileObj);
+	// fileObj = document.getElementById("file_select").files[0];
+	console.log("A02 fileObj: ", fileObj);
 	if (!fileObj) {
 		alert("the file dosen't exist !!!");
 		updatePage()
@@ -433,19 +438,45 @@ function display() {
 function disappear() {
 	document.getElementById("box").style.display = "none";
 }
+
+function createCanvas(pw, ph) {
+
+	let canvas = document.createElement('canvas');
+	canvas.style.display = 'bolck';
+	canvas.style.position = 'relative';
+	// canvas.style.backgroundColor = 'transparent';
+	canvas.style.pointerEvents = 'none';
+	canvas.style.left = 0 + "px";
+	canvas.style.top = 0 + "px";
+	canvas.height = ph;
+	canvas.width = pw;
+	let ctx2D = canvas.getContext("2d");
+	ctx2D.fillStyle = "green";
+	ctx2D.fillRect(0, 0, pw, ph);
+	// ctx2D.clearRect(0, 0, pw, ph);
+	return canvas;
+}
 function createViewerDiv(px, py, pw, ph) {
 	let div = document.createElement("div");
 	div.style.width = pw + "px";
 	div.style.height = ph + "px";
-	// document.body.appendChild(div);
 	div.style.display = "bolck";
-	div.style.left = px + "px";
-	div.style.top = py + "px";
-	div.style.position = "absolute";
-	div.style.display = "bolck";
-	div.style.position = "absolute";
+	div.style.margin = "0 auto";
+	div.style.backgroundColor = "#222222"
+	// div.style.textAlign = "center";
+	// div.style.left = px + "px";
+	// div.style.top = py + "px";
+	// div.style.position = "absolute";
 	return div;
 }
 function initModelViewer(div) {
-	console.log("init mnodel view")
+	
+	clearDivAllEles(div)
+
+	console.log("init mnodel view, div.parentNode: ", div.parentNode)
+	let viewerDiv = createViewerDiv(0, 0, 256, 256);
+	div.appendChild(viewerDiv);
+	console.log("viewerDiv: ", viewerDiv)
+	let viewerCanvas = createCanvas(256, 256);
+	viewerDiv.appendChild( viewerCanvas );
 }

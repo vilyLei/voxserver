@@ -36,12 +36,20 @@
 			text-align: center;
 			position: absolute;
 		}
+		#select_file_div {
+			text-align: center;
+			background-color:rgb(196, 247, 216)
+		}
+
+		body {
+			text-align:center;
+		}
 	</style>
 	<script type="text/javascript" src="./rmsamplev1.js"></script>
 </head>
 
 <body>
-	<center />
+	<!-- <center /> -->
 	<br />
 	<span id="percentage"></span>
 	<br />
@@ -60,8 +68,8 @@
 			value="2048x2048">2048x2048</input>
 		<br />
 		渲染图背景透明:&nbsp;
-		<input type="radio" id="bg_transparent_select_radio_btn" name="bg_transparent_select_radio" onclick="rtBGTransparentHandleChange(this);"
-			value="false"><span id="b-t-s-r">否</span></input>
+		<input type="radio" id="bg_transparent_select_radio_btn" name="bg_transparent_select_radio"
+			onclick="rtBGTransparentHandleChange(this);" value="false"><span id="b-t-s-r">否</span></input>
 	</div>
 	<br />
 	<div id="select_file_div">
@@ -85,11 +93,12 @@
 		initConfig();
 		var inputObj = document.getElementById("file_select")
 		inputObj.addEventListener("change", () => {
-			uploadAFile()
+			// uploadAFile()
+			readyUploadAFile()
 			let div = document.getElementById("select_file_div")
 			// console.log("div.parentNode: ", div.parentNode)
 			// div.parentNode.removeChild(div);
-			clearDivAllEles(div)
+			// clearDivAllEles(div)
 			initModelViewer(div)
 		});
 	</script>
