@@ -103,7 +103,7 @@ func RenderingTask(g *gin.Context) {
 					}
 				}
 			}
-			infoStr = `{"phase":"` + rtNode.Phase + `","progress":` + strconv.Itoa(rtNode.Progress) + `,"taskid":` + taskid + `,"status":22, "teamIndex":` + strconv.Itoa(teamIndex) + `, "teamLength": ` + strconv.Itoa(teamLen) + `}`
+			infoStr = rtNode.GetViewStatusInfo(teamIndex, teamLen)
 		} else {
 			infoStr = `{"phase":"undefined","status":0}`
 		}

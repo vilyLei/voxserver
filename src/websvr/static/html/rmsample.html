@@ -268,10 +268,11 @@
 					case "finish":
 						if (taskStatus < 1) {
 							taskStatus = 1
+							let sizes = sdo.sizes;
 							let time_ms = (Date.now() - startTime)
 							let time_s = Math.round(time_ms / 1000.0)
 							console.log("loss time: ", time_s + "s(" + time_ms + "ms)");
-							div.innerHTML = `渲染完成<b>(耗时` + time_s + `s)</b>`
+							div.innerHTML = `完成<b><font color="#008800">`+sizes[0] + "x" + sizes[1] +`</font></b>效果图渲染<b>(耗时` + time_s + `s)</b>`
 							taskSuccess(taskJsonObj.filepath)
 						}
 						break;

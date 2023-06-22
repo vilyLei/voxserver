@@ -41,6 +41,18 @@ func (self *RTaskInfoNode) SetResolutionWithSizeStr(sizesStr string) {
 	self.Resolution = [2]int{iw, ih}
 }
 
+func (self *RTaskInfoNode) GetViewStatusInfo(teamIndex int, teamLength int) string {
+	infoStr := `{"phase":"` + self.Phase + `","progress":` + strconv.Itoa(self.Progress) + `,"taskid":` + strconv.FormatInt(self.Id, 10) + `,"status":22`
+	switch self.Phase {
+	case "new":
+		infoStr += `, "teamIndex":` + strconv.Itoa(teamIndex) + `, "teamLength": ` + strconv.Itoa(teamLength)
+	case "finish":
+		infoStr += `, "sizes":[` + strconv.Itoa(self.Resolution[0]) + `,` + strconv.Itoa(self.Resolution[1]) + `]`
+	}
+	infoStr += `}`
+	return infoStr
+}
+
 var rtTaskID int64 = 2001
 var rtTaskVer string = "v1"
 var rtWaitTaskNodes []*RTaskInfoNode
