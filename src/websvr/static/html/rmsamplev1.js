@@ -456,27 +456,57 @@ function createCanvas(pw, ph) {
 	// ctx2D.clearRect(0, 0, pw, ph);
 	return canvas;
 }
-function createViewerDiv(px, py, pw, ph) {
-	let div = document.createElement("div");
+
+function create3DViewerDiv(px, py, pw, ph) {
+	const div = document.createElement("div");
 	div.style.width = pw + "px";
 	div.style.height = ph + "px";
 	div.style.display = "bolck";
 	div.style.margin = "0 auto";
-	div.style.backgroundColor = "#222222"
+	div.style.backgroundColor = "#222222";
+	// 添加样式 二
+	div.style.position = "absolute";
+	div.style.left = "calc(50% - 256px / 2)";
+	
+	return div;
+}
+
+function create3DViewerInfoDiv(px, py, pw, ph) {
+	const div = document.createElement("div");
+	div.style.width = pw + "px";
+	div.style.height = ph + "px";
+	div.style.display = "flex";
+	div.style.margin = "0 auto";
+	div.style.zIndex = "9";
+	div.style.color = "#55aaaa";
+	// div.style.backgroundColor = "#333322";
+	// 添加样式 三
+	div.style.position = "absolute";
+	div.style.left = "calc(50% - 256px / 2)";
+	// div.style.zIndex = 200;
+
 	// div.style.textAlign = "center";
+	div.style.alignItems = "center";
+	div.style.justifyContent = "center";
+	div.style.pointerEvents = 'none';
 	// div.style.left = px + "px";
 	// div.style.top = py + "px";
 	// div.style.position = "absolute";
 	return div;
 }
+
 function initModelViewer(div) {
 	
 	clearDivAllEles(div)
 
 	console.log("init mnodel view, div.parentNode: ", div.parentNode)
-	let viewerDiv = createViewerDiv(0, 0, 256, 256);
+	let viewerDiv = create3DViewerDiv(0, 0, 256, 256);
 	div.appendChild(viewerDiv);
 	console.log("viewerDiv: ", viewerDiv)
-	let viewerCanvas = createCanvas(256, 256);
-	viewerDiv.appendChild( viewerCanvas );
+	// let viewerCanvas = createCanvas(256, 256);
+	// viewerDiv.appendChild( viewerCanvas );
+	let infoDiv = create3DViewerInfoDiv(0, 0, 256, 256);
+	div.appendChild(infoDiv);
+	infoDiv.innerHTML = "ABC";
+
 }

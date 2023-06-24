@@ -30,7 +30,7 @@
 			display: none;
 			width: 110px;
 			height: auto;
-			background: #dadab4;
+			background: #b4c3da;
 			/* border: 1px solid #333; */
 			padding: 12px;
 			text-align: center;
@@ -38,7 +38,7 @@
 		}
 		#select_file_div {
 			text-align: center;
-			background-color:rgb(196, 247, 216)
+			background-color:rgb(219, 224, 244)
 		}
 
 		body {
@@ -101,6 +101,15 @@
 			// clearDivAllEles(div)
 			initModelViewer(div)
 		});
+		function testDiv() {
+			readyUploadAFile()
+			let div = document.getElementById("select_file_div")
+			// console.log("div.parentNode: ", div.parentNode)
+			// div.parentNode.removeChild(div);
+			// clearDivAllEles(div)
+			initModelViewer(div)
+		}
+		testDiv();
 	</script>
 </body>
 
