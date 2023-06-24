@@ -5,6 +5,7 @@ let hostUrl = "http://localhost:9090/"
 hostUrl = "/"
 let taskReqSvrUrl = hostUrl + "renderingTask";
 
+let curr3DViewerInfoDiv = null;
 
 let ptupdateTimes = 2100
 let timeoutId = -1;
@@ -134,6 +135,7 @@ function sendCurrentGetReq(purl) {
 function showSpecInfo(keyStr, times) {
 
 	var div = document.getElementById("infoDiv");
+	// var div = curr3DViewerInfoDiv;
 	let flag = times % 3
 	switch (flag) {
 		case 0:
@@ -226,6 +228,9 @@ function initConfig() {
 	setBGTransRBtnSt(kvalue);
 }
 function sendAGetReq(purl) {
+	if(taskStatus == 3) {
+		return;
+	}
 	let codeLoader = new XMLHttpRequest();
 	codeLoader.open("GET", purl, true);
 	codeLoader.onerror = function (err) {
@@ -242,6 +247,7 @@ function sendAGetReq(purl) {
 		let status = sdo.status
 
 		var div = document.getElementById("infoDiv");
+		// var div = curr3DViewerInfoDiv;
 		let phase = sdo.phase;
 		if (rt_phase != phase) {
 			rt_phase = phase
@@ -345,6 +351,9 @@ function readyUploadAFile() {
 	console.log("A01 fileObj: ", fileObj);
 }
 function uploadAFile() {
+	if(fileObj == null) {
+		return;
+	}
 	let sizes = rimgSizes + ""
 	var url = hostUrl + "uploadRTData?srcType=viewer&&phase=newrtask&sizes=" + sizes;
 	console.log("UpladFile() call ...url: ", url);
@@ -376,6 +385,7 @@ function uploadAFile() {
 	};
 
 	xhr.send(form);
+	fileObj = null;
 }
 
 function uploadComplete(evt) {
@@ -463,7 +473,7 @@ function create3DViewerDiv(px, py, pw, ph) {
 	div.style.height = ph + "px";
 	div.style.display = "bolck";
 	div.style.margin = "0 auto";
-	div.style.backgroundColor = "#222222";
+	// div.style.backgroundColor = "#222222";
 	// 添加样式 二
 	div.style.position = "absolute";
 	div.style.left = "calc(50% - 256px / 2)";
@@ -495,6 +505,25 @@ function create3DViewerInfoDiv(px, py, pw, ph) {
 	return div;
 }
 
+function createBtn(id, btnValue, callback) {
+	let btn = document.createElement("input");
+	btn.type = "button"
+	btn.value = btnValue;
+	if(id !== "") {
+		btn.id = id;
+	}
+	btn.style.zIndex = "19";
+	btn.style.position = "absolute";
+	btn.style.top = "440px";
+	btn.style.left = "calc(50% - 70px / 2)";
+	btn.style.margin = "0 auto";
+	btn.addEventListener("click", callback);
+	console.log("create a btn ...")
+	return btn;
+}
+
+let sendRenderingBtn = null;
+
 function initModelViewer(div) {
 	
 	clearDivAllEles(div)
@@ -507,6 +536,13 @@ function initModelViewer(div) {
 	// viewerDiv.appendChild( viewerCanvas );
 	let infoDiv = create3DViewerInfoDiv(0, 0, 256, 256);
 	div.appendChild(infoDiv);
-	infoDiv.innerHTML = "ABC";
+	infoDiv.innerHTML = "loading model resource...";
+	// curr3DViewerInfoDiv = infoDiv;
+	let btn = sendRenderingBtn = createBtn("send_rendering", "发起渲染", () => {
+		console.log("发起渲染...");
+		uploadAFile();
+		sendRenderingBtn.style.display = 'none';
+	});
+	div.appendChild(btn);
 
 }
