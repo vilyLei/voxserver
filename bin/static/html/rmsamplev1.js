@@ -41,13 +41,14 @@ function clearSTInfoDivEles() {
 	var div = document.getElementById("imgDiv");
 	clearDivAllEles(div)
 }
-function taskSuccess(filepath) {
+function taskSuccess(filepath, transparent) {
 	if (filepath === undefined || filepath == "") {
 		filepath = "./static/rtUploadFiles/modelRTask2001/boomBox.glb"
 	}
+	let suffix = transparent ? "png":"jpg"
 	let i = filepath.lastIndexOf("/")
 	let imgDirUrl = hostUrl + filepath.slice(2, i + 1);
-	imgUrl = imgDirUrl + "bld_rendering_mini.jpg?ver=" + Math.random() + "-" + Math.random(Date.now())
+	imgUrl = imgDirUrl + "bld_rendering_mini."+suffix+"?ver=" + Math.random() + "-" + Math.random(Date.now())
 	console.log("imgUrl: ", imgUrl);
 
 	var div = document.getElementById("imgDiv");
@@ -58,7 +59,7 @@ function taskSuccess(filepath) {
 	// var br = document.createElement("br");
 	// div.appendChild(br);
 
-	let big_imgUrl = imgDirUrl + "bld_rendering.jpg"
+	let big_imgUrl = imgDirUrl + "bld_rendering."+suffix+"?ver=" + Math.random() + "-" + Math.random(Date.now())
 	var link = document.createElement("a");
 	link.setAttribute("href", big_imgUrl);
 	link.setAttribute("target", "_blank");
@@ -293,7 +294,7 @@ function sendAGetReq(purl) {
 					let time_s = Math.round(time_ms / 1000.0)
 					console.log("loss time: ", time_s + "s(" + time_ms + "ms)");
 					div.innerHTML = `<b><font color="#008800">` + sizes[0] + "x" + sizes[1] + `</font></b>效果图渲染完成<br/><b>(总耗时` + time_s + `s)</b>`
-					taskSuccess(taskJsonObj.filepath)
+					taskSuccess(taskJsonObj.filepath, sdo.bgTransparent == 1)
 				}
 				break;
 			case "rtaskerror":

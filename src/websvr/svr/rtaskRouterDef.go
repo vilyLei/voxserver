@@ -82,6 +82,7 @@ func (self *RTaskInfoNode) GetViewStatusInfo(teamIndex int, teamLength int) stri
 		infoStr += `, "teamIndex":` + strconv.Itoa(teamIndex) + `, "teamLength": ` + strconv.Itoa(teamLength)
 	case "finish":
 		infoStr += `, "sizes":[` + strconv.Itoa(self.Resolution[0]) + `,` + strconv.Itoa(self.Resolution[1]) + `]`
+		infoStr += `, "bgTransparent":` + strconv.Itoa(self.BGTransparent)
 	}
 	infoStr += `}`
 	return infoStr
