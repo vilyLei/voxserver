@@ -48,6 +48,7 @@ func RenderingTask(g *gin.Context) {
 		if hasTaskFlag {
 			if rtNode.Phase == "finish" {
 				imgSizes := g.DefaultQuery("sizes", "512,512")
+				camdvs := g.DefaultQuery("camdvs", "[]")
 				fmt.Println("rTask("+taskid+"):"+phase+", ready re-rendering, imgSizes: ", imgSizes)
 				rtNode.Action = phase
 				rtNode.Phase = "new"
@@ -57,6 +58,7 @@ func RenderingTask(g *gin.Context) {
 				iw, _ := strconv.Atoi(parts[0])
 				ih, _ := strconv.Atoi(parts[1])
 				rtNode.Resolution = [2]int{iw, ih}
+				rtNode.SetCamdvsWithStr(camdvs)
 				rtWaitTaskNodes = append(rtWaitTaskNodes, rtNode)
 
 			} else {
@@ -137,7 +139,6 @@ func UploadRenderingTaskData(g *gin.Context) {
 		filename = file.Filename
 		switch phase {
 		case "newrtask":
-			imgSizes := g.DefaultQuery("sizes", "512,512")
 			status = 22
 			// check file name suffix correctness
 			suffix := webfs.GetFileNameSuffix(filename)
@@ -147,6 +148,9 @@ func UploadRenderingTaskData(g *gin.Context) {
 				case "obj", "fbx", "glb", "usdz", "usdc", ".blend":
 
 					fmt.Println("UploadRenderingTaskData(), upload receive file.Size: ", file.Size, "bytes")
+
+					imgSizes := g.DefaultQuery("sizes", "512,512")
+					camdvs := g.DefaultQuery("camdvs", "[]")
 
 					taskid = strconv.FormatInt(rtTaskID, 10)
 					taskname = rtTaskVer + "ModelRTask" + taskid
@@ -163,8 +167,7 @@ func UploadRenderingTaskData(g *gin.Context) {
 					// iw, _ := strconv.Atoi(parts[0])
 					// ih, _ := strconv.Atoi(parts[1])
 					// rtNode.Resolution = [2]int{iw, ih}
-
-					rtNode.SetResolutionWithSizeStr(imgSizes)
+					rtNode.SetResolutionWithSizeStr(imgSizes, camdvs)
 
 					rtNode.Id = rtTaskID
 					rtNode.Name = taskname

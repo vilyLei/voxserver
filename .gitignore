@@ -36,3 +36,5 @@ node_modules/
 src/websvr/static/uploadFiles/
 src/websvr/static/bulesystem/
 bin/static/rtUploadFiles/
+bin/static/uploadFiles/
+*.exe~

@@ -27,7 +27,9 @@ function updatePage() {
 
 function rerendering() {
 	console.log("重新渲染当前模型");
-	notifyTaskInfoToSvr("query-re-rendering-task", 0, taskJsonObj.taskid, taskJsonObj.taskname, "&sizes=" + rimgSizes);
+	let params = "&sizes=" + rimgSizes
+	params += "&" + getCameraDataParam();
+	notifyTaskInfoToSvr("query-re-rendering-task", 0, taskJsonObj.taskid, taskJsonObj.taskname, params);
 
 }
 function clearDivAllEles(div) {
@@ -43,7 +45,7 @@ function taskSuccess(filepath) {
 	}
 	let i = filepath.lastIndexOf("/")
 	let imgDirUrl = hostUrl + filepath.slice(2, i + 1);
-	imgUrl = imgDirUrl + "bld_rendering_mini.jpg"
+	imgUrl = imgDirUrl + "bld_rendering_mini.jpg?ver=" + Math.random() + "-" + Math.random(Date.now())
 	console.log("imgUrl: ", imgUrl);
 
 	var div = document.getElementById("imgDiv");
@@ -350,12 +352,16 @@ function readyUploadAFile() {
 	fileObj = document.getElementById("file_select").files[0];
 	console.log("A01 fileObj: ", fileObj);
 }
-function uploadAFile() {
+function getCameraDataParam() {
+	return "camdvs=[" + rscViewer.getCameraData(0.01)+"]";
+}
+function uploadAndSendRendering() {
 	if(fileObj == null) {
 		return;
 	}
 	let sizes = rimgSizes + ""
 	var url = hostUrl + "uploadRTData?srcType=viewer&&phase=newrtask&sizes=" + sizes;
+	url += "&" + getCameraDataParam();
 	console.log("UpladFile() call ...url: ", url);
 	// fileObj = document.getElementById("file_select").files[0];
 	console.log("A02 fileObj: ", fileObj);
@@ -477,7 +483,7 @@ function create3DViewerDiv(px, py, pw, ph) {
 	// 添加样式 二
 	div.style.position = "absolute";
 	div.style.left = "calc(50% - 256px / 2)";
-	
+
 	return div;
 }
 
@@ -505,7 +511,7 @@ function create3DViewerInfoDiv(px, py, pw, ph) {
 	return div;
 }
 
-function createBtn(id, btnValue, callback) {
+function createBtn(id, top, btnValue, callback) {
 	let btn = document.createElement("input");
 	btn.type = "button"
 	btn.value = btnValue;
@@ -514,7 +520,7 @@ function createBtn(id, btnValue, callback) {
 	}
 	btn.style.zIndex = "19";
 	btn.style.position = "absolute";
-	btn.style.top = "440px";
+	btn.style.top = top + "px";
 	btn.style.left = "calc(50% - 70px / 2)";
 	btn.style.margin = "0 auto";
 	btn.addEventListener("click", callback);
@@ -523,26 +529,76 @@ function createBtn(id, btnValue, callback) {
 }
 
 let sendRenderingBtn = null;
+let viewerDiv = null;
+let viewerInfoDiv = null;
 
 function initModelViewer(div) {
-	
+
 	clearDivAllEles(div)
 
 	console.log("init mnodel view, div.parentNode: ", div.parentNode)
-	let viewerDiv = create3DViewerDiv(0, 0, 256, 256);
+	viewerDiv = create3DViewerDiv(0, 0, 256, 256);
 	div.appendChild(viewerDiv);
 	console.log("viewerDiv: ", viewerDiv)
 	// let viewerCanvas = createCanvas(256, 256);
 	// viewerDiv.appendChild( viewerCanvas );
-	let infoDiv = create3DViewerInfoDiv(0, 0, 256, 256);
-	div.appendChild(infoDiv);
-	infoDiv.innerHTML = "loading model resource...";
+	viewerInfoDiv = create3DViewerInfoDiv(0, 0, 256, 256);
+	div.appendChild(viewerInfoDiv);
+	viewerInfoDiv.innerHTML = "loading model resource...";
 	// curr3DViewerInfoDiv = infoDiv;
-	let btn = sendRenderingBtn = createBtn("send_rendering", "发起渲染", () => {
+	let btn = sendRenderingBtn = createBtn("send_rendering", 440, "发起渲染", () => {
 		console.log("发起渲染...");
-		uploadAFile();
+		uploadAndSendRendering();
 		sendRenderingBtn.style.display = 'none';
 	});
 	div.appendChild(btn);
 
+	loadModule("RModelSCViewer.umd.js");
+}
+let rscViewer = null;
+function initRSCViewer() {
+	rscViewer = new RModelSCViewer.RModelSCViewer();
+	console.log("rscViewer: ", rscViewer);
+	rscViewer.initialize( viewerDiv, () => {
+		//fileObj
+		rscViewer.initSceneByFiles([fileObj], (prog) => {
+			console.log("model loading prog: ", prog);
+			if(prog >= 1.0) {
+				viewerInfoDiv.innerHTML = "";
+			}
+		}, 200);
+	} );
+
+	document.onmousedown = () => {
+		console.log("mouse down.");
+		// let cameraData = rscViewer.getCameraData(0.01);
+		// console.log("cameraData: ", cameraData);
+	}
+}
+function loadModule(url) {
+
+	let req = new XMLHttpRequest();
+	req.open("GET", url, true);
+	req.onerror = function (err) {
+		console.error("load error: ", err);
+	}
+	// req.onprogress = e => { };
+	req.onload = evt => {
+		// this.loadedData(req.response, url);
+
+		let scriptEle = document.createElement("script");
+		scriptEle.onerror = evt => {
+			console.error("module script onerror, e: ", evt);
+		};
+		scriptEle.type = "text/javascript";
+		try {
+			scriptEle.innerHTML = req.response;
+			document.head.appendChild(scriptEle);
+			initRSCViewer();
+		} catch (e) {
+			console.error("ModuleLoader::loadedData() apply script ele error.");
+			throw e;
+		}
+	}
+	req.send(null);
 }

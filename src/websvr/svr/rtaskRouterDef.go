@@ -18,13 +18,14 @@ type UploadReqDef struct {
 }
 
 type RTaskInfoNode struct {
-	Id               int64  `json:"id"`
-	Name             string `json:"name"`
-	ResUrl           string `json:"resUrl"`
-	Resolution       [2]int `json:"resolution"`
-	Phase            string `json:"phase"`
-	Action           string `json:"action"`
-	AutoFitModelSize string `json:"autoFitModelSize"`
+	Id               int64       `json:"id"`
+	Name             string      `json:"name"`
+	ResUrl           string      `json:"resUrl"`
+	Resolution       [2]int      `json:"resolution"`
+	Camdvs           [16]float64 `json:"camdvs"`
+	Phase            string      `json:"phase"`
+	Action           string      `json:"action"`
+	AutoFitModelSize string      `json:"autoFitModelSize"`
 	Progress         int
 	RerenderingTimes int
 }
@@ -36,11 +37,38 @@ func (self *RTaskInfoNode) Reset() {
 	self.Progress = 0
 	self.RerenderingTimes = 0
 }
-func (self *RTaskInfoNode) SetResolutionWithSizeStr(sizesStr string) {
+func (self *RTaskInfoNode) SetCamdvsWithStr(camdvsStr string) {
+
+	// self.Action = "new"
+	// self.Phase = "new"
+	// self.Progress = 0
+	// self.RerenderingTimes = 0
+	fmt.Println("SetCamdvsWithStr() ### len(camdvsStr): ", len(camdvsStr))
+	var dvs [16]float64
+	if len(camdvsStr) > 16 {
+		camdvsStr = camdvsStr[1 : len(camdvsStr)-1]
+		parts := strings.Split(camdvsStr, ",")
+		fmt.Println("SetCamdvsWithStr() ### camdvsStr: ", camdvsStr)
+		fmt.Println("SetCamdvsWithStr() ### len(parts): ", len(parts))
+		// s := fmt.Sprintf("%f", 678.3567)
+		// for i, substr := range parts {
+		for i := 0; i < len(parts); i++ {
+			if value, err := strconv.ParseFloat(parts[i], 64); err == nil {
+				// fmt.Println(s) // 3.14159265
+				dvs[i] = value
+			}
+		}
+
+		fmt.Println("SetCamdvsWithStr() ### dvs: ", dvs)
+	}
+	self.Camdvs = dvs
+}
+func (self *RTaskInfoNode) SetResolutionWithSizeStr(sizesStr string, camdvs string) {
 	parts := strings.Split(sizesStr, ",")
 	iw, _ := strconv.Atoi(parts[0])
 	ih, _ := strconv.Atoi(parts[1])
 	self.Resolution = [2]int{iw, ih}
+	self.SetCamdvsWithStr(camdvs)
 }
 
 func (self *RTaskInfoNode) GetViewStatusInfo(teamIndex int, teamLength int) string {

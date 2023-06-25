@@ -9279,22 +9279,26 @@ class CoModuleVersion {
   constructor(infoObj) {
     this.m_infoObj = null;
     this.m_verMap = new Map();
-    this.m_infoObj = infoObj;
-    const versionInfo = this.m_infoObj;
-    const versionInfoMap = this.m_verMap;
-    let items = versionInfo.items;
+    this.forceFiltering = false;
 
-    for (let i = 0; i < items.length; ++i) {
-      const ia = items[i];
-      versionInfoMap.set(ia.name, ia);
+    if (infoObj != null) {
+      this.m_infoObj = infoObj;
+      const versionInfo = this.m_infoObj;
+      const versionInfoMap = this.m_verMap;
+      let items = versionInfo.items;
 
-      if (ia.type) {
-        if (ia.type == "dir") {
-          let ls = ia.items;
+      for (let i = 0; i < items.length; ++i) {
+        const ia = items[i];
+        versionInfoMap.set(ia.name, ia);
 
-          for (let i = 0; i < ls.length; ++i) {
-            const ib = ls[i];
-            versionInfoMap.set(ib.name, ib);
+        if (ia.type) {
+          if (ia.type == "dir") {
+            let ls = ia.items;
+
+            for (let i = 0; i < ls.length; ++i) {
+              const ib = ls[i];
+              versionInfoMap.set(ib.name, ib);
+            }
           }
         }
       }
@@ -9334,6 +9338,7 @@ class CoModuleLoader extends ModuleLoader_1.ModuleLoader {
    */
   constructor(times, callback = null, versionFilter = null) {
     super(times, callback, null);
+    this.forceFiltering = false;
 
     let urlChecker = url => {
       console.log("XX MMMM XXXX init url: ", url);
@@ -9345,7 +9350,7 @@ class CoModuleLoader extends ModuleLoader_1.ModuleLoader {
       let hostUrl = window.location.href;
       url = url.trim();
 
-      if (hostUrl.indexOf(".artvily.") > 0) {
+      if (hostUrl.indexOf(".artvily.") > 0 || this.forceFiltering) {
         let i = url.lastIndexOf("/");
         let j = url.indexOf(".", i); // hostUrl = "http://localhost:9000/test/";
 
@@ -16394,6 +16399,138 @@ exports.default = RenderFBOProxy;
 
 /***/ }),
 
+/***/ "5b39":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+/***************************************************************************/
+
+/*                                                                         */
+
+/*  Copyright 2018-2023 by                                                 */
+
+/*  Vily(vily313@126.com)                                                  */
+
+/*                                                                         */
+
+/***************************************************************************/
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+class HttpFileLoader {
+  constructor() {
+    this.crossOrigin = 'anonymous';
+  }
+
+  setCrossOrigin(crossOrigin) {
+    this.crossOrigin = crossOrigin;
+  }
+
+  async load(url, onLoad,
+  /**
+   * @param progress its value is 0.0 -> 1.0
+   */
+  onProgress = null, onError = null, responseType = "blob", headRange = "") {
+    // console.log("HttpFileLoader::load(), A url: ", url);
+    // console.log("loadBinBuffer, headRange != '': ", headRange != "");
+    if (onLoad == null) {
+      throw Error("onload == null !!!");
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = e => {
+      if (onLoad) onLoad(reader.result, url);
+    };
+
+    const request = new XMLHttpRequest();
+    request.open("GET", url, true);
+
+    if (headRange != "") {
+      request.setRequestHeader("Range", headRange);
+    }
+
+    request.responseType = responseType;
+
+    request.onload = e => {
+      // console.log("loaded binary buffer request.status: ", request.status, e);
+      // console.log("HttpFileLoader::load(), B url: ", url);
+      if (request.status <= 206) {
+        switch (responseType) {
+          case "arraybuffer":
+          case "blob":
+            reader.readAsArrayBuffer(request.response);
+            break;
+
+          case "json":
+            if (onLoad) onLoad(request.response, url);
+            break;
+
+          case "text":
+            if (onLoad) onLoad(request.response, url);
+            break;
+
+          default:
+            if (onLoad) onLoad(request.response, url);
+            break;
+        } // if(responseType == "blob" || responseType == "arraybuffer") {
+        // 	reader.readAsArrayBuffer(request.response);
+        // }else {
+        // 	if(onLoad) onLoad(<string>request.response, url);
+        // }
+
+      } else if (onError) {
+        onError(request.status, url);
+      }
+    };
+
+    if (onProgress != null) {
+      request.onprogress = evt => {
+        // console.log("progress evt: ", evt);
+        // console.log("progress total: ", evt.total, ", loaded: ", evt.loaded);
+        let k = 0.0;
+
+        if (evt.total > 0 || evt.lengthComputable) {
+          k = Math.min(1.0, evt.loaded / evt.total);
+        } else {
+          let content_length = parseInt(request.getResponseHeader("content-length")); // var encoding = req.getResponseHeader("content-encoding");
+          // if (total && encoding && encoding.indexOf("gzip") > -1) {
+
+          if (content_length > 0) {
+            // assuming average gzip compression ratio to be 25%
+            content_length *= 4; // original size / compressed size
+
+            k = Math.min(1.0, evt.loaded / content_length);
+          } else {
+            console.warn("lengthComputable failed");
+          }
+        } //let progressInfo = k + "%";
+        //console.log("progress progressInfo: ", progressInfo);
+
+
+        onProgress(k, url);
+      };
+    }
+
+    if (onError != null) {
+      request.onerror = e => {
+        console.error("load error, request.status: ", request.status, ", url: ", url);
+        onError(request.status, url);
+      };
+    }
+
+    request.send(null);
+  }
+
+}
+
+exports.HttpFileLoader = HttpFileLoader;
+
+/***/ }),
+
 /***/ "5d04":
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -21821,7 +21958,9 @@ class CoDataModule {
         ]
       };
       this.m_dependencyGraphObj = dependencyGraphObj;
+      console.log("this.verTool.forceFiltering: ", this.verTool.forceFiltering);
       let loader = new CoModuleLoader_1.CoModuleLoader(1, null, this.verTool);
+      loader.forceFiltering = this.verTool.forceFiltering;
       let urlChecker = loader.getUrlChecker();
 
       if (urlChecker) {
@@ -35690,6 +35829,20 @@ class CoGeomModelLoader {
     }
   }
 
+  loadWithType(urls, types) {
+    CoGeomModelLoader.s_coapp.verTool = this.verTool;
+
+    if (urls != null && urls.length > 0) {
+      CoGeomModelLoader.s_coapp.initialize(null, true);
+      let purls = urls.slice(0);
+      CoGeomModelLoader.s_coapp.deferredInit(() => {
+        for (let i = 0; i < purls.length; ++i) {
+          this.loadModel(purls[i], types[i]);
+        }
+      });
+    }
+  }
+
   reset() {
     this.m_loadedTotal = 0;
     this.m_loadTotal = 0;
@@ -43109,6 +43262,10 @@ const MouseInteraction_1 = __webpack_require__("6cb9");
 
 const MeshFactory_1 = __importDefault(__webpack_require__("0238"));
 
+const URLFilter_1 = __importDefault(__webpack_require__("7aa4"));
+
+const HttpFileLoader_1 = __webpack_require__("5b39");
+
 class VVF {
   isEnabled() {
     return true;
@@ -43124,13 +43281,20 @@ class RModelSCViewer {
     this.m_dropController = new DropFileController_1.DropFileController();
     this.m_rscene = null;
     this.m_texLoader = null;
-    this.m_teamLoader = new CoModelTeamLoader_1.CoModelTeamLoader();
+    this.m_teamLoader = null; //new CoModelTeamLoader();
+
     this.m_layouter = new EntityLayouter_1.EntityLayouter();
     this.m_baseSize = 300;
     this.m_dropEnabled = true;
   }
 
   getTexByUrl(purl, wrapRepeat = true, mipmapEnabled = true) {
+    let host = URLFilter_1.default.getHostUrl("9090");
+
+    if (purl.indexOf("http:") < 0 && purl.indexOf("https:") < 0) {
+      purl = host + purl;
+    }
+
     return this.m_texLoader.getTexByUrl(purl, wrapRepeat, mipmapEnabled);
   }
 
@@ -43138,19 +43302,39 @@ class RModelSCViewer {
     this.m_texLoader = new ImageTextureLoader_1.default(this.m_rscene.textureBlock);
     this.m_rscene.addEventListener(MouseEvent_1.default.MOUSE_DOWN, this, this.mouseDown); // new RenderStatusDisplay(this.m_rscene, true);
 
-    new MouseInteraction_1.MouseInteraction().initialize(this.m_rscene, 0, true).setAutoRunning(true, 1);
+    new MouseInteraction_1.MouseInteraction().initialize(this.m_rscene, 0, true).setAutoRunning(true, 1); // this.m_teamLoader.verTool = new CoModuleVersion(null);
   }
 
-  initialize(div) {
+  loadInfo(initCallback) {
+    let host = URLFilter_1.default.getHostUrl("9090");
+    let url = host + "static/cospace/info.json";
+    console.log("url: ", url);
+    url = URLFilter_1.default.filterUrl(url);
+    let httpLoader = new HttpFileLoader_1.HttpFileLoader();
+    httpLoader.load(url, (data, url) => {
+      console.log("loadInfo loaded data: ", data);
+      this.m_teamLoader = new CoModelTeamLoader_1.CoModelTeamLoader();
+      this.m_teamLoader.verTool = new CoModelTeamLoader_1.CoModuleVersion(data);
+      this.m_teamLoader.verTool.forceFiltering = true;
+
+      if (initCallback) {
+        initCallback();
+      }
+    }, null, null, "json");
+  }
+
+  initialize(div, initCallback = null) {
     console.log("RModelSCViewer::initialize()......");
 
     if (this.m_rscene == null) {
       RendererDevice_1.default.SHADERCODE_TRACE_ENABLED = false;
       RendererDevice_1.default.VERT_SHADER_PRECISION_GLOBAL_HIGHP_ENABLED = true;
       let rparam = new RendererParam_1.default(div);
+      rparam.autoSyncRenderBufferAndWindowSize = false;
       rparam.setCamProject(45, 0.1, 2000.0);
       rparam.setCamPosition(800.0, 800.0, 800.0);
       rparam.setCamUpDirect(0.0, 0.0, 1.0);
+      rparam.setAttriAntialias(true);
       this.m_rscene = new RendererScene_1.default();
       this.m_rscene.initialize(rparam).setAutoRunning(true);
       let unit = 100.0; // let cube = new Box3DEntity();
@@ -43180,18 +43364,21 @@ class RModelSCViewer {
       // console.log("getCameraData(), vs: ", vs);
 
       this.m_dropController.initialize(this.m_rscene.getRenderProxy().getCanvas(), this);
+      this.loadInfo(initCallback);
     }
   }
 
-  initSceneByFiles(files, size = 300) {
+  initSceneByFiles(files, loadingCallback, size = 300) {
     this.m_baseSize = size;
+    this.m_loadingCallback = loadingCallback;
     this.m_dropController.initFilesLoad(files);
   }
 
-  initSceneByUrls(urls, size = 300) {
+  initSceneByUrls(urls, types, loadingCallback, size = 300) {
     this.m_baseSize = size;
+    this.m_loadingCallback = loadingCallback;
     let loader = this.m_teamLoader;
-    loader.load(urls, (models, transforms) => {
+    loader.loadWithTypes(urls, types, (models, transforms) => {
       this.m_layouter.layoutReset();
 
       for (let i = 0; i < models.length; ++i) {
@@ -43199,6 +43386,10 @@ class RModelSCViewer {
       }
 
       this.m_layouter.layoutUpdate(size, new Vector3D_1.default(0, 0, 0));
+
+      if (this.m_loadingCallback) {
+        this.m_loadingCallback(1.0);
+      }
     });
   }
 
@@ -43216,12 +43407,16 @@ class RModelSCViewer {
 
   initFileLoad(files) {
     let urls = [];
+    let types = [];
 
     for (let i = 0; i < files.length; ++i) {
+      console.log("files[i].url: ", files[i].url);
+      console.log("files[i].type: ", files[i].type);
       urls.push(files[i].url);
+      types.push(files[i].type);
     }
 
-    this.initSceneByUrls(urls, this.m_baseSize);
+    this.initSceneByUrls(urls, types, this.m_loadingCallback, this.m_baseSize);
   }
 
   isDropEnabled() {
@@ -43249,7 +43444,7 @@ class RModelSCViewer {
       let material = new Default3DMaterial_1.default();
       material.normalEnabled = true;
       material.setUVScale(uvScale, uvScale);
-      material.setTextureList([this.getTexByUrl("static/assets/box.jpg")]);
+      material.setTextureList([this.getTexByUrl("static/assets/white.jpg")]);
       let mesh = MeshFactory_1.default.createDataMeshFromModel(model, material);
       let entity = new DisplayEntity_1.default();
       entity.setRenderState(RendererState_1.default.NONE_CULLFACE_NORMAL_STATE);
@@ -43534,6 +43729,10 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
+const CoModuleLoader_1 = __webpack_require__("2a2b");
+
+exports.CoModuleVersion = CoModuleLoader_1.CoModuleVersion;
+
 const CoGeomModelLoader_1 = __webpack_require__("d82c");
 
 exports.CoGeomDataType = CoGeomModelLoader_1.CoGeomDataType;
@@ -43543,6 +43742,7 @@ class LoadingTeam {
     this.m_map = new Map();
     this.m_total = 0;
     this.m_loadedTotal = 0;
+    this.types = null;
     this.models = [];
     this.transforms = [];
     this.init(urls);
@@ -43619,14 +43819,28 @@ class CoModelTeamLoader {
       let team = this.m_teams.shift();
       this.m_team = team;
       this.m_enabled = false;
-      console.log("CoModelTeamLoader, begin load urls: ", team.urls);
-      this.m_modelLoader.load(team.urls);
+      console.log("CoModelTeamLoader, begin load urls: ", team.urls, ", team.types: ", team.types);
+
+      if (team.types) {
+        this.m_modelLoader.loadWithType(team.urls, team.types);
+      } else {
+        this.m_modelLoader.load(team.urls);
+      }
     }
   }
 
   load(urls, callback) {
     this.m_modelLoader.verTool = this.verTool;
     let team = new LoadingTeam(urls);
+    team.callback = callback;
+    this.m_teams.push(team);
+    this.loadNext();
+  }
+
+  loadWithTypes(urls, types, callback) {
+    this.m_modelLoader.verTool = this.verTool;
+    let team = new LoadingTeam(urls);
+    team.types = types;
     team.callback = callback;
     this.m_teams.push(team);
     this.loadNext();
