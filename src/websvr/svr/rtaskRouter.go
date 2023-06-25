@@ -139,14 +139,14 @@ func UploadRenderingTaskData(g *gin.Context) {
 		filename = file.Filename
 		switch phase {
 		case "newrtask":
-			status = 22
 			// check file name suffix correctness
 			suffix := webfs.GetFileNameSuffix(filename)
 			if file.Size > 16 {
 
 				switch suffix {
-				case "obj", "fbx", "glb", "usdz", "usdc", ".blend":
+				case "obj", "fbx", "glb", "usdz", "usdc", "blend":
 
+					status = 22
 					fmt.Println("UploadRenderingTaskData(), upload receive file.Size: ", file.Size, "bytes")
 
 					imgSizes := g.DefaultQuery("sizes", "512,512")

@@ -352,16 +352,13 @@ function readyUploadAFile() {
 	fileObj = document.getElementById("file_select").files[0];
 	console.log("A01 fileObj: ", fileObj);
 }
-function getCameraDataParam() {
-	return "camdvs=[" + rscViewer.getCameraData(0.01)+"]";
-}
 function uploadAndSendRendering() {
 	if(fileObj == null) {
 		return;
 	}
 	let sizes = rimgSizes + ""
 	var url = hostUrl + "uploadRTData?srcType=viewer&&phase=newrtask&sizes=" + sizes;
-	url += "&" + getCameraDataParam();
+	url +=  getCameraDataParam();
 	console.log("UpladFile() call ...url: ", url);
 	// fileObj = document.getElementById("file_select").files[0];
 	console.log("A02 fileObj: ", fileObj);
@@ -556,6 +553,14 @@ function initModelViewer(div) {
 	loadModule("RModelSCViewer.umd.js");
 }
 let rscViewer = null;
+let loadedModel = false;
+function getCameraDataParam(first = false) {
+	if(loadedModel) {
+		let key = first ? "" : "&";
+		return key + "camdvs=[" + rscViewer.getCameraData(0.01, true)+"]";
+	}
+	return "";
+}
 function initRSCViewer() {
 	rscViewer = new RModelSCViewer.RModelSCViewer();
 	console.log("rscViewer: ", rscViewer);
@@ -565,9 +570,10 @@ function initRSCViewer() {
 			console.log("model loading prog: ", prog);
 			if(prog >= 1.0) {
 				viewerInfoDiv.innerHTML = "";
+				loadedModel = true;
 			}
 		}, 200);
-	} );
+	}, true);
 
 	document.onmousedown = () => {
 		console.log("mouse down.");

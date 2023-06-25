@@ -5114,6 +5114,7 @@ class EntityLayouter {
     this.m_sizeScale = 1.0;
     this.m_entities = [];
     this.m_transforms = [];
+    this.locationEnabled = true;
     this.rotationEnabled = false;
   }
 
@@ -5237,19 +5238,22 @@ class EntityLayouter {
     }
 
     aabb.update();
-    let pdv = new Vector3D_1.default();
-    pdv.subVecsTo(fixV3, aabb.center);
-    aabb.reset();
 
-    for (let k = 0; k < entities.length; ++k) {
-      let pv = entities[k].getPosition();
-      pv.addBy(pdv);
-      entities[k].setPosition(pv);
-      entities[k].update();
-      if (k > 0) aabb.union(entities[k].getGlobalBounds());else aabb.copyFrom(entities[k].getGlobalBounds());
+    if (this.locationEnabled) {
+      let pdv = new Vector3D_1.default();
+      pdv.subVecsTo(fixV3, aabb.center);
+      aabb.reset();
+
+      for (let k = 0; k < entities.length; ++k) {
+        let pv = entities[k].getPosition();
+        pv.addBy(pdv);
+        entities[k].setPosition(pv);
+        entities[k].update();
+        if (k > 0) aabb.union(entities[k].getGlobalBounds());else aabb.copyFrom(entities[k].getGlobalBounds());
+      }
+
+      aabb.update();
     }
-
-    aabb.update();
   }
 
   getSizeScale() {
@@ -9354,7 +9358,12 @@ class CoModuleLoader extends ModuleLoader_1.ModuleLoader {
         let i = url.lastIndexOf("/");
         let j = url.indexOf(".", i); // hostUrl = "http://localhost:9000/test/";
 
-        hostUrl = "http://www.artvily.com:9090/";
+        if (!this.forceFiltering) {
+          hostUrl = "http://www.artvily.com:9090/";
+        } else {
+          hostUrl = URLFilter_1.default.getHostUrl("9090");
+        }
+
         let fileName = url.slice(i, j);
 
         if (url.indexOf(".umd.") > 0) {
@@ -10151,6 +10160,171 @@ class ShaderCodeUniform {
 }
 
 exports.ShaderCodeUniform = ShaderCodeUniform;
+
+/***/ }),
+
+/***/ "32cc":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+/***************************************************************************/
+
+/*                                                                         */
+
+/*  Copyright 2018-2023 by                                                 */
+
+/*  Vily(vily313@126.com)                                                  */
+
+/*                                                                         */
+
+/***************************************************************************/
+
+var __importDefault = this && this.__importDefault || function (mod) {
+  return mod && mod.__esModule ? mod : {
+    "default": mod
+  };
+};
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const ShaderUniformData_1 = __importDefault(__webpack_require__("b3bd"));
+
+const ShaderCodeBuffer_1 = __importDefault(__webpack_require__("faa5"));
+
+const MaterialBase_1 = __importDefault(__webpack_require__("0fc4"));
+
+class Line3DShaderBuffer extends ShaderCodeBuffer_1.default {
+  constructor() {
+    super();
+    this.m_uniqueName = "";
+    this.dynColorEnabled = false;
+  }
+
+  initialize(texEnabled) {
+    super.initialize(texEnabled);
+    this.m_uniqueName = "Line3DShd";
+    if (this.dynColorEnabled) this.m_uniqueName += "_dynColor";
+  }
+
+  buildShader() {
+    this.m_coder.addVertLayout("vec3", "a_vs");
+    this.m_coder.addFragUniform("vec4", "u_color");
+
+    if (this.dynColorEnabled) {
+      this.m_coder.addDefine("DYNAMIC_COLOR");
+    } else {
+      this.m_coder.addVertLayout("vec3", "a_cvs");
+      this.m_coder.addVarying("vec3", "v_color");
+    }
+
+    this.m_coder.addFragOutputHighp("vec4", "FragColor0");
+    this.m_coder.addFragMainCode(`
+    #ifndef DYNAMIC_COLOR
+        FragColor0 = vec4(v_color, 1.0) * u_color;
+    #else
+        FragColor0 = u_color;
+    #endif
+`);
+    this.m_coder.addVertMainCode(`
+    viewPosition = u_viewMat * u_objMat * vec4(a_vs,1.0);
+    vec4 pv = u_projMat * viewPosition;
+    #ifndef DYNAMIC_COLOR
+        v_color = a_cvs;
+    #endif
+    gl_Position = pv;
+            `);
+  }
+
+  getUniqueShaderName() {
+    return this.m_uniqueName;
+  }
+
+  static GetInstance() {
+    let lsb = Line3DShaderBuffer;
+
+    if (lsb.s_instance != null) {
+      return lsb.s_instance;
+    }
+
+    lsb.s_instance = new Line3DShaderBuffer();
+    return lsb.s_instance;
+  }
+
+}
+
+Line3DShaderBuffer.s_instance = null;
+
+class Line3DMaterial extends MaterialBase_1.default {
+  /**
+   * @param dynColorEnabled the default value is false
+   */
+  constructor(dynColorEnabled = false) {
+    super();
+    this.m_dynColorEnabled = false;
+    this.m_data = null;
+    this.premultiplyAlpha = false;
+    this.normalEnabled = false;
+    this.shadowReceiveEnabled = false;
+    this.m_dynColorEnabled = dynColorEnabled;
+    this.m_data = new Float32Array([1.0, 1.0, 1.0, 1.0]);
+    let oum = new ShaderUniformData_1.default();
+    oum.uniformNameList = ["u_color"];
+    oum.dataList = [this.m_data];
+    this.m_shaderUniformData = oum;
+  }
+
+  buildBuf() {
+    Line3DShaderBuffer.GetInstance().dynColorEnabled = this.m_dynColorEnabled;
+  }
+
+  getCodeBuf() {
+    return Line3DShaderBuffer.GetInstance();
+  }
+
+  setRGB3f(pr, pg, pb) {
+    this.m_data[0] = pr;
+    this.m_data[1] = pg;
+    this.m_data[2] = pb;
+  }
+
+  getRGB3f(color) {
+    let ds = this.m_data;
+    color.setRGB3f(ds[0], ds[1], ds[2]);
+  }
+
+  setRGBA4f(pr, pg, pb, pa) {
+    this.m_data[0] = pr;
+    this.m_data[1] = pg;
+    this.m_data[2] = pb;
+    this.m_data[3] = pa;
+  }
+
+  getRGBA4f(color) {
+    color.fromArray4(this.m_data);
+  }
+
+  setAlpha(pa) {
+    this.m_data[3] = pa;
+  }
+
+  getAlpha() {
+    return this.m_data[3];
+  }
+
+  setColor(color) {
+    color.toArray4(this.m_data);
+  }
+
+  getColor(color) {
+    color.fromArray4(this.m_data);
+  }
+
+}
+
+exports.default = Line3DMaterial;
 
 /***/ }),
 
@@ -11775,6 +11949,230 @@ class Stage3D extends StageBase_1.default {
 
 Stage3D.s_document = null;
 exports.default = Stage3D;
+
+/***/ }),
+
+/***/ "38de":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+/***************************************************************************/
+
+/*                                                                         */
+
+/*  Copyright 2018-2023 by                                                 */
+
+/*  Vily(vily313@126.com)                                                  */
+
+/*                                                                         */
+
+/***************************************************************************/
+
+var __importDefault = this && this.__importDefault || function (mod) {
+  return mod && mod.__esModule ? mod : {
+    "default": mod
+  };
+};
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const MathConst_1 = __importDefault(__webpack_require__("6e01"));
+
+const Vector3D_1 = __importDefault(__webpack_require__("8e17"));
+
+const AbsGeomBase_1 = __importDefault(__webpack_require__("f48d"));
+
+class RadialLine extends AbsGeomBase_1.default {
+  constructor() {
+    super(...arguments);
+    this.tv = new Vector3D_1.default(1.0, 0.0, 0.0);
+  }
+
+  update() {
+    this.tv.normalize();
+  }
+
+  updateFast() {
+    this.tv.normalize();
+  } // 射线和三个点表示的三角形是否相交
+
+
+  static IntersectionTri(rlpv, rltv, triva, trivb, trivc, outV) {
+    return 0;
+  } // 射线和两个点表示的线段是否相交
+
+
+  static IntersectionLS(rlpv, rltv, lspva, lspvb, outV, radius = 1.0) {
+    let pv = RadialLine.__tAv;
+    pv.copyFrom(lspvb);
+    pv.subtractBy(lspva);
+    pv.normalize();
+    Vector3D_1.default.Cross(rltv, pv, outV);
+    outV.normalize();
+    pv.w = outV.dot(rlpv) - outV.dot(lspvb);
+
+    if (Math.abs(pv.w) <= radius) {
+      // 两条直线已经相交
+      // outV 和 rlpv rltv 计算构成了一个平面
+      outV.crossBy(rltv);
+      outV.normalize();
+      outV.w = outV.dot(rlpv); // 计算 lspva 所在的直线与平面的交点
+      //let tv2:Vector3D = AbsGeomBase.__tV1;
+
+      pv.w = (outV.w - outV.dot(lspva)) / pv.dot(outV);
+      outV.copyFrom(pv);
+      outV.scaleBy(pv.w);
+      outV.addBy(lspva);
+      pv.copyFrom(outV);
+      pv.subtractBy(lspva);
+      let pv1 = AbsGeomBase_1.default.__tV1;
+      pv1.copyFrom(outV);
+      pv1.subtractBy(lspvb);
+
+      if (pv.dot(pv1) <= 0.0) {
+        return 1;
+      }
+    }
+
+    return 0;
+  }
+  /**
+   * @param rlpv 射线起点
+   * @param rltv  射线朝向
+   * @param cv 球心坐标
+   * @param radius 球体半径
+   * @param outV 如果相交，记录下交点
+   * @returns 检测得到距离射线起点最近的点, 1表示相交, 0表示不相交
+   */
+
+
+  static IntersectioNearSphere2(rlpv, rltv, cv, radius, outV) {
+    let pv = RadialLine.__tAv;
+    pv.x = cv.x - rlpv.x;
+    pv.y = cv.y - rlpv.y;
+    pv.z = cv.z - rlpv.z;
+    pv.w = pv.dot(rltv);
+    radius *= radius;
+
+    if (pv.w > MathConst_1.default.MATH_MIN_POSITIVE) {
+      outV.copyFrom(rltv);
+      outV.scaleBy(pv.w);
+      outV.subtractBy(pv);
+      pv.x = outV.getLengthSquared();
+
+      if (pv.x <= radius) {
+        // 远距离
+        //outV.w = pv.w + Math.sqrt(radius * radius - outV.getLengthSquared());
+        // 取近距离
+        pv.w -= Math.sqrt(radius - pv.x);
+        outV.copyFrom(rltv);
+        outV.scaleBy(pv.w);
+        outV.addBy(rlpv);
+        outV.w = 1.0;
+        return 1;
+      }
+    } else if (pv.getLengthSquared() <= radius) {
+      outV.copyFrom(rltv);
+      outV.scaleBy(pv.w);
+      outV.subtractBy(pv);
+      pv.x = outV.getLengthSquared();
+
+      if (pv.x <= radius) {
+        // 取远距离
+        pv.w += Math.sqrt(radius - pv.x);
+        outV.copyFrom(rltv);
+        outV.scaleBy(pv.w);
+        outV.addBy(rlpv);
+        outV.w = 1.0;
+        return 1;
+      }
+    }
+
+    return 0;
+  } // @return 检测得到距离射线起点最近的点, 1表示相交,0表示不相交
+
+
+  static IntersectioNearSphere(rlpv, rltv, cv, radius, outV) {
+    let pv = RadialLine.__tAv;
+    pv.x = cv.x - rlpv.x;
+    pv.y = cv.y - rlpv.y;
+    pv.z = cv.z - rlpv.z;
+    pv.w = pv.dot(rltv);
+
+    if (pv.w > MathConst_1.default.MATH_MIN_POSITIVE) {
+      outV.x = pv.x - pv.w * rltv.x;
+      outV.y = pv.y - pv.w * rltv.y;
+      outV.z = pv.z - pv.w * rltv.z;
+      outV.x = outV.getLengthSquared();
+      outV.w = radius * radius;
+
+      if (outV.x <= outV.w) {
+        // rlpv到远交点记作XP, rlpv到球心记作CP, CP到远交点记作RP
+        // 通过余弦定律得到一元二次方程得并且解这个方程得到 XP 的距离
+        // 获得CP距离的平方值
+        outV.x = pv.getLengthSquared(); // RP距离的平方值 减去 CP距离的平方值
+
+        outV.z = outV.w - outV.x; //	// 获得CP距离值
+        //	outV.w = Math.sqrt(outV.x);
+        // 准备计算 CP和XP 之间夹角a的余弦值, cos(a)值
+
+        pv.normalize(); // cos(a) 值 和 CP距离值相乘
+        //pv.y = pv.dot(rltv) * outV.w;
+
+        outV.y = pv.dot(rltv) * Math.sqrt(outV.x); // 求解方程的根,得到近些的距离
+
+        pv.w = (-outV.y + Math.sqrt(outV.y * outV.y + 4.0 * outV.z)) * 0.5;
+        outV.copyFrom(rltv);
+        outV.scaleBy(pv.w);
+        outV.addBy(rlpv);
+        outV.w = 1.0;
+        return 1;
+      }
+    } else {
+      outV.x = pv.getLengthSquared();
+      outV.w = radius * radius;
+
+      if (outV.x <= outV.w) {
+        outV.z = outV.w - outV.x;
+        pv.normalize();
+        outV.y = pv.dot(rltv) * Math.sqrt(outV.x); // 求解方程的根,得到远些的距离
+
+        pv.w = (-outV.y + Math.sqrt(outV.y * outV.y + 4.0 * outV.z)) * 0.5;
+        outV.copyFrom(rltv);
+        outV.scaleBy(pv.w);
+        outV.addBy(rlpv);
+        outV.w = 1.0;
+        return 1;
+      }
+    }
+
+    return 0;
+  }
+
+  static IntersectSphere(rlpv, rltv, cv, radius) {
+    let pv = RadialLine.__tAv;
+    pv.x = cv.x - rlpv.x;
+    pv.y = cv.y - rlpv.y;
+    pv.z = cv.z - rlpv.z;
+    pv.w = pv.dot(rltv);
+
+    if (pv.w < MathConst_1.default.MATH_MIN_POSITIVE) {
+      return pv.getLengthSquared() <= radius * radius;
+    }
+
+    pv.x -= pv.w * rltv.x;
+    pv.y -= pv.w * rltv.y;
+    pv.z -= pv.w * rltv.z;
+    return pv.getLengthSquared() <= radius * radius;
+  }
+
+}
+
+RadialLine.__tAv = new Vector3D_1.default();
+exports.default = RadialLine;
 
 /***/ }),
 
@@ -21342,8 +21740,8 @@ class URLFilter {
     return url;
   }
 
-  static getFileName(url, lowerCase = false) {
-    if (url.indexOf("blob:") < 0) {
+  static getFileName(url, lowerCase = false, force = false) {
+    if (url.indexOf("blob:") < 0 || force) {
       let i = url.lastIndexOf("/");
 
       if (i < 0) {
@@ -21370,8 +21768,8 @@ class URLFilter {
     return "";
   }
 
-  static getFileNameAndSuffixName(url, lowerCase = false) {
-    if (url.indexOf("blob:") < 0) {
+  static getFileNameAndSuffixName(url, lowerCase = false, force = false) {
+    if (url.indexOf("blob:") < 0 || force) {
       let i = url.lastIndexOf("/");
       let j = url.indexOf(".", i);
 
@@ -21391,8 +21789,8 @@ class URLFilter {
     return "";
   }
 
-  static getFileSuffixName(url, lowerCase = false) {
-    if (url.indexOf("blob:") < 0) {
+  static getFileSuffixName(url, lowerCase = false, force = false) {
+    if (url.indexOf("blob:") < 0 || force) {
       let i = url.lastIndexOf("/");
       let j = url.indexOf(".", i);
 
@@ -21958,9 +22356,13 @@ class CoDataModule {
         ]
       };
       this.m_dependencyGraphObj = dependencyGraphObj;
-      console.log("this.verTool.forceFiltering: ", this.verTool.forceFiltering);
       let loader = new CoModuleLoader_1.CoModuleLoader(1, null, this.verTool);
-      loader.forceFiltering = this.verTool.forceFiltering;
+
+      if (this.verTool) {
+        loader.forceFiltering = this.verTool.forceFiltering;
+        console.log("this.verTool.forceFiltering: ", this.verTool.forceFiltering);
+      }
+
       let urlChecker = loader.getUrlChecker();
 
       if (urlChecker) {
@@ -25932,6 +26334,227 @@ exports.default = ROTextureResource;
 
 /***/ }),
 
+/***/ "9c3c":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+/***************************************************************************/
+
+/*                                                                         */
+
+/*  Copyright 2018-2023 by                                                 */
+
+/*  Vily(vily313@126.com)                                                  */
+
+/*                                                                         */
+
+/***************************************************************************/
+
+var __importDefault = this && this.__importDefault || function (mod) {
+  return mod && mod.__esModule ? mod : {
+    "default": mod
+  };
+};
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const Vector3D_1 = __importDefault(__webpack_require__("8e17"));
+
+const RadialLine_1 = __importDefault(__webpack_require__("38de"));
+
+const AABB_1 = __importDefault(__webpack_require__("fecb"));
+
+const VtxBufConst_1 = __importDefault(__webpack_require__("8a0a"));
+
+const MeshBase_1 = __importDefault(__webpack_require__("cb29"));
+
+const ROVertexBuffer_1 = __importDefault(__webpack_require__("e7d2"));
+
+const RenderConst_1 = __webpack_require__("e08e");
+
+class DashedLineMesh extends MeshBase_1.default {
+  constructor(bufDataUsage = VtxBufConst_1.default.VTX_STATIC_DRAW) {
+    super(bufDataUsage);
+    this.m_vsVer = 0;
+    this.m_cvsVer = 0;
+    this.m_vs = null;
+    this.m_cvs = null;
+    this.m_lsTotal = 0; // 用于射线检测
+
+    this.rayTestRadius = 2.0;
+  }
+
+  getVS() {
+    return this.m_vs;
+  }
+
+  setVSData(data, offset = 0) {
+    if (data && this.m_vs != null && data.length + offset <= this.m_vs.length) {
+      this.m_vs.set(data, offset);
+      this.m_vsVer++;
+    }
+  }
+
+  setVS(vs) {
+    this.m_vs = vs;
+    this.m_vsVer++;
+  }
+
+  getCVS() {
+    return this.m_cvs;
+  }
+
+  setCVS(cvs) {
+    this.m_cvs = cvs;
+    this.m_cvsVer++;
+  }
+
+  updateData() {
+    if (this.m_vbuf != null) {
+      const rvb = ROVertexBuffer_1.default;
+      rvb.Reset();
+      rvb.AddFloat32DataVer(this.m_vsVer);
+      rvb.AddFloat32Data(this.m_vs, 3);
+
+      if (this.m_cvs == null) {
+        rvb.AddFloat32DataVer(this.m_cvsVer);
+        rvb.AddFloat32Data(this.m_cvs, 3);
+      }
+
+      rvb.UpdateBufData(this.m_vbuf);
+      this.buildEnd();
+    }
+  }
+
+  initialize(posarr, colors = null) {
+    if (this.m_vs != null || posarr.length >= 6) {
+      if (this.m_vs == null || this.m_vs.length != posarr.length) {
+        this.m_vs = new Float32Array(posarr);
+      } else {
+        if (posarr) {
+          if (posarr.length <= this.m_vs.length) {
+            this.m_vs.set(posarr);
+          } else {
+            this.m_vs = new Float32Array(posarr);
+          }
+        }
+      }
+
+      this.vtCount = Math.floor(this.m_vs.length / 3);
+      this.m_lsTotal = Math.floor(this.vtCount / 2);
+
+      if (this.bounds == null) {
+        this.bounds = new AABB_1.default();
+      }
+
+      this.bounds.addFloat32Arr(this.m_vs);
+      this.bounds.updateFast();
+      const rvb = ROVertexBuffer_1.default;
+      rvb.Reset();
+      rvb.AddFloat32DataVer(++this.m_vsVer);
+      rvb.AddFloat32Data(this.m_vs, 3); // console.log("this.m_vs: ",this.m_vs);
+      // console.log("colors: ",colors);
+
+      if (this.isVBufEnabledAt(VtxBufConst_1.default.VBUF_CVS_INDEX)) {
+        if (this.m_cvs == null) {
+          this.m_cvs = colors ? new Float32Array(colors) : new Float32Array(this.m_vs.length);
+          rvb.AddFloat32DataVer(++this.m_vsVer);
+        } else {
+          if (colors) {
+            rvb.AddFloat32DataVer(++this.m_cvsVer);
+          } else {
+            rvb.AddFloat32DataVer(this.m_cvsVer);
+          }
+        }
+
+        rvb.AddFloat32Data(this.m_cvs, 3);
+      }
+
+      rvb.vbWholeDataEnabled = this.vbWholeDataEnabled;
+
+      if (this.m_vbuf != null) {
+        rvb.UpdateBufData(this.m_vbuf);
+      } else {
+        let u = this.getBufDataUsage();
+        let f = this.getBufSortFormat();
+
+        if (this.vbWholeDataEnabled) {
+          this.m_vbuf = rvb.CreateBySaveData(u, f);
+        } else {
+          this.m_vbuf = rvb.CreateBySaveDataSeparate(u);
+        }
+      }
+
+      this.drawMode = RenderConst_1.RenderDrawMode.ARRAYS_LINES;
+      this.buildEnd();
+    }
+  }
+
+  setVSXYZAt(i, px, py, pz) {
+    if (this.m_vbuf) {
+      // ++this.m_vsVer;
+      this.m_vbuf.setData3fAt(i, 0, px, py, pz);
+      this.m_vbuf.updateF32DataVerAt(0);
+    }
+  }
+
+  isPolyhedral() {
+    return false;
+  }
+  /**
+   * 射线和自身的相交检测(多面体或几何函数(例如球体))
+   * @rlpv            表示物体坐标空间的射线起点
+   * @rltv            表示物体坐标空间的射线朝向
+   * @outV            如果检测相交存放物体坐标空间的交点
+   * @boundsHit       表示是否包围盒体已经和射线相交了
+   * @return          返回值 -1 表示不会进行检测,1表示相交,0表示不相交
+   */
+
+
+  testRay(rlpv, rltv, outV, boundsHit) {
+    let j = 0;
+    let vs = this.m_vs;
+    let flag = 0;
+    let radius = this.rayTestRadius;
+    let pv0 = DashedLineMesh.s_pv0;
+    let pv1 = DashedLineMesh.s_pv1;
+
+    for (let i = 0; i < this.m_lsTotal; ++i) {
+      pv0.setXYZ(vs[j], vs[j + 1], vs[j + 2]);
+      pv1.setXYZ(vs[j + 3], vs[j + 4], vs[j + 5]);
+      flag = RadialLine_1.default.IntersectionLS(rlpv, rltv, pv0, pv1, outV, radius);
+
+      if (flag > 0) {
+        return 1;
+      }
+
+      j += 6;
+    }
+
+    return 0;
+  }
+
+  __$destroy() {
+    if (this.isResFree()) {
+      this.bounds = null;
+      this.m_vs = null;
+      this.m_cvs = null;
+
+      super.__$destroy();
+    }
+  }
+
+}
+
+DashedLineMesh.s_pv0 = new Vector3D_1.default();
+DashedLineMesh.s_pv1 = new Vector3D_1.default();
+exports.default = DashedLineMesh;
+
+/***/ }),
+
 /***/ "9c4d":
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -29135,6 +29758,1099 @@ exports.default = ShaderData;
 
 /***/ }),
 
+/***/ "ae33":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+/***************************************************************************/
+
+/*                                                                         */
+
+/*  Copyright 2018-2023 by                                                 */
+
+/*  Vily(vily313@126.com)                                                  */
+
+/*                                                                         */
+
+/***************************************************************************/
+
+var __importDefault = this && this.__importDefault || function (mod) {
+  return mod && mod.__esModule ? mod : {
+    "default": mod
+  };
+};
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const MathConst_1 = __importDefault(__webpack_require__("6e01"));
+
+const RSEntityFlag_1 = __importDefault(__webpack_require__("11e6"));
+
+const Vector3D_1 = __importDefault(__webpack_require__("8e17"));
+
+const AABB_1 = __importDefault(__webpack_require__("fecb"));
+
+const Matrix4Pool_1 = __importDefault(__webpack_require__("2139"));
+
+const SpaceCullingMask_1 = __webpack_require__("cc48");
+
+class DisplayEntityContainer {
+  constructor(boundsEnabled = true, spaceEnabled = false, renderingFlow = false) {
+    this.m_uid = DisplayEntityContainer.s_uid++;
+    this.m_eventDispatcher = null;
+    this.m_spaceEnabled = false;
+    this.m_renderingFlow = false;
+    this.m_transformStatus = 0;
+    this.m_rotateBoo = false; // It is a flag that need inverted mat yes or no
+
+    this.m_invMatEnabled = false;
+    this.m_invLocMatEnabled = false;
+    this.m_oMatEnabled = false;
+    this.m_pos = new Vector3D_1.default();
+    this.m_visible = true;
+    this.m_parentVisible = true;
+    this.m_globalBounds = null;
+    this.m_gboundsStatus = -1; // 父级, 不允许外面其他代码调用
+
+    this.__$parent = null;
+    this.__$renderer = null;
+    this.m_entities = [];
+    this.m_entitiesTotal = 0;
+    this.m_children = [];
+    this.m_childrenTotal = 0;
+    /**
+     * entity global bounds version list
+     */
+
+    this.m_ebvers = null;
+    /**
+     * child container global bounds version list
+     */
+
+    this.m_cbvers = null;
+    this.m_$updateBounds = true;
+    /**
+     * renderer scene entity flag, be used by the renderer system
+     * 第0位到第19位总共20位存放自身在space中的 index id(最小值为1, 最大值为1048575,默认值是0, 也就是最多只能展示1048575个entitys),
+     * 第20位开始到26位为总共7位止存放在renderer中的状态数据(renderer unique id and others)
+     * 第27位存放是否在container里面
+     * 第28位开始到29位总共二位存放renderer 载入状态 的相关信息
+     * 第30位位存放是否渲染运行时排序
+     */
+
+    this.__$rseFlag = RSEntityFlag_1.default.DEFAULT; // 自身所在的world的唯一id, 通过这个id可以找到对应的world
+
+    this.__$wuid = -1;
+    /**
+     * render process uid
+     */
+
+    this.__$wprocuid = -1; // 自身在world中被分配的唯一id, 通过这个id就能在world中快速找到自己所在的数组位置
+
+    this.__$weid = -1; // 记录自身是否再容器中(取值为0和1), 不允许外外面其他代码调用
+
+    this.__$contId = 0;
+    this.uuid = "";
+    /**
+     * 可见性裁剪是否开启, 如果不开启，则摄像机和遮挡剔除都不会裁剪, 取值于 SpaceCullingMask, 默认只会有摄像机裁剪
+     */
+
+    this.spaceCullMask = SpaceCullingMask_1.SpaceCullingMask.CAMERA;
+    /**
+     * mouse interaction enabled
+     */
+
+    this.mouseEnabled = false;
+    this.m_rendering = true;
+    this.m_rst = 0;
+    this.m_rx = 0;
+    this.m_ry = 0;
+    this.m_rz = 0;
+    this.m_sx = 1.0;
+    this.m_sy = 1.0;
+    this.m_sz = 1.0; // local matrix
+
+    this.m_localMat = Matrix4Pool_1.default.GetMatrix();
+    this.m_invLocalMat = null; // local to world spcae matrix
+
+    this.m_omat = null; // word to local matrix
+
+    this.m_invOmat = null;
+    this.m_parentMat = null;
+
+    if (boundsEnabled) {
+      this.createBounds();
+    }
+
+    this.m_spaceEnabled = spaceEnabled;
+    this.m_renderingFlow = renderingFlow;
+  }
+
+  __$setRenderer(renderer) {
+    let i = 0;
+
+    if (this.__$renderer) {
+      if (renderer == null) {
+        // remove all entities from renderer with container
+        for (; i < this.m_entitiesTotal; ++i) {
+          this.__$renderer.removeEntity(this.m_entities[i]);
+        }
+      }
+
+      this.__$renderer = renderer;
+    } else {
+      this.__$renderer = renderer;
+
+      if (renderer) {
+        // add all entities into renderer
+        for (; i < this.m_entitiesTotal; ++i) {
+          const et = this.m_entities[i];
+          et.__$rseFlag = RSEntityFlag_1.default.RemoveContainerFlag(et.__$rseFlag);
+
+          this.__$renderer.addEntity(et, this.__$wprocuid, false);
+
+          et.__$rseFlag = RSEntityFlag_1.default.AddContainerFlag(et.__$rseFlag);
+        }
+      }
+    }
+
+    for (i = 0; i < this.m_childrenTotal; ++i) {
+      this.m_children[i].__$wprocuid = this.__$wprocuid;
+
+      this.m_children[i].__$setRenderer(renderer);
+    }
+  }
+
+  __$setParent(parent) {
+    if (parent != this && parent != this.__$parent) {
+      this.m_$updateBounds = true;
+      this.__$parent = parent;
+
+      if (parent != null) {
+        this.__$wprocuid = parent.__$wprocuid;
+        this.m_parentVisible = parent.__$getParentVisible() && parent.getVisible();
+
+        this.__$setRenderer(parent.__$renderer);
+      } else {
+        this.__$setRenderer(null);
+      }
+
+      this.__$setParentMatrix(parent);
+    }
+  }
+
+  isInRenderer() {
+    return this.__$wprocuid >= 0;
+  }
+
+  hasParent() {
+    return this.__$parent != null;
+  }
+
+  getRenderer() {
+    return this.__$renderer;
+  }
+
+  getParent() {
+    return this.__$parent;
+  }
+
+  getTransform() {
+    return null;
+  }
+  /**
+   * @returns 是否用于空间管理系统
+   */
+
+
+  isSpaceEnabled() {
+    return this.m_spaceEnabled;
+  }
+
+  isRendering() {
+    return this.m_rendering;
+  }
+
+  __$setRendering(r) {
+    this.m_rendering = r;
+  }
+
+  setRendering(rendering) {
+    // console.log("rendering: ", rendering);
+    this.m_rendering = rendering;
+
+    for (let i = 0; i < this.m_entitiesTotal; ++i) {
+      this.m_entities[i].setRendering(rendering);
+    }
+
+    for (let i = 0; i < this.m_childrenTotal; ++i) {
+      this.m_children[i].setRendering(rendering);
+    }
+  }
+
+  dispatchEvt(evt) {
+    // if (evt.getClassType() == MouseEvent.EventClassType) {
+    if (this.m_eventDispatcher != null) {
+      return this.m_eventDispatcher.dispatchEvt(evt);
+    } // }
+
+
+    return 0;
+  }
+
+  getEvtDispatcher(evtClassType) {
+    return this.m_eventDispatcher;
+  }
+
+  setEvtDispatcher(evtDisptacher) {
+    this.m_eventDispatcher = evtDisptacher;
+  }
+
+  createBounds() {
+    if (this.m_globalBounds == null) {
+      this.m_globalBounds = new AABB_1.default();
+      this.m_ebvers = [];
+      this.m_cbvers = [];
+    }
+  }
+  /**
+   * @return 返回true表示当前entity能被用于渲染
+   */
+
+
+  isDrawEnabled() {
+    return true;
+  }
+
+  getGlobalBounds() {
+    return this.m_globalBounds;
+  }
+
+  getLocalBounds() {
+    return null;
+  }
+
+  getGlobalBoundsVer() {
+    if (this.m_globalBounds != null) {
+      return this.m_globalBounds.version;
+    }
+
+    return -1;
+  }
+
+  getEntities() {
+    return this.m_entities;
+  }
+
+  getContainers() {
+    return this.m_children;
+  }
+
+  addChild(et) {
+    if (et != null) {
+      if (et.getREType() < 12) {
+        this.addEntity(et);
+        return;
+      }
+
+      let child = et;
+
+      if (child.__$wuid < 0 && child.__$contId < 1) {
+        let i = 0;
+
+        for (; i < this.m_childrenTotal; ++i) {
+          if (this.m_children[i] == child) {
+            return;
+          }
+        }
+
+        if (i >= this.m_childrenTotal) {
+          let flag = false;
+          let parent = this;
+
+          while (parent) {
+            if (parent.isSpaceEnabled()) {
+              flag = true;
+            }
+
+            parent = parent.getParent();
+          }
+
+          if (flag != child.isSpaceEnabled()) {
+            throw Error("flag != child.isSpaceEnabled(), illegal operation !!!");
+          }
+
+          if (this.m_cbvers != null) {
+            this.m_cbvers.push(-1);
+          }
+
+          child.spaceCullMask |= this.spaceCullMask;
+          child.__$contId = 1;
+          child.__$wprocuid = this.__$wprocuid;
+
+          child.__$setParent(this);
+
+          this.m_children.push(child);
+          this.m_childrenTotal++;
+        }
+      }
+    }
+  }
+
+  removeChild(et) {
+    if (et != null) {
+      if (et.getREType() < 12) {
+        this.removeEntity(et);
+        return;
+      }
+
+      let child = et;
+
+      if (child.getParent() == this) {
+        for (let i = 0; i < this.m_childrenTotal; ++i) {
+          if (this.m_children[i] == child) {
+            child.__$contId = 0;
+            child.__$wprocuid = -1;
+
+            child.__$setParent(null);
+
+            this.m_children.splice(i, 1);
+
+            if (this.m_cbvers != null) {
+              this.m_cbvers.slice(i, 1);
+            }
+
+            --this.m_childrenTotal;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  removeChildByUid(uid) {
+    if (uid > -1) {
+      for (let i = 0; i < this.m_childrenTotal; ++i) {
+        if (this.m_children[i].getUid() == uid) {
+          this.m_children[i].__$contId = 0;
+          this.m_children.splice(i, 1);
+
+          if (this.m_cbvers != null) {
+            this.m_cbvers.slice(i, 1);
+          }
+
+          --this.m_childrenTotal;
+          break;
+        }
+      }
+    }
+  }
+
+  getChildAt(i) {
+    if (i >= 0 && i < this.m_childrenTotal) {
+      return this.m_children[i];
+    }
+
+    return null;
+  }
+
+  getChildByUid(uid) {
+    if (uid > -1) {
+      for (let i = 0; i < this.m_entitiesTotal; ++i) {
+        if (this.m_entities[i].getUid() == uid) {
+          return this.m_entities[i];
+        }
+      }
+    }
+
+    return null;
+  }
+
+  getChildrenTotal() {
+    return this.m_childrenTotal;
+  }
+
+  addEntity(et) {
+    if (et != null) {
+      if (et.getREType() >= 12) {
+        this.addChild(et);
+        return;
+      }
+
+      let entity = et;
+
+      if (entity.getMesh() == null) {
+        throw Error("Error: entity.getMesh() == null.");
+      }
+
+      if (entity.__$testContainerEnabled()) {
+        let i = 0;
+
+        for (; i < this.m_entitiesTotal; ++i) {
+          if (this.m_entities[i] == entity) {
+            return;
+          }
+        }
+
+        if (i >= this.m_entitiesTotal) {
+          this.m_entities.push(entity);
+          this.m_entitiesTotal++;
+
+          if (this.m_ebvers != null) {
+            this.m_ebvers.push(-1);
+          }
+
+          entity.getTransform().setParentMatrix(this.getMatrix());
+          entity.spaceCullMask |= this.spaceCullMask;
+
+          entity.__$setParent(this);
+
+          if (this.__$renderer) {
+            //entity.__$contId = 0;
+            entity.__$rseFlag = RSEntityFlag_1.default.RemoveContainerFlag(entity.__$rseFlag);
+
+            this.__$renderer.addEntity(this.m_entities[i], this.__$wprocuid, false);
+          }
+
+          entity.__$rseFlag = RSEntityFlag_1.default.AddContainerFlag(entity.__$rseFlag);
+          entity.update();
+        }
+      }
+    }
+  }
+
+  removeEntity(et) {
+    if (et != null) {
+      if (et.getREType() >= 12) {
+        this.removeChild(et);
+        return;
+      }
+
+      let entity = et;
+
+      if (entity.__$getParent() == this) {
+        for (let i = 0; i < this.m_entitiesTotal; ++i) {
+          if (this.m_entities[i] == entity) {
+            entity.__$rseFlag = RSEntityFlag_1.default.RemoveContainerFlag(entity.__$rseFlag);
+
+            this.m_entities[i].__$setParent(null);
+
+            this.m_entities.splice(i, 1);
+
+            if (this.m_ebvers != null) {
+              this.m_ebvers.slice(i, 1);
+            }
+
+            --this.m_entitiesTotal;
+
+            if (this.__$renderer != null) {
+              this.__$renderer.removeEntity(entity);
+            }
+
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  removeEntityByUid(uid) {
+    if (uid > -1) {
+      for (let i = 0; i < this.m_entitiesTotal; ++i) {
+        if (this.m_entities[i].getUid() == uid) {
+          this.m_entities[i].__$rseFlag = RSEntityFlag_1.default.RemoveContainerFlag(this.m_entities[i].__$rseFlag);
+
+          this.m_entities[i].__$setParent(null);
+
+          if (this.__$renderer != null) {
+            this.__$renderer.removeEntity(this.m_entities[i]);
+          }
+
+          this.m_entities.splice(i, 1);
+
+          if (this.m_ebvers != null) {
+            this.m_ebvers.slice(i, 1);
+          }
+
+          --this.m_entitiesTotal;
+          break;
+        }
+      }
+    }
+  }
+
+  getEntityAt(i) {
+    if (i >= 0 && i < this.m_entitiesTotal) {
+      return this.m_entities[i];
+    }
+
+    return null;
+  }
+
+  getAllEntities() {
+    let entities = null;
+
+    if (this.m_entities != null) {
+      entities = this.m_entities.slice(0);
+    }
+
+    for (let i = 0; i < this.m_children.length; ++i) {
+      let list = this.m_children[i].getAllEntities();
+
+      if (list != null) {
+        entities = entities.concat(list);
+      }
+    }
+
+    return entities;
+  }
+
+  getEntityByUid(uid) {
+    if (uid > -1) {
+      for (let i = 0; i < this.m_entitiesTotal; ++i) {
+        if (this.m_entities[i].getUid() == uid) {
+          return this.m_entities[i];
+        }
+      }
+    }
+
+    return null;
+  }
+
+  getEntitiesTotal() {
+    return this.m_entitiesTotal;
+  }
+
+  sphereIntersect(centerV, radius) {
+    return false;
+  }
+
+  setRenderState(rst) {
+    this.m_rst = rst;
+
+    for (let i = 0; i < this.m_entities.length; ++i) {
+      this.m_entities[i].setRenderState(rst);
+    }
+
+    for (let i = 0; i < this.m_children.length; ++i) {
+      this.m_children[i].setRenderState(rst);
+    }
+  }
+
+  getRenderState() {
+    return this.m_rst;
+  }
+
+  __$getParentVisible() {
+    return this.m_parentVisible;
+  }
+
+  __$updateVisible() {
+    if (this.__$parent != null) {
+      this.m_parentVisible = this.__$parent.__$getParentVisible() && this.__$parent.getVisible();
+    }
+
+    let i = 0; //console.log("this.m_visible: "+this.m_visible+", this.m_parentVisible: "+this.m_parentVisible);
+
+    let boo = this.m_visible && this.m_parentVisible;
+
+    for (; i < this.m_entitiesTotal; ++i) {
+      this.m_entities[i].__$setDrawEnabled(boo);
+    }
+
+    for (i = 0; i < this.m_childrenTotal; ++i) {
+      this.m_children[i].__$updateVisible();
+    }
+  }
+
+  setVisible(boo) {
+    this.m_visible = boo;
+
+    this.__$updateVisible();
+
+    return this;
+  }
+
+  getVisible() {
+    return this.m_visible;
+  }
+
+  isVisible() {
+    return this.m_visible;
+  }
+
+  getREType() {
+    return this.m_renderingFlow ? 20 : 12;
+  }
+  /**
+   * @returns 自身是否未必任何渲染器相关的系统使用
+   */
+
+
+  isFree() {
+    return this.__$rseFlag == RSEntityFlag_1.default.DEFAULT;
+  }
+
+  getUid() {
+    return this.m_uid;
+  }
+
+  getX() {
+    return this.m_pos.x;
+  }
+
+  getY() {
+    return this.m_pos.y;
+  }
+
+  getZ() {
+    return this.m_pos.z;
+  }
+
+  setX(p) {
+    this.m_pos.x = p;
+    this.m_transformStatus |= 1;
+  }
+
+  setY(p) {
+    this.m_pos.y = p;
+    this.m_transformStatus |= 1;
+  }
+
+  setZ(p) {
+    this.m_pos.z = p;
+    this.m_transformStatus |= 1;
+  }
+
+  setXYZ(px, py, pz) {
+    this.m_pos.x = px;
+    this.m_pos.y = py;
+    this.m_pos.z = pz;
+    this.m_transformStatus |= 1;
+    return this;
+  }
+
+  offsetPosition(pv) {
+    this.m_pos.x += pv.x;
+    this.m_pos.y += pv.y;
+    this.m_pos.z += pv.z;
+    this.m_transformStatus |= 1;
+  }
+
+  setPosition(pv) {
+    this.m_pos.x = pv.x;
+    this.m_pos.y = pv.y;
+    this.m_pos.z = pv.z;
+    this.m_transformStatus |= 1;
+    return this;
+  }
+
+  getPosition(pv = null) {
+    if (!pv) pv = new Vector3D_1.default();
+    pv.copyFrom(this.m_pos);
+    return pv;
+  }
+
+  getRotationX() {
+    return this.m_rx;
+  }
+
+  getRotationY() {
+    return this.m_ry;
+  }
+
+  getRotationZ() {
+    return this.m_rz;
+  }
+
+  setRotationX(degrees) {
+    this.m_rx = degrees;
+    this.m_transformStatus |= 2;
+    this.m_rotateBoo = true;
+  }
+
+  setRotationY(degrees) {
+    this.m_ry = degrees;
+    this.m_transformStatus |= 2;
+    this.m_rotateBoo = true;
+  }
+
+  setRotationZ(degrees) {
+    this.m_rz = degrees;
+    this.m_transformStatus |= 2;
+    this.m_rotateBoo = true;
+  }
+
+  setRotation3(r) {
+    this.m_rx = r.x;
+    this.m_transformStatus |= 2;
+    this.m_rotateBoo = true;
+    this.m_ry = r.y;
+    this.m_rz = r.z;
+    return this;
+  }
+
+  setRotationXYZ(rx, ry, rz) {
+    this.m_rx = rx;
+    this.m_ry = ry;
+    this.m_rz = rz;
+    this.m_transformStatus |= 2;
+    this.m_rotateBoo = true;
+    return this;
+  }
+
+  getScaleX() {
+    return this.m_sx;
+  }
+
+  getScaleY() {
+    return this.m_sy;
+  }
+
+  getScaleZ() {
+    return this.m_sz;
+  }
+
+  setScaleX(p) {
+    this.m_sx = p;
+    this.m_transformStatus |= 2;
+  }
+
+  setScaleY(p) {
+    this.m_sy = p;
+    this.m_transformStatus |= 2;
+  }
+
+  setScaleZ(p) {
+    this.m_sz = p;
+    this.m_transformStatus |= 2;
+  }
+
+  setScaleXYZ(sx, sy, sz) {
+    this.m_sx = sx;
+    this.m_sy = sy;
+    this.m_sz = sz;
+    this.m_transformStatus |= 2;
+    return this;
+  }
+
+  setScale3(sv) {
+    this.setScaleXYZ(sv.x, sv.y, sv.z);
+  }
+
+  setScaleXY(sx, sy) {
+    this.setScaleXYZ(sx, sy, this.m_sz);
+  }
+
+  setScale(s) {
+    this.setScaleXYZ(s, s, s);
+  }
+
+  getRotationXYZ(pv) {
+    if (!pv) pv = new Vector3D_1.default();
+    pv.setXYZ(this.m_rx, this.m_ry, this.m_rz);
+    return pv;
+  }
+
+  getScaleXYZ(pv) {
+    if (!pv) pv = new Vector3D_1.default();
+    pv.setXYZ(this.m_sx, this.m_sy, this.m_sz);
+    return pv;
+  }
+
+  localToParent(pv) {
+    this.m_localMat.transformVectorSelf(pv);
+  }
+
+  parentToLocal(pv) {
+    if (this.m_invLocalMat != null) {
+      if (this.m_invLocMatEnabled) {
+        this.m_invLocMatEnabled = false;
+        this.m_invLocalMat.copyFrom(this.m_localMat);
+      }
+    } else {
+      this.m_localMat = Matrix4Pool_1.default.GetMatrix();
+      this.m_invLocMatEnabled = false;
+    }
+
+    this.m_invLocalMat.transformVectorSelf(pv);
+  }
+
+  localToGlobal(pv) {
+    this.getMatrix().transformVectorSelf(pv);
+    return this;
+  }
+
+  globalToLocal(pv) {
+    this.getInvMatrix().transformVectorSelf(pv);
+    return this;
+  }
+
+  getInvMatrix() {
+    if (this.m_invOmat != null) {
+      if (this.m_invMatEnabled) {
+        this.m_invOmat.copyFrom(this.getMatrix());
+        this.m_invOmat.invert();
+        this.m_invMatEnabled = false;
+      }
+    } else {
+      this.m_invOmat = Matrix4Pool_1.default.GetMatrix();
+      this.m_invOmat.copyFrom(this.getMatrix());
+      this.m_invOmat.invert();
+    }
+
+    this.m_invMatEnabled = false;
+    return this.m_invOmat;
+  }
+
+  getLocalMatrix() {
+    return this.m_localMat;
+  } // local to world matrix
+
+
+  getMatrix() {
+    if (this.m_parentMat != null) {
+      if (this.m_oMatEnabled) {
+        this.m_omat.copyFrom(this.m_localMat);
+        this.m_omat.append(this.m_parentMat);
+        this.m_oMatEnabled = false;
+      }
+
+      return this.m_omat;
+    } else {
+      this.m_oMatEnabled = false;
+      return this.m_localMat;
+    }
+  }
+
+  __$setParentMatrix(parent) {
+    this.m_parentMat = parent.getMatrix();
+
+    if (this.m_parentMat != null) {
+      if (this.m_omat == null) {
+        this.m_omat = Matrix4Pool_1.default.GetMatrix();
+      }
+    }
+
+    this.m_transformStatus |= 2; //this.update();
+
+    let i = 0;
+
+    for (; i < this.m_childrenTotal; ++i) {
+      this.m_children[i].__$setParentMatrix(this);
+    }
+  }
+
+  __$updateBoundsDo() {
+    let i = 0;
+
+    if (this.m_$updateBounds) {
+      this.m_$updateBounds = false;
+
+      if (this.m_globalBounds != null) {
+        this.m_globalBounds.reset();
+        let bounds = null;
+
+        for (; i < this.m_entitiesTotal; ++i) {
+          bounds = this.m_entities[i].getGlobalBounds();
+
+          if (bounds != null) {
+            this.m_globalBounds.union(bounds);
+          }
+
+          this.m_ebvers[i] != this.m_entities[i].getGlobalBoundsVer();
+        }
+
+        for (i = 0; i < this.m_childrenTotal; ++i) {
+          this.m_children[i].__$updateBoundsDo();
+
+          bounds = this.m_children[i].getGlobalBounds();
+
+          if (bounds != null) {
+            this.m_globalBounds.union(bounds);
+          }
+
+          this.m_cbvers[i] != this.m_children[i].getGlobalBoundsVer();
+        }
+
+        this.m_globalBounds.update();
+      }
+    } else {
+      for (i = 0; i < this.m_childrenTotal; ++i) {
+        this.m_children[i].__$updateBoundsDo();
+      }
+    }
+  }
+
+  __$updateBounds() {
+    this.m_$updateBounds = true;
+  }
+
+  updateBounds() {
+    const gb = this.m_globalBounds;
+
+    if (gb && this.m_gboundsStatus > 0) {
+      let i = 0;
+
+      if (this.m_gboundsStatus < 2) {
+        // 表示父级和子集的global bounds都要发生变化
+        for (; i < this.m_childrenTotal; ++i) {
+          this.m_children[i].updateBounds();
+        }
+      }
+
+      gb.reset();
+      i = 0;
+      let bounds = null;
+
+      for (; i < this.m_entitiesTotal; ++i) {
+        // this.m_entities[i].update();
+        bounds = this.m_entities[i].getGlobalBounds();
+
+        if (bounds != null) {
+          gb.union(bounds);
+        }
+
+        this.m_ebvers[i] = this.m_entities[i].getGlobalBoundsVer();
+      }
+
+      for (i = 0; i < this.m_childrenTotal; ++i) {
+        bounds = this.m_children[i].getGlobalBounds();
+
+        if (bounds != null) {
+          gb.union(bounds);
+        }
+
+        this.m_cbvers[i] = this.m_children[i].getGlobalBoundsVer();
+      }
+
+      gb.update();
+
+      if (this.__$parent != null) {
+        // 只需要父级执行bounds尺寸范围的调节
+        let parent = this.__$parent;
+
+        while (parent != null) {
+          parent.__$updateBounds();
+
+          parent = parent.getParent();
+        }
+      }
+
+      this.m_gboundsStatus = -1;
+    }
+  }
+
+  update() {
+    if (this.m_localMat != null) {
+      if (this.m_transformStatus > 0) {
+        this.m_localMat.identity();
+
+        if (this.m_rotateBoo) {
+          this.m_localMat.setScaleXYZ(this.m_sx, this.m_sy, this.m_sz);
+          this.m_localMat.setRotationEulerAngle(this.m_rx * MathConst_1.default.MATH_PI_OVER_180, this.m_ry * MathConst_1.default.MATH_PI_OVER_180, this.m_rz * MathConst_1.default.MATH_PI_OVER_180);
+          this.m_localMat.setTranslation(this.m_pos);
+        } else {
+          this.m_localMat.setScaleXYZ(this.m_sx, this.m_sy, this.m_sz);
+          this.m_localMat.setTranslation(this.m_pos);
+        }
+
+        this.m_invMatEnabled = true;
+        this.m_oMatEnabled = true;
+        this.m_invLocMatEnabled = true; // 把平移与旋转缩放分开，是不是能增加效能?
+
+        this.m_transformStatus = 0; //console.log("DisplayEntityContainer::update(), this: "+this);
+        //console.log("DisplayEntityContainer::update(), this.getMatrix(): "+this.getMatrix().toString());
+        //console.log("this.m_entitiesTotal: "+this.m_entitiesTotal+", this: "+this);
+
+        let i = 0;
+
+        for (; i < this.m_entitiesTotal; ++i) {
+          //console.log("this.m_entities["+i+"].getTransform().");
+          this.m_entities[i].getTransform().setParentMatrix(this.getMatrix()); //if(this.m_entities[i].__$wuid > -1)this.m_entities[i].update();
+
+          this.m_entities[i].update();
+        } // 重构自己的AABB
+        // 通知子集自己的 transform信息变了
+
+
+        for (i = 0; i < this.m_childrenTotal; ++i) {
+          this.m_children[i].__$setParentMatrix(this);
+
+          this.m_children[i].update();
+        } // 依次通知父级一些信息, 例如aabb需要重新计算, 注意，这里可能因为上面的几步操作子级和父级相互循环调用，出现堆栈溢出
+        // 容器本身不需要localBounds
+        // bounds变化的诱因: a.自身的transform发生变化(可能这个变化来自于父级的transform变化);b.包含的entity发生了transform变换或者mesh数据变换;
+        // c.子类出现了a或者b的情况
+        // m_gboundsStatus 为1, 表示容器自身发生了tansform变化因此自身的子集需要做global bounds的变化, 而父级的bounds需要做对应的重新计算而不要影响到子集
+
+
+        this.m_gboundsStatus = 1;
+      } else {
+        // 这样的话会导致这里每帧都会被执行
+        this.m_gboundsStatus = -1;
+        let i = 0;
+
+        if (this.m_entitiesTotal > 0) {
+          for (; i < this.m_entitiesTotal; ++i) {
+            this.m_entities[i].update();
+
+            if (this.m_ebvers[i] != this.m_entities[i].getGlobalBoundsVer()) {
+              this.m_gboundsStatus = 2;
+            }
+          }
+        } // 如果 m_gboundsStatus 为2, 则表示自身的 bounds 因为自身的 entity 的bounds变化,父级的bounds需要做对应的重新计算而不要影响到子集
+
+
+        if (this.m_childrenTotal > 0) {
+          for (i = 0; i < this.m_childrenTotal; ++i) {
+            this.m_children[i].update();
+
+            if (this.m_cbvers[i] != this.m_children[i].getGlobalBoundsVer()) {
+              this.m_gboundsStatus = 2; //break;
+            }
+          }
+        } // 如果 m_gboundsStatus 为2, 则表示子容器的 bounds 发生了变化, 父级的bounds需要做对应的重新计算而不要影响到子集
+
+      }
+
+      this.updateBounds();
+
+      this.__$updateBoundsDo();
+    }
+  } //// local to world matrix, 使用的时候注意数据安全->防止多个显示对象拥有而出现多次修改的问题,因此此函数尽量不要用
+
+
+  destroy() {
+    // 当自身被完全移出RenderWorld之后才能执行自身的destroy
+    if (this.__$wuid < 0 && this.isFree()) {
+      if (this.m_eventDispatcher != null) {
+        this.m_eventDispatcher.destroy();
+        this.m_eventDispatcher = null;
+      }
+
+      if (this.m_omat != null && this.m_omat != this.m_localMat) Matrix4Pool_1.default.RetrieveMatrix(this.m_omat);
+      if (this.m_invOmat != null) Matrix4Pool_1.default.RetrieveMatrix(this.m_invOmat);
+      if (this.m_localMat != null) Matrix4Pool_1.default.RetrieveMatrix(this.m_localMat);
+      if (this.m_invLocalMat != null) Matrix4Pool_1.default.RetrieveMatrix(this.m_invLocalMat);
+      this.m_localMat = null;
+      this.m_invLocalMat = null;
+      this.m_invOmat = null;
+      this.m_parentMat = null;
+      this.m_omat = null;
+    }
+  }
+
+}
+
+DisplayEntityContainer.s_uid = 0;
+exports.default = DisplayEntityContainer;
+
+/***/ }),
+
 /***/ "af29":
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -31510,6 +33226,176 @@ class ShaderUniformData {
 }
 
 exports.default = ShaderUniformData;
+
+/***/ }),
+
+/***/ "b9b5":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+/***************************************************************************/
+
+/*                                                                         */
+
+/*  Copyright 2018-2023 by                                                 */
+
+/*  Vily(vily313@126.com)                                                  */
+
+/*                                                                         */
+
+/***************************************************************************/
+
+var __importDefault = this && this.__importDefault || function (mod) {
+  return mod && mod.__esModule ? mod : {
+    "default": mod
+  };
+};
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const DashedLineMesh_1 = __importDefault(__webpack_require__("9c3c"));
+
+const DisplayEntity_1 = __importDefault(__webpack_require__("402a"));
+
+const Color4_1 = __importDefault(__webpack_require__("3930"));
+
+const Line3DMaterial_1 = __importDefault(__webpack_require__("32cc"));
+
+const Vector3D_1 = __importDefault(__webpack_require__("8e17"));
+
+class Axis3DEntity extends DisplayEntity_1.default {
+  constructor() {
+    super();
+    this.m_sm = null; // 用于射线检测
+
+    this.rayTestRadius = 8.0;
+    this.m_posarr = [0, 0, 0, 100.0, 0, 0, 0, 0, 0, 0, 100.0, 0, 0, 0, 0, 0, 0, 100.0];
+    this.colorX = new Color4_1.default(1.0, 0.0, 0.0, 1.0);
+    this.colorY = new Color4_1.default(0.0, 1.0, 0.0, 1.0);
+    this.colorZ = new Color4_1.default(0.0, 0.0, 1.0, 1.0);
+  }
+
+  setLineWidth(lineW) {//if(this.getMesh())
+    //{
+    //    //this.getMesh().vbuf.lineWidth = lineW;
+    //}
+  }
+
+  createMaterial() {
+    if (this.getMaterial() == null) {
+      let cm = new Line3DMaterial_1.default();
+      this.setMaterial(cm);
+    }
+  }
+
+  __activeMesh(material) {
+    if (this.getMesh() == null) {
+      let colorarr = [this.colorX.r, this.colorX.g, this.colorX.b, this.colorX.r, this.colorX.g, this.colorX.b, this.colorY.r, this.colorY.g, this.colorY.b, this.colorY.r, this.colorY.g, this.colorY.b, this.colorZ.r, this.colorZ.g, this.colorZ.b, this.colorZ.r, this.colorZ.g, this.colorZ.b];
+      let mesh = new DashedLineMesh_1.default();
+      mesh.rayTestRadius = this.rayTestRadius;
+      mesh.vbWholeDataEnabled = false;
+      mesh.setBufSortFormat(material.getBufSortFormat());
+      mesh.initialize(this.m_posarr, colorarr);
+      this.setMesh(mesh);
+      this.m_sm = mesh;
+    }
+  }
+
+  updateDataWithPos(axisXPos, axisYPos, axisZPos) {
+    let ls = this.m_posarr;
+    axisXPos.toArray(ls, 3);
+    axisYPos.toArray(ls, 9);
+    axisZPos.toArray(ls, 15);
+    this.m_sm.setVSData(this.m_posarr);
+    this.m_sm.updateData();
+  }
+  /**
+   * initialize the axis entity mesh and geometry data
+   * @param axisSize the X/Y/Z axis length
+   */
+
+
+  initialize(axisSize = 100.0) {
+    if (axisSize < 1) {
+      axisSize = 1;
+    }
+
+    this.m_posarr[3] = axisSize;
+    this.m_posarr[10] = axisSize;
+    this.m_posarr[17] = axisSize;
+    this.createMaterial();
+    this.activeDisplay();
+  }
+  /**
+   * initialize the axis entity mesh and geometry data
+   * @param sizeX the X axis length
+   * @param sizeY the Y axis length
+   * @param sizeZ the Z axis length
+   */
+
+
+  initializeSizeXYZ(sizeX, sizeY, sizeZ) {
+    this.m_posarr[3] = sizeX;
+    this.m_posarr[10] = sizeY;
+    this.m_posarr[17] = sizeZ;
+    this.createMaterial();
+    this.activeDisplay();
+  }
+
+  initializeCorssSizeXYZ(sizeX, sizeY, sizeZ) {
+    //  this.m_posarr[3] = sizeX;
+    //  this.m_posarr[10] = sizeY;
+    //  this.m_posarr[17] = sizeZ;
+    sizeX *= 0.5;
+    sizeY *= 0.5;
+    sizeZ *= 0.5;
+    this.m_posarr[0] = -sizeX;
+    this.m_posarr[7] = -sizeY;
+    this.m_posarr[14] = -sizeZ;
+    this.m_posarr[3] = sizeX;
+    this.m_posarr[10] = sizeY;
+    this.m_posarr[17] = sizeZ;
+    this.createMaterial();
+    this.activeDisplay();
+  }
+  /**
+   * initialize the cross axis entity mesh and geometry data
+   * @param axisSize the X/Y/Z axis length
+   */
+
+
+  initializeCross(axisSize = 100.0, offset = null) {
+    if (axisSize < 2) {
+      axisSize = 2;
+    }
+
+    axisSize *= 0.5;
+
+    if (offset == null) {
+      offset = new Vector3D_1.default();
+    }
+
+    this.m_posarr[0] = -axisSize + offset.x;
+    this.m_posarr[7] = -axisSize + offset.y;
+    this.m_posarr[14] = -axisSize + offset.z;
+    this.m_posarr[3] = axisSize + offset.x;
+    this.m_posarr[10] = axisSize + offset.y;
+    this.m_posarr[17] = axisSize + offset.z;
+    this.createMaterial();
+    this.activeDisplay();
+  }
+
+  destroy() {
+    super.destroy();
+    this.m_sm = null;
+  }
+
+}
+
+exports.default = Axis3DEntity;
 
 /***/ }),
 
@@ -43262,9 +45148,13 @@ const MouseInteraction_1 = __webpack_require__("6cb9");
 
 const MeshFactory_1 = __importDefault(__webpack_require__("0238"));
 
+const Axis3DEntity_1 = __importDefault(__webpack_require__("b9b5"));
+
 const URLFilter_1 = __importDefault(__webpack_require__("7aa4"));
 
 const HttpFileLoader_1 = __webpack_require__("5b39");
+
+const DisplayEntityContainer_1 = __importDefault(__webpack_require__("ae33"));
 
 class VVF {
   isEnabled() {
@@ -43284,7 +45174,10 @@ class RModelSCViewer {
     this.m_teamLoader = null; //new CoModelTeamLoader();
 
     this.m_layouter = new EntityLayouter_1.EntityLayouter();
-    this.m_baseSize = 300;
+    this.m_entityContainer = new DisplayEntityContainer_1.default();
+    this.m_entities = [];
+    this.m_modelDataUrl = "";
+    this.m_baseSize = 200;
     this.m_dropEnabled = true;
   }
 
@@ -43323,17 +45216,37 @@ class RModelSCViewer {
     }, null, null, "json");
   }
 
-  initialize(div, initCallback = null) {
+  createDiv(px, py, pw, ph) {
+    let div = document.createElement("div");
+    div.style.width = pw + "px";
+    div.style.height = ph + "px";
+    document.body.appendChild(div);
+    div.style.display = "bolck";
+    div.style.left = px + "px";
+    div.style.top = py + "px";
+    div.style.position = "absolute";
+    div.style.display = "bolck";
+    div.style.position = "absolute";
+    return div;
+  }
+
+  initialize(div = null, initCallback = null, zAxisUp = false) {
     console.log("RModelSCViewer::initialize()......");
 
     if (this.m_rscene == null) {
       RendererDevice_1.default.SHADERCODE_TRACE_ENABLED = false;
       RendererDevice_1.default.VERT_SHADER_PRECISION_GLOBAL_HIGHP_ENABLED = true;
-      let rparam = new RendererParam_1.default(div);
+      let rparam = new RendererParam_1.default(div ? div : this.createDiv(0, 0, 512, 512));
       rparam.autoSyncRenderBufferAndWindowSize = false;
       rparam.setCamProject(45, 0.1, 2000.0);
       rparam.setCamPosition(800.0, 800.0, 800.0);
-      rparam.setCamUpDirect(0.0, 0.0, 1.0);
+
+      if (zAxisUp || div == null) {
+        rparam.setCamUpDirect(0.0, 0.0, 1.0);
+      } else {
+        rparam.setCamUpDirect(0.0, 1.0, 0.0);
+      }
+
       rparam.setAttriAntialias(true);
       this.m_rscene = new RendererScene_1.default();
       this.m_rscene.initialize(rparam).setAutoRunning(true);
@@ -43347,10 +45260,10 @@ class RModelSCViewer {
       // cone.setRotationXYZ(90,0,0);
       // cone.setXYZ(-0.8 * unit, 0, 1.6 * unit)
       // this.m_rscene.addEntity(cone);
-      // let axis = new Axis3DEntity();
-      // axis.initialize(300)
-      // this.m_rscene.addEntity(axis);
-      // let cam = this.m_rscene.getCamera()
+
+      let axis = new Axis3DEntity_1.default();
+      axis.initialize(300);
+      this.m_rscene.addEntity(axis); // let cam = this.m_rscene.getCamera()
       // console.log("cam.getViewMatrix(): ")
       // console.log(cam.getViewMatrix().toString())
       // let mat = cam.getViewMatrix().clone();
@@ -43363,18 +45276,27 @@ class RModelSCViewer {
       this.initSys(); // let vs = this.getCameraData(1.0);
       // console.log("getCameraData(), vs: ", vs);
 
-      this.m_dropController.initialize(this.m_rscene.getRenderProxy().getCanvas(), this);
-      this.loadInfo(initCallback);
+      this.m_layouter.locationEnabled = false;
+
+      if (div) {
+        this.m_dropController.initialize(this.m_rscene.getRenderProxy().getCanvas(), this);
+        this.loadInfo(initCallback);
+      } else {
+        this.m_teamLoader = new CoModelTeamLoader_1.CoModelTeamLoader();
+        this.initModels();
+      }
+
+      this.m_rscene.addEntity(this.m_entityContainer);
     }
   }
 
-  initSceneByFiles(files, loadingCallback, size = 300) {
+  initSceneByFiles(files, loadingCallback, size = 200) {
     this.m_baseSize = size;
     this.m_loadingCallback = loadingCallback;
     this.m_dropController.initFilesLoad(files);
   }
 
-  initSceneByUrls(urls, types, loadingCallback, size = 300) {
+  initSceneByUrls(urls, types, loadingCallback, size = 200) {
     this.m_baseSize = size;
     this.m_loadingCallback = loadingCallback;
     let loader = this.m_teamLoader;
@@ -43382,10 +45304,12 @@ class RModelSCViewer {
       this.m_layouter.layoutReset();
 
       for (let i = 0; i < models.length; ++i) {
-        this.createEntity(models[i], transforms != null ? transforms[i] : null, 2.00);
+        this.createEntity(models[i], transforms != null ? transforms[i] : null, 2.0);
       }
 
-      this.m_layouter.layoutUpdate(size, new Vector3D_1.default(0, 0, 0));
+      this.m_modelDataUrl = urls[0] + "." + types[0];
+      console.log("XXXXXX initSceneByUrls() this.m_modelDataUrl: ", this.m_modelDataUrl);
+      this.fitEntitiesSize();
 
       if (this.m_loadingCallback) {
         this.m_loadingCallback(1.0);
@@ -43393,11 +45317,34 @@ class RModelSCViewer {
     });
   }
 
-  getCameraData(posScale) {
+  fitEntitiesSize() {
+    this.m_layouter.layoutUpdate(this.m_baseSize, new Vector3D_1.default(0, 0, 0));
+    let container = this.m_entityContainer;
+    let format = URLFilter_1.default.getFileSuffixName(this.m_modelDataUrl, true, true);
+    console.log("XXXXXX fitEntitiesSize() this.m_modelDataUrl: ", this.m_modelDataUrl);
+    console.log("format: ", format);
+
+    switch (format) {
+      case "obj":
+        container.setRotationXYZ(90, 0, 0);
+        break;
+
+      default:
+        break;
+    }
+
+    container.update();
+  }
+
+  getCameraData(posScale, transpose = false) {
     let cam = this.m_rscene.getCamera();
     let mat = cam.getViewMatrix().clone();
     mat.invert();
-    mat.transpose();
+
+    if (transpose) {
+      mat.transpose();
+    }
+
     let vs = mat.getLocalFS32().slice(0);
     vs[3] *= posScale;
     vs[7] *= posScale;
@@ -43426,15 +45373,19 @@ class RModelSCViewer {
   initModels() {
     let url0 = "static/private/fbx/soleBig01_unwrapuv.fbx";
     url0 = "static/private/obj/box01.obj";
+    url0 = "static/assets/obj/scene01.obj";
+    url0 = "static/assets/fbx/scene03.fbx";
     let loader = this.m_teamLoader;
-    loader.load([url0], (models, transforms) => {
+    let urls = [url0];
+    loader.load(urls, (models, transforms) => {
       this.m_layouter.layoutReset();
 
       for (let i = 0; i < models.length; ++i) {
-        this.createEntity(models[i], transforms != null ? transforms[i] : null, 2.00);
+        this.createEntity(models[i], transforms != null ? transforms[i] : null, 2.0);
       }
 
-      this.m_layouter.layoutUpdate(300, new Vector3D_1.default(0, 0, 0));
+      this.m_modelDataUrl = urls[0];
+      this.fitEntitiesSize();
     });
   }
 
@@ -43449,15 +45400,26 @@ class RModelSCViewer {
       let entity = new DisplayEntity_1.default();
       entity.setRenderState(RendererState_1.default.NONE_CULLFACE_NORMAL_STATE);
       entity.setMesh(mesh);
-      entity.setMaterial(material);
-      this.m_rscene.addEntity(entity);
+      entity.setMaterial(material); // this.m_rscene.addEntity(entity);
+
+      entity.update(); // this.m_entities.push( entity );
+
       this.m_layouter.layoutAppendItem(entity, new Matrix4_1.default(transform));
+      this.m_entityContainer.addChild(entity);
       return entity;
     }
   }
 
   mouseDown(evt) {
     console.log("mouse down.");
+    let camdvs = this.getCameraData(0.01, true);
+    console.log("	camdvs: ", camdvs);
+    /*
+    -0.7071067690849304, -0.40824827551841736, 0.5773502588272095, 7.295821666717529,
+    0.70710676908493040, -0.40824827551841736, 0.5773502588272095, 7.295821666717529,
+    0.00000000000000000, 0.816496551036834700, 0.5773502588272095, 7.295821666717529,
+    -0.0000000000000000, 0.000000000000000000, -0.000000000000000, 1.000000000000000
+    */
   }
 
 }
