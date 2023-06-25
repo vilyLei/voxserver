@@ -22,6 +22,7 @@ type RTaskInfoNode struct {
 	Name             string      `json:"name"`
 	ResUrl           string      `json:"resUrl"`
 	Resolution       [2]int      `json:"resolution"`
+	BGTransparent    int         `json:"bgTransparent"`
 	Camdvs           [16]float64 `json:"camdvs"`
 	Phase            string      `json:"phase"`
 	Action           string      `json:"action"`
@@ -63,11 +64,13 @@ func (self *RTaskInfoNode) SetCamdvsWithStr(camdvsStr string) {
 	}
 	self.Camdvs = dvs
 }
-func (self *RTaskInfoNode) SetResolutionWithSizeStr(sizesStr string, camdvs string) {
+
+func (self *RTaskInfoNode) SetParamsWithStr(sizesStr string, camdvs string, bgTransparent string) {
 	parts := strings.Split(sizesStr, ",")
 	iw, _ := strconv.Atoi(parts[0])
 	ih, _ := strconv.Atoi(parts[1])
 	self.Resolution = [2]int{iw, ih}
+	self.BGTransparent = strconv.Atoi(bgTransparent)
 	self.SetCamdvsWithStr(camdvs)
 }
 

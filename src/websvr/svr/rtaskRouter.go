@@ -49,16 +49,18 @@ func RenderingTask(g *gin.Context) {
 			if rtNode.Phase == "finish" {
 				imgSizes := g.DefaultQuery("sizes", "512,512")
 				camdvs := g.DefaultQuery("camdvs", "[]")
+				rtBGTransparent := g.DefaultQuery("rtBGTransparent", "0")
 				fmt.Println("rTask("+taskid+"):"+phase+", ready re-rendering, imgSizes: ", imgSizes)
 				rtNode.Action = phase
 				rtNode.Phase = "new"
 				rtNode.Progress = 0
 				rtNode.RerenderingTimes++
-				parts := strings.Split(imgSizes, ",")
-				iw, _ := strconv.Atoi(parts[0])
-				ih, _ := strconv.Atoi(parts[1])
-				rtNode.Resolution = [2]int{iw, ih}
-				rtNode.SetCamdvsWithStr(camdvs)
+				// parts := strings.Split(imgSizes, ",")
+				// iw, _ := strconv.Atoi(parts[0])
+				// ih, _ := strconv.Atoi(parts[1])
+				// rtNode.Resolution = [2]int{iw, ih}
+				// rtNode.SetCamdvsWithStr(camdvs)
+				rtNode.SetParamsWithStr(imgSizes, camdvs, rtBGTransparent)
 				rtWaitTaskNodes = append(rtWaitTaskNodes, rtNode)
 
 			} else {
@@ -151,6 +153,7 @@ func UploadRenderingTaskData(g *gin.Context) {
 
 					imgSizes := g.DefaultQuery("sizes", "512,512")
 					camdvs := g.DefaultQuery("camdvs", "[]")
+					rtBGTransparent := g.DefaultQuery("rtBGTransparent", "0")
 
 					taskid = strconv.FormatInt(rtTaskID, 10)
 					taskname = rtTaskVer + "ModelRTask" + taskid
@@ -167,7 +170,8 @@ func UploadRenderingTaskData(g *gin.Context) {
 					// iw, _ := strconv.Atoi(parts[0])
 					// ih, _ := strconv.Atoi(parts[1])
 					// rtNode.Resolution = [2]int{iw, ih}
-					rtNode.SetResolutionWithSizeStr(imgSizes, camdvs)
+					// rtNode.SetResolutionWithSizeStr(imgSizes, camdvs)
+					rtNode.SetParamsWithStr(imgSizes, camdvs, rtBGTransparent)
 
 					rtNode.Id = rtTaskID
 					rtNode.Name = taskname

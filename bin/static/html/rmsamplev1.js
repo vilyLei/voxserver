@@ -27,8 +27,10 @@ function updatePage() {
 
 function rerendering() {
 	console.log("重新渲染当前模型");
-	let params = "&sizes=" + rimgSizes
-	params += "&" + getCameraDataParam();
+	// let params = "&sizes=" + rimgSizes
+	// params += getCameraDataParam();
+	// params += "&rtBGTransparent=" + (rtBGTransparent?"1":"0");
+	let params = getRenderingParams();
 	notifyTaskInfoToSvr("query-re-rendering-task", 0, taskJsonObj.taskid, taskJsonObj.taskname, params);
 
 }
@@ -164,7 +166,7 @@ function sizeHandleChange(btn) {
 
 function setBGTransRBtnSt(valueStr) {
 
-	rtBGTransparent = valueStr == "true"
+	rtBGTransparent = valueStr == "true";
 	btn = document.getElementById("bg_transparent_select_radio_btn")
 	btn.checked = rtBGTransparent
 	btn.value = valueStr
@@ -352,13 +354,21 @@ function readyUploadAFile() {
 	fileObj = document.getElementById("file_select").files[0];
 	console.log("A01 fileObj: ", fileObj);
 }
+function getRenderingParams() {
+	let params ="&sizes=" + rimgSizes;
+	params +=  getCameraDataParam();
+	params += "&rtBGTransparent=" + (rtBGTransparent?"1":"0");
+	return params
+}
 function uploadAndSendRendering() {
 	if(fileObj == null) {
 		return;
 	}
-	let sizes = rimgSizes + ""
-	var url = hostUrl + "uploadRTData?srcType=viewer&&phase=newrtask&sizes=" + sizes;
-	url +=  getCameraDataParam();
+	// let sizes = rimgSizes + ""
+	var url = hostUrl + "uploadRTData?srcType=viewer&phase=newrtask" + getRenderingParams();
+	// var url = hostUrl + "uploadRTData?srcType=viewer&&phase=newrtask&sizes=" + sizes;
+	// url +=  getCameraDataParam();
+	// url += "&rtBGTransparent=" + (rtBGTransparent?"1":"0");
 	console.log("UpladFile() call ...url: ", url);
 	// fileObj = document.getElementById("file_select").files[0];
 	console.log("A02 fileObj: ", fileObj);
