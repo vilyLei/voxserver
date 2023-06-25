@@ -70,7 +70,8 @@ func (self *RTaskInfoNode) SetParamsWithStr(sizesStr string, camdvs string, bgTr
 	iw, _ := strconv.Atoi(parts[0])
 	ih, _ := strconv.Atoi(parts[1])
 	self.Resolution = [2]int{iw, ih}
-	self.BGTransparent = strconv.Atoi(bgTransparent)
+	iflag, _ := strconv.Atoi(bgTransparent)
+	self.BGTransparent = iflag
 	self.SetCamdvsWithStr(camdvs)
 }
 
