@@ -22310,7 +22310,9 @@ class CoDataModule {
     if (this.m_init) {
       this.m_init = false;
       this.m_sysInitCallback = sysInitCallback;
-      this.m_deferredInit = deferredInit;
+      this.m_deferredInit = deferredInit; // let dracoModuleParam = new TaskCodeModuleParam("static/cospace/modules/draco/ModuleDracoGeomParser.umd.js", ModuleNS.dracoParser, ModuleFileType.JS);
+      // dracoModuleParam.params = ["static/cospace/modules/dracoLib/"];
+
       let modules = [{
         url: "static/cospace/core/coapp/CoSpaceApp.umd.js",
         name: CoSpaceAppData_1.CoModuleNS.coSpaceApp,
@@ -22335,6 +22337,11 @@ class CoDataModule {
         url: "static/cospace/modules/fbxFast/ModuleFBXGeomFastParser.umd.js",
         name: CoSpaceAppData_1.CoModuleNS.fbxFastParser,
         type: CoSpaceAppData_1.CoModuleFileType.JS
+      }, {
+        url: "static/cospace/modules/draco/ModuleDracoGeomParser.umd.js",
+        name: CoSpaceAppData_1.CoModuleNS.dracoParser,
+        type: CoSpaceAppData_1.CoModuleFileType.JS,
+        params: ["static/cospace/modules/dracoLib/"]
       }];
       this.m_modules = modules; // 初始化数据协同中心
 
@@ -24370,8 +24377,9 @@ class ROIndicesRes {
         vrc.eleBufSubData(ivs, ivtx.getBufDataUsage());
       }
 
-      size = ivs.length;
-      stride = size > 65536 ? 4 : 2;
+      size = ivs.length; // stride = size > 65536 ? 4 : 2;
+
+      stride = ivs.BYTES_PER_ELEMENT;
       bytesSize = newBytesSize;
     } else {
       let offset = 0;
@@ -45177,12 +45185,18 @@ class RModelSCViewer {
     this.m_entityContainer = new DisplayEntityContainer_1.default();
     this.m_entities = [];
     this.m_modelDataUrl = "";
+    this.m_forceRot90 = false;
+    this.m_debugDev = false;
     this.m_baseSize = 200;
     this.m_dropEnabled = true;
   }
 
   getTexByUrl(purl, wrapRepeat = true, mipmapEnabled = true) {
     let host = URLFilter_1.default.getHostUrl("9090");
+
+    if (this.m_debugDev) {
+      host = "";
+    }
 
     if (purl.indexOf("http:") < 0 && purl.indexOf("https:") < 0) {
       purl = host + purl;
@@ -45282,6 +45296,7 @@ class RModelSCViewer {
         this.m_dropController.initialize(this.m_rscene.getRenderProxy().getCanvas(), this);
         this.loadInfo(initCallback);
       } else {
+        this.m_debugDev = true;
         this.m_teamLoader = new CoModelTeamLoader_1.CoModelTeamLoader();
         this.initModels();
       }
@@ -45317,7 +45332,12 @@ class RModelSCViewer {
     });
   }
 
-  fitEntitiesSize() {
+  setForceRotate90(force) {
+    this.m_forceRot90 = force;
+  }
+
+  fitEntitiesSize(forceRot90 = false) {
+    forceRot90 = forceRot90 || this.m_forceRot90;
     this.m_layouter.layoutUpdate(this.m_baseSize, new Vector3D_1.default(0, 0, 0));
     let container = this.m_entityContainer;
     let format = URLFilter_1.default.getFileSuffixName(this.m_modelDataUrl, true, true);
@@ -45330,6 +45350,10 @@ class RModelSCViewer {
         break;
 
       default:
+        if (forceRot90) {
+          container.setRotationXYZ(90, 0, 0);
+        }
+
         break;
     }
 
@@ -45375,8 +45399,42 @@ class RModelSCViewer {
     url0 = "static/private/obj/box01.obj";
     url0 = "static/assets/obj/scene01.obj";
     url0 = "static/assets/fbx/scene03.fbx";
+    url0 = "static/private/obj/scene01/export_0.obj.drc";
+    url0 = "http://localhost:9090/static/uploadFiles/rtTask/v1ModelRTask2001/draco/export_0.drc";
     let loader = this.m_teamLoader;
     let urls = [url0];
+    this.m_forceRot90 = true;
+    urls = [];
+
+    for (let i = 0; i < 2; ++i) {
+      let purl = "http://localhost:9090/static/uploadFiles/rtTask/v1ModelRTask2001/draco/export_" + i + ".drc";
+      urls.push(purl);
+    }
+    /*
+    urls = [];
+    for(let i = 0; i < 51; ++i) {
+        let purl = "static/private/obj/model02/export_" + i + ".drc";
+        urls.push( purl );
+    }
+    //*/
+
+    /*
+    urls = [];
+    for(let i = 0; i < 6; ++i) {
+        let purl = "static/private/obj/scene03/export_" + i + ".drc";
+        urls.push( purl );
+    }
+    //*/
+
+    /*
+    urls = [];
+    for(let i = 0; i < 8; ++i) {
+        let purl = "static/private/ply/scene01_ply/export_" + i + ".drc";
+        urls.push( purl );
+    }
+    //*/
+
+
     loader.load(urls, (models, transforms) => {
       this.m_layouter.layoutReset();
 
@@ -45410,16 +45468,18 @@ class RModelSCViewer {
     }
   }
 
+  setMouseDownListener(mouseDownCall) {
+    this.m_mouseDownCall = mouseDownCall;
+  }
+
   mouseDown(evt) {
     console.log("mouse down.");
-    let camdvs = this.getCameraData(0.01, true);
-    console.log("	camdvs: ", camdvs);
-    /*
-    -0.7071067690849304, -0.40824827551841736, 0.5773502588272095, 7.295821666717529,
-    0.70710676908493040, -0.40824827551841736, 0.5773502588272095, 7.295821666717529,
-    0.00000000000000000, 0.816496551036834700, 0.5773502588272095, 7.295821666717529,
-    -0.0000000000000000, 0.000000000000000000, -0.000000000000000, 1.000000000000000
-    */
+
+    if (this.m_mouseDownCall != null) {
+      this.m_mouseDownCall(evt);
+    } // let camdvs = this.getCameraData(0.01, true);
+    // console.log("	camdvs: ", camdvs);
+
   }
 
 }

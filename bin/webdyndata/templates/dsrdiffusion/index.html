@@ -1,0 +1,150 @@
+{{ define "dsrdiffusion/index.tmpl" }}
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="UTF-8">
+	<title>{{ .title }}</title>
+	<style type="text/css">
+		.custom-file-upload {
+			display: inline-block;
+			padding: 6px 12px;
+			cursor: pointer;
+			font-size: 14px;
+			font-weight: bold;
+			color: #fff;
+			background-color: #337ab7;
+			border-color: #2e6da4;
+			border-radius: 4px;
+		}
+
+		.custom-file-upload:hover {
+			background-color: #286090;
+			border-color: #204d74;
+		}
+
+		input[type="file"] {
+			display: none;
+		}
+
+		.box {
+			display: none;
+			width: 110px;
+			height: auto;
+			background: #b4c3da;
+			/* border: 1px solid #333; */
+			padding: 12px;
+			text-align: center;
+			position: absolute;
+		}
+
+		#select_file_div {
+			text-align: center;
+			background-color: rgb(219, 224, 244)
+		}
+
+		body {
+			text-align: center;
+		}
+	</style>
+	<script>
+
+		let isLZHCN = navigator.language == "zh-CN";
+		var stils = [];
+		var CURR_PAGE_ST_INFO_LIST = stils;
+		function initPageST() {
+			let info2 = "Number of views"
+			let info1 = "Contacts with me";
+			if (isLZHCN) {
+				info2 = "浏览次数";
+				info1 = "联系我们";
+			}
+			info1 += "(vily313@126.com)";
+			info2 += "({{ .viewsTotal }})";
+			stils.push(info1, info2);
+		}
+		initPageST();
+	</script>
+	<script type="text/javascript" src="static/html/dsrdiffusion.js"></script>
+</head>
+
+<body>
+	<!-- <center /> -->
+	<br />
+	<span id="percentage"></span>
+	<br />
+	<progress id="progressBar" value="0" max="100" style="width: 300px;"></progress>
+	<br />
+	<span id="time"></span>
+	<br />
+	<br />
+	<div id="select_img_size">
+		渲染图尺寸:&nbsp;
+		<input type="radio" name="size_select_radio" onclick="sizeHandleChange(this);" value="256x256">256x256</input>
+		<input type="radio" name="size_select_radio" onclick="sizeHandleChange(this);" value="512x512">512x512</input>
+		<input type="radio" name="size_select_radio" onclick="sizeHandleChange(this);"
+			value="1024x1024">1024x1024</input>
+		<input type="radio" name="size_select_radio" onclick="sizeHandleChange(this);"
+			value="2048x2048">2048x2048</input>
+		<br />
+		渲染图背景透明:&nbsp;
+		<input type="radio" id="bg_transparent_select_radio_btn" name="bg_transparent_select_radio"
+			onclick="rtBGTransparentHandleChange(this);" value="false"><span id="b-t-s-r">否</span></input>
+	</div>
+	<br />
+	<div id="select_file_div">
+		<label id="file_select_label" for="file_select" class="custom-file-upload">
+			<i class="fa fa-cloud-upload"></i> 选择模型文件
+		</label>
+		<input type="file" id="file_select" accept=".glb,.fbx,.obj,.usdz,.usdc,.blend" readonly="readonly" name="myfile"
+			value="上传渲染模型" />
+		<br />
+		带宽小，上传的模型文件不能大于30M
+	</div>
+	<br />
+	<br />
+	<br />
+	<br />
+	<br />
+	<br />
+	<br />
+	<br />
+	<br />
+	<br />
+	<br />
+	<br />
+	<br />
+	<br />
+	<br />
+	<div id="infoDiv">
+	</div>
+	<br />
+	<div id="imgDiv">
+	</div>
+	<div id="box" class="box">点击查看大图</div>
+	<script type="text/javascript">
+		initConfig();
+		var inputObj = document.getElementById("file_select")
+		inputObj.addEventListener("change", () => {
+			// uploadAFile()
+			readyUploadAFile()
+			let div = document.getElementById("select_file_div")
+			// console.log("div.parentNode: ", div.parentNode)
+			// div.parentNode.removeChild(div);
+			// clearDivAllEles(div)
+			initModelViewer(div)
+		});
+		// function testDiv() {
+		// 	readyUploadAFile()
+		// 	let div = document.getElementById("select_file_div")
+		// 	// console.log("div.parentNode: ", div.parentNode)
+		// 	// div.parentNode.removeChild(div);
+		// 	// clearDivAllEles(div)
+		// 	initModelViewer(div)
+		// }
+		// testDiv();
+	</script>
+</body>
+
+</html>
+{{ end }}

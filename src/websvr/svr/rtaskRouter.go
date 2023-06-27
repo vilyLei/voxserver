@@ -130,6 +130,14 @@ func UploadRenderingTaskData(g *gin.Context) {
 	fmt.Println("UploadRenderingTaskData, phase: ", phase, ", taskid: ", taskid, ", taskname: ", taskname, " srcType: ", srcType)
 	// single file uploading receive
 	filename := "none"
+	// tid, _ := strconv.ParseInt(taskid, 10, 64)
+	// hasTaskFlag := false
+	tid, _ := strconv.ParseInt(taskid, 10, 64)
+	// if errInt64 == nil {
+	// 	hasTaskFlag = HasRTTaskNodeByID(tid)
+	// }
+	// var rtNode *RTaskInfoNode = &tempRTNode
+
 	var status = 0
 	file, _ := g.FormFile("file")
 	filePath := ""
@@ -154,6 +162,7 @@ func UploadRenderingTaskData(g *gin.Context) {
 					camdvs := g.DefaultQuery("camdvs", "[]")
 					rtBGTransparent := g.DefaultQuery("rtBGTransparent", "0")
 
+					tid = rtTaskID
 					taskid = strconv.FormatInt(rtTaskID, 10)
 					taskname = rtTaskVer + "ModelRTask" + taskid
 					fileDir := uploadDir + taskname + "/"
@@ -172,10 +181,11 @@ func UploadRenderingTaskData(g *gin.Context) {
 					// rtNode.SetResolutionWithSizeStr(imgSizes, camdvs)
 					rtNode.SetParamsWithStr(imgSizes, camdvs, rtBGTransparent)
 
-					rtNode.Id = rtTaskID
+					rtNode.Id = tid
 					rtNode.Name = taskname
+					rtNode.ResDir = fileDir
 					rtNode.ResUrl = fileDir + filename
-					rtTaskNodeMap[rtTaskID] = &rtNode
+					rtTaskNodeMap[tid] = &rtNode
 
 					rtWaitTaskNodes = append(rtWaitTaskNodes, &rtNode)
 
@@ -202,7 +212,7 @@ func UploadRenderingTaskData(g *gin.Context) {
 			status = 22
 			fileDir := uploadDir + taskname + "/"
 			filePath = fileDir + filename
-			fmt.Println("upload receive a rendering outpu pic file name: ", filename)
+			fmt.Println("uploading receive a rendering output pic file name: ", filename)
 
 			g.SaveUploadedFile(file, filePath)
 
@@ -212,8 +222,6 @@ func UploadRenderingTaskData(g *gin.Context) {
 		}
 	}
 
-	tid, _ := strconv.ParseInt(taskid, 10, 64)
-
 	var reqd UploadReqDef
 	reqd.Success = status == 22
 	reqd.FileName = filename
@@ -221,6 +229,116 @@ func UploadRenderingTaskData(g *gin.Context) {
 	reqd.TaskName = taskname
 	reqd.Status = status
 	reqd.FilePath = filePath
+
+	jsonBytes, err := json.Marshal(reqd)
+	if err != nil {
+		fmt.Println("error:", err)
+	}
+	jsonStr := string(jsonBytes)
+	// c.String(http.StatusOK, fmt.Sprintf("'%s' uploaded!", file.Filename))
+	g.String(http.StatusOK, fmt.Sprintf("%s", jsonStr))
+}
+func GetRTaskInfo(g *gin.Context) {
+	phase := g.DefaultQuery("phase", "none")
+	taskid := g.DefaultQuery("taskid", "0")
+	taskname := g.DefaultQuery("taskname", "none")
+	srcType := g.DefaultQuery("srcType", "none")
+
+	fmt.Println("GetRTaskInfo, phase: ", phase, ", taskid: ", taskid, ", taskname: ", taskname, " srcType: ", srcType)
+
+	var status = 0
+
+	hasTaskFlag := false
+	tid, errInt64 := strconv.ParseInt(taskid, 10, 64)
+	if errInt64 == nil {
+		hasTaskFlag = HasRTTaskNodeByID(tid)
+	}
+	var rtNode *RTaskInfoNode = &tempRTNode
+	if hasTaskFlag {
+		rtNode = rtTaskNodeMap[tid]
+	}
+
+	var reqd UploadReqDef
+	reqd.Success = status == 22
+	reqd.TaskID = tid
+	reqd.TaskName = taskname
+	reqd.Status = status
+	reqd.FilePath = rtNode.ResDir + "draco/"
+	reqd.DrcsTotal = rtNode.ModelDrcsTotal
+
+	jsonBytes, err := json.Marshal(reqd)
+	if err != nil {
+		fmt.Println("error:", err)
+	}
+	jsonStr := string(jsonBytes)
+	// c.String(http.StatusOK, fmt.Sprintf("'%s' uploaded!", file.Filename))
+	g.String(http.StatusOK, fmt.Sprintf("%s", jsonStr))
+}
+func UploadRTaskFilesData(g *gin.Context) {
+	// infoStr := ``
+	// g.String(http.StatusOK, fmt.Sprintf(infoStr))
+	phase := g.DefaultQuery("phase", "none")
+	taskid := g.DefaultQuery("taskid", "0")
+	taskname := g.DefaultQuery("taskname", "none")
+	srcType := g.DefaultQuery("srcType", "none")
+
+	fmt.Println("UploadRTaskFilesData, phase: ", phase, ", taskid: ", taskid, ", taskname: ", taskname, " srcType: ", srcType)
+	// multiple files uploading receive
+	filename := "none"
+	var status = 0
+	form, formErr := g.MultipartForm()
+
+	hasTaskFlag := false
+	tid, errInt64 := strconv.ParseInt(taskid, 10, 64)
+	if errInt64 == nil {
+		hasTaskFlag = HasRTTaskNodeByID(tid)
+	}
+	var rtNode *RTaskInfoNode = &tempRTNode
+	if hasTaskFlag {
+		rtNode = rtTaskNodeMap[tid]
+	}
+
+	fileDir := ""
+	if formErr == nil {
+
+		files := form.File["files"]
+		fmt.Println("files.length: ", len(files))
+		// filePath := ""
+		if files != nil {
+
+			uploadDir := "./static/uploadFiles/rtTask/"
+
+			switch phase {
+			case "modelToDrc":
+
+				if hasTaskFlag {
+					status = 22
+					fileDir = uploadDir + taskname + "/draco/"
+					// filePath = fileDir + filename
+					// fmt.Println("upload receive a rendering outpu pic file name: ", filename)
+					// g.SaveUploadedFile(file, filePath)
+					total := 0
+					for _, file := range files {
+						filePath := fileDir + file.Filename
+						fmt.Println("uploading receive a drc filePath: ", filePath)
+						g.SaveUploadedFile(file, filePath)
+						total++
+					}
+					rtNode.ModelDrcsTotal = total
+				}
+			default:
+
+			}
+		}
+	}
+
+	var reqd UploadReqDef
+	reqd.Success = status == 22
+	reqd.FileName = filename
+	reqd.TaskID = tid
+	reqd.TaskName = taskname
+	reqd.Status = status
+	reqd.FilePath = fileDir
 
 	jsonBytes, err := json.Marshal(reqd)
 	if err != nil {

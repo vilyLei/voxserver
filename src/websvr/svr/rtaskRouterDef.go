@@ -8,19 +8,21 @@ import (
 )
 
 type UploadReqDef struct {
-	TaskID   int64  `json:"taskid,int64"`
-	FilePath string `json:"filepath"`
-	TaskName string `json:"taskname"`
-	Success  bool   `json:"success,bool"`
-	Status   int    `json:"status,int"`
-	FileName string `json:"fileName"`
-	UUID     string `json:"-"` //忽略输出
+	TaskID    int64  `json:"taskid,int64"`
+	FilePath  string `json:"filepath"`
+	TaskName  string `json:"taskname"`
+	Success   bool   `json:"success,bool"`
+	Status    int    `json:"status,int"`
+	DrcsTotal int    `json:"drcsTotal,int"`
+	FileName  string `json:"fileName"`
+	UUID      string `json:"-"` //忽略输出
 }
 
 type RTaskInfoNode struct {
 	Id               int64       `json:"id"`
 	Name             string      `json:"name"`
 	ResUrl           string      `json:"resUrl"`
+	ResDir           string      `json:"resDir"`
 	Resolution       [2]int      `json:"resolution"`
 	BGTransparent    int         `json:"bgTransparent"`
 	Camdvs           [16]float64 `json:"camdvs"`
@@ -29,6 +31,7 @@ type RTaskInfoNode struct {
 	AutoFitModelSize string      `json:"autoFitModelSize"`
 	Progress         int
 	RerenderingTimes int
+	ModelDrcsTotal   int
 }
 
 func (self *RTaskInfoNode) Reset() {
@@ -37,6 +40,7 @@ func (self *RTaskInfoNode) Reset() {
 	self.Phase = "new"
 	self.Progress = 0
 	self.RerenderingTimes = 0
+	self.ModelDrcsTotal = 0
 }
 func (self *RTaskInfoNode) SetCamdvsWithStr(camdvsStr string) {
 
@@ -76,7 +80,9 @@ func (self *RTaskInfoNode) SetParamsWithStr(sizesStr string, camdvs string, bgTr
 }
 
 func (self *RTaskInfoNode) GetViewStatusInfo(teamIndex int, teamLength int) string {
-	infoStr := `{"phase":"` + self.Phase + `","progress":` + strconv.Itoa(self.Progress) + `,"taskid":` + strconv.FormatInt(self.Id, 10) + `,"status":22`
+	infoStr := `{"phase":"` + self.Phase + `","progress":` + strconv.Itoa(self.Progress)
+	infoStr += `,"taskid":` + strconv.FormatInt(self.Id, 10) + `,"status":22`
+	infoStr += `,"drcsTotal":` + strconv.Itoa(self.ModelDrcsTotal)
 	switch self.Phase {
 	case "new":
 		infoStr += `, "teamIndex":` + strconv.Itoa(teamIndex) + `, "teamLength": ` + strconv.Itoa(teamLength)
@@ -85,6 +91,7 @@ func (self *RTaskInfoNode) GetViewStatusInfo(teamIndex int, teamLength int) stri
 		infoStr += `, "bgTransparent":` + strconv.Itoa(self.BGTransparent)
 	}
 	infoStr += `}`
+	fmt.Println("GetViewStatusInfo() ### infoStr: ", infoStr)
 	return infoStr
 }
 func (self *RTaskInfoNode) GetTaskJsonStr() string {

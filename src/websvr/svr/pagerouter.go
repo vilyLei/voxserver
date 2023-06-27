@@ -33,10 +33,14 @@ func InitPages(router *gin.Engine) {
 
 	router.GET("/renderCase", RenderCasePage)
 
+	router.GET("/dsrdiffusion", DSRDiffusionPage)
+
 	router.GET("/updatePageInsStatus", UpdatePageInsStatusInfo)
 
 	router.GET("/renderingTask", RenderingTask)
 	router.POST("/uploadRTData", UploadRenderingTaskData)
+	router.POST("/uploadRTFiles", UploadRTaskFilesData)
+	router.GET("/getRTInfo", GetRTaskInfo)
 
 	router.GET("/errorRes", ErrorRes)
 
@@ -113,6 +117,22 @@ func IndexPage(g *gin.Context) {
 		"title":         "Rendering & Art",
 		"viewsTotal":    viewsTotalStr,
 		"allViewsTotal": allViewsTotStr,
+	})
+}
+
+//dsrdiffusion
+
+func DSRDiffusionPage(g *gin.Context) {
+	ns := "website-dsrdiffusion"
+	// viewsTotalStr := strconv.Itoa(database.GetPageViewCountByName(ns) + 1)
+	viewsTotalStr := getPageViewCountStrByName(ns)
+	defer func() {
+		increasePageViewCountByName(ns)
+	}()
+	fmt.Println("req DSRDiffusionPage info ...viewsTotalStr: ", viewsTotalStr)
+	g.HTML(http.StatusOK, "dsrdiffusion/index.tmpl", gin.H{
+		"title":      "dsr-diffusion",
+		"viewsTotal": viewsTotalStr,
 	})
 }
 func EnginePage(g *gin.Context) {

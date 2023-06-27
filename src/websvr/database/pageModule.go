@@ -163,7 +163,7 @@ func UpdatePageInsStatusInfo() {
 
 	pageViewsTotal = 0
 	total := 0
-	var pageNSList = [...]string{"website", "website-engine", "website-tool", "website-course", "website-game", "website-renderCase", "websit-contentnotfind", "websit-errorres"}
+	var pageNSList = [...]string{"website", "website-dsrdiffusion", "website-engine", "website-tool", "website-course", "website-game", "website-renderCase", "websit-contentnotfind", "websit-errorres"}
 	pagesTotal := len(pageNSList)
 	for i := 0; i < pagesTotal; i++ {
 		ns := pageNSList[i]

@@ -272,10 +272,10 @@ function loadDrcModels(total) {
 
 				rscViewer.initSceneByUrls(drcUrls, types, (prog) => {
 					console.log("3d viewer drc model loading prog: ", prog);
-					// if(prog >= 1.0) {
-					// 	viewerInfoDiv.innerHTML = "";
-					// 	loadedModel = true;
-					// }
+					if(prog >= 1.0) {
+						viewerInfoDiv.innerHTML = "";
+						loadedModel = true;
+					}
 				}, 200);
 			})
 		}
@@ -408,16 +408,41 @@ function reqstUpdate() {
 		clearTimeout(timeoutId);
 	}
 	// console.log("reqstUpdate() ... taskJsonObj: ", taskJsonObj)
+	var flag = false;
 	if (taskStatus < 1) {
 		notifyTaskInfoToSvr("queryataskrst", 0, taskJsonObj.taskid, taskJsonObj.taskname, "")
 		ptupdateTimes--;
 		if (ptupdateTimes > 0) {
 			timeoutId = setTimeout(reqstUpdate, 800);
 		} else {
-
+			flag = true;
 		}
 	} else {
 		console.log("task finish !!!!")
+		flag = true;
+	}
+	if(flag) {
+		if(drcModelLoading) {
+			drcModelUpdate();
+		}
+	}
+}
+var drcModelTimeId = -1
+function drcModelUpdate() {
+
+	if (drcModelTimeId > -1) {
+		clearTimeout(drcModelTimeId);
+	}
+	// console.log("reqstUpdate() ... taskJsonObj: ", taskJsonObj)
+	if (drcModelLoading) {
+		// notifyTaskInfoToSvr("queryataskrst", 0, taskJsonObj.taskid, taskJsonObj.taskname, "")
+		let url = createReqUrlStr(taskReqSvrUrl, "queryataskrst", 0, taskJsonObj.taskid, taskJsonObj.taskname, "");
+		sendACommonGetReq(url, (purl, content) => {
+			console.log("### ###### drcModelUpdate() loaded, content: ", content);
+			var infoObj = JSON.parse(content);
+			loadDrcModels(infoObj.drcsTotal)
+		})
+		drcModelTimeId = setTimeout(reqstUpdate, 800);
 	}
 }
 
@@ -633,7 +658,7 @@ function initModelViewer(div) {
 	});
 	div.appendChild(btn);
 
-	loadModule("RModelSCViewer.umd.js");
+	loadModule("static/html/RModelSCViewer.umd.js");
 }
 let rscViewer = null;
 let loadedModel = false;
@@ -657,6 +682,12 @@ function initRSCViewer() {
 		// 	}
 		// }, 200);
 	}, true);
+
+	rscViewer.setForceRotate90( true );
+	rscViewer.setMouseDownListener( (evt) => {
+		console.log("viewer evt: ", evt);
+		// viewerInfoDiv.innerHTML = "";
+	 } );
 
 	document.onmousedown = () => {
 		console.log("mouse down.");
