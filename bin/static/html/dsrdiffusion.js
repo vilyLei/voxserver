@@ -682,7 +682,7 @@ function initRSCViewer() {
 		// 	}
 		// }, 200);
 	}, true);
-
+	// 增加三角面数量的信息显示
 	rscViewer.setForceRotate90( true );
 	rscViewer.setMouseDownListener( (evt) => {
 		console.log("viewer evt: ", evt);
