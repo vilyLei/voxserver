@@ -153,7 +153,7 @@ func UploadRenderingTaskData(g *gin.Context) {
 			if file.Size > 16 {
 
 				switch suffix {
-				case "obj", "fbx", "glb", "usdz", "usdc", "blend":
+				case "obj", "fbx", "glb", "usdz", "usdc", "blend", "bld":
 
 					status = 22
 					fmt.Println("UploadRenderingTaskData(), upload receive file.Size: ", file.Size, "bytes")
