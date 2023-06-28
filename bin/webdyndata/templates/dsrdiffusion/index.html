@@ -80,27 +80,40 @@
 	<br />
 	<div id="select_img_size">
 		渲染图尺寸:&nbsp;
+		<input type="radio" name="size_select_radio" onclick="sizeHandleChange(this);" value="128x128">128x128</input>
 		<input type="radio" name="size_select_radio" onclick="sizeHandleChange(this);" value="256x256">256x256</input>
 		<input type="radio" name="size_select_radio" onclick="sizeHandleChange(this);" value="512x512">512x512</input>
+		<br />
 		<input type="radio" name="size_select_radio" onclick="sizeHandleChange(this);"
-			value="1024x1024">1024x1024</input>
+			value="1024x1024">1K</input>
 		<input type="radio" name="size_select_radio" onclick="sizeHandleChange(this);"
-			value="2048x2048">2048x2048</input>
+			value="2048x2048">2K</input>
+			<input type="radio" name="size_select_radio" onclick="sizeHandleChange(this);"
+				value="4096x4096">4K</input>
 		<br />
 		渲染图背景透明:&nbsp;
 		<input type="radio" id="bg_transparent_select_radio_btn" name="bg_transparent_select_radio"
 			onclick="rtBGTransparentHandleChange(this);" value="false"><span id="b-t-s-r">否</span></input>
 	</div>
 	<br />
+	<div id="task_name_div">
+		...
+	</div>
 	<div id="select_file_div">
 		<label id="file_select_label" for="file_select" class="custom-file-upload">
-			<i class="fa fa-cloud-upload"></i> 选择模型文件
+			<i class="fa-cloud-upload"></i> 选择模型文件
 		</label>
 		<input type="file" id="file_select" accept=".glb,.fbx,.obj,.usdz,.usdc,.blend,.bld" readonly="readonly" name="myfile"
 			value="上传渲染模型" />
 		<br />
 		带宽小，上传的模型文件不能大于30M
+		<br />
+		<br />
+		<button type="button" id="taskListGertting" onclick="syncAliveTasks(this);">获取渲染任务列表</button>
+		<br />
+		<br />
 	</div>
+	<br />
 	<br />
 	<br />
 	<br />

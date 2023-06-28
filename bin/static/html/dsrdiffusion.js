@@ -1,6 +1,7 @@
-console.log("js sys init ...");
-let rimgSizes = [512, 512]
-let rtBGTransparent = false
+console.log("dsr-diffusion sys init ...");
+
+let rimgSizes = [128, 128]
+let rtBGTransparent = false;
 let hostUrl = "http://localhost:9090/"
 hostUrl = "/"
 let taskReqSvrUrl = hostUrl + "renderingTask";
@@ -12,15 +13,26 @@ let ptupdateTimes = 2100
 let timeoutId = -1;
 let startTime = Date.now()
 
-let taskJsonObj = {}
+let taskJsonObj = { version: -1 }
 let taskStatus = 0
 let rt_phase = ""
 let rt_phase_times = 0
+
 function reset() {
-	taskJsonObj = {}
+	setTaskJsonData({ version: -1 });
+
 	taskStatus = 0
 	rt_phase = ""
 	rt_phase_times = 0
+}
+function setTaskJsonData(data) {
+	taskJsonObj = data;
+	var div = document.getElementById("task_name_div");
+	if (taskJsonObj.taskname !== undefined) {
+		div.innerHTML = "渲染任务:&nbsp;" + taskJsonObj.taskname;
+	} else {
+		div.innerHTML = "..."
+	}
 }
 function updatePage() {
 	location.reload();
@@ -35,8 +47,8 @@ function getHostUrl(port) {
 	let host = location.href;
 	let domain = getDomain(host);
 	let nsList = domain.split(":");
-	host = nsList[0]+":"+nsList[1];
-	return port ? host + ":"+port+"/" : domain + "/";
+	host = nsList[0] + ":" + nsList[1];
+	return port ? host + ":" + port + "/" : domain + "/";
 }
 function rerendering() {
 	console.log("重新渲染当前模型");
@@ -58,10 +70,10 @@ function taskSuccess(filepath, transparent) {
 	if (filepath === undefined || filepath == "") {
 		filepath = "./static/rtUploadFiles/modelRTask2001/boomBox.glb"
 	}
-	let suffix = transparent ? "png":"jpg"
+	let suffix = transparent ? "png" : "jpg"
 	let i = filepath.lastIndexOf("/")
 	let imgDirUrl = hostUrl + filepath.slice(2, i + 1);
-	imgUrl = imgDirUrl + "bld_rendering_mini."+suffix+"?ver=" + Math.random() + "-" + Math.random(Date.now())
+	imgUrl = imgDirUrl + "bld_rendering_mini." + suffix + "?ver=" + Math.random() + "-" + Math.random(Date.now())
 	console.log("imgUrl: ", imgUrl);
 
 	var div = document.getElementById("imgDiv");
@@ -72,7 +84,7 @@ function taskSuccess(filepath, transparent) {
 	// var br = document.createElement("br");
 	// div.appendChild(br);
 
-	let big_imgUrl = imgDirUrl + "bld_rendering."+suffix+"?ver=" + Math.random() + "-" + Math.random(Date.now())
+	let big_imgUrl = imgDirUrl + "bld_rendering." + suffix + "?ver=" + Math.random() + "-" + Math.random(Date.now())
 	var link = document.createElement("a");
 	link.setAttribute("href", big_imgUrl);
 	link.setAttribute("target", "_blank");
@@ -90,7 +102,8 @@ function taskSuccess(filepath, transparent) {
 	var br = document.createElement("br");
 	div.appendChild(br);
 	const span = document.createElement('span');
-	span.innerHTML = '/\\';
+	// span.innerHTML = '/\\';
+	span.innerHTML = '点击上图查看大图';
 	div.appendChild(span);
 	br = document.createElement("br");
 	div.appendChild(br);
@@ -150,9 +163,9 @@ function sendCurrentGetReq(purl) {
 	};
 	req.send(null);
 }
-function showSpecInfo(keyStr, times) {
+function showSpecInfo(keyStr, times, infoDiv = null) {
 
-	var div = document.getElementById("infoDiv");
+	var div = infoDiv ? infoDiv : document.getElementById("infoDiv");
 	// var div = curr3DViewerInfoDiv;
 	let flag = times % 3
 	switch (flag) {
@@ -167,6 +180,7 @@ function showSpecInfo(keyStr, times) {
 			break;
 	}
 }
+
 function sizeHandleChange(btn) {
 	let vs = btn.value.split("x");
 	rimgSizes[0] = parseInt(vs[0]);
@@ -178,13 +192,24 @@ function sizeHandleChange(btn) {
 	setCookieByName(cname, kvalue)
 }
 
-function setBGTransRBtnSt(valueStr) {
+function setBGTransRBtnSt(kvalue, force = false) {
 
-	rtBGTransparent = valueStr == "true";
+	// kvalue = rtBGTransparent ? "true" : "false";
+	let cname = "rtBGTransparent";
+	if (!force) {
+		let cvalue = getCookieByName(cname)
+		if (cvalue != "") {
+			kvalue = cvalue
+		}
+	}
+
+	rtBGTransparent = kvalue == "true";
 	btn = document.getElementById("bg_transparent_select_radio_btn")
 	btn.checked = rtBGTransparent
-	btn.value = valueStr
-	document.getElementById("b-t-s-r").innerHTML = rtBGTransparent ? "是" : "否"
+	btn.value = kvalue
+	document.getElementById("b-t-s-r").innerHTML = rtBGTransparent ? "是" : "否";
+
+	setCookieByName(cname, kvalue)
 }
 function rtBGTransparentHandleChange(btn) {
 
@@ -193,11 +218,8 @@ function rtBGTransparentHandleChange(btn) {
 	} else {
 		btn.value = "true"
 	}
-	setBGTransRBtnSt(btn.value);
+	setBGTransRBtnSt(btn.value, true);
 
-	let cname = "rtBGTransparent";
-	let kvalue = btn.value;
-	setCookieByName(cname, kvalue)
 }
 function getCookieByName(cname) {
 	let ckInfo = document.cookie + ""
@@ -216,15 +238,14 @@ function getCookieByName(cname) {
 function setCookieByName(cname, value) {
 	document.cookie = cname + "=" + value + ";"
 }
-function initConfig() {
+function setSizeBtnStatWithValue(kvalue, force = false) {
 
-	let kvalue = rimgSizes[0] + "x" + rimgSizes[1];
 	let cname = "rtTaskInfo";
-	let cvalue = getCookieByName(cname)
-	if (cvalue != "") {
-		kvalue = cvalue
-	} else {
-		setCookieByName(cname, kvalue)
+	if (!force) {
+		let cvalue = getCookieByName(cname)
+		if (cvalue != "") {
+			kvalue = cvalue
+		}
 	}
 	var checks = document.getElementsByName("size_select_radio");
 	for (let i = 0; i < checks.length; ++i) {
@@ -234,26 +255,47 @@ function initConfig() {
 			sizeHandleChange(checks[i])
 		}
 	}
+	// setCookieByName(cname, kvalue)
+}
+function initConfig() {
+
+	let kvalue = rimgSizes[0] + "x" + rimgSizes[1];
+	setSizeBtnStatWithValue(kvalue)
+	// let cname = "rtTaskInfo";
+	// let cvalue = getCookieByName(cname)
+	// if (cvalue != "") {
+	// 	kvalue = cvalue
+	// } else {
+	// 	setCookieByName(cname, kvalue)
+	// }
+	// var checks = document.getElementsByName("size_select_radio");
+	// for (let i = 0; i < checks.length; ++i) {
+	// 	// console.log("checks[i].value: ", checks[i].value);
+	// 	if (checks[i].value == kvalue) {
+	// 		checks[i].checked = true;
+	// 		sizeHandleChange(checks[i])
+	// 	}
+	// }
 
 	kvalue = rtBGTransparent ? "true" : "false";
-	cname = "rtBGTransparent";
-	cvalue = getCookieByName(cname)
-	if (cvalue != "") {
-		kvalue = cvalue
-	} else {
-		setCookieByName(cname, kvalue)
-	}
+	// let cname = "rtBGTransparent";
+	// let cvalue = getCookieByName(cname)
+	// if (cvalue != "") {
+	// 	kvalue = cvalue
+	// } else {
+	// 	setCookieByName(cname, kvalue)
+	// }
 	setBGTransRBtnSt(kvalue);
 }
 let drcModelLoading = true
 function loadDrcModels(total) {
 	// console.log("### ###### loadDrcModels, total: ", total);
-	if(drcModelLoading) {
-		if(total > 0) {
+	if (drcModelLoading) {
+		if (total > 0) {
 			console.log("### ######01 loadDrcModels(), ready load drc models, total: ", total);
 			drcModelLoading = false;
 			let params = ""
-			let url = createReqUrlStr(taskInfoGettingUrl, "modelToDrc",0, taskJsonObj.taskid, taskJsonObj.taskname, params);
+			let url = createReqUrlStr(taskInfoGettingUrl, "modelToDrc", 0, taskJsonObj.taskid, taskJsonObj.taskname, params);
 			console.log("### ######02 loadDrcModels(), url: ", url);
 			sendACommonGetReq(url, (purl, content) => {
 				console.log("### ###### loadDrcModels() loaded, content: ", content);
@@ -263,21 +305,25 @@ function loadDrcModels(total) {
 				let drcsTotal = infoObj.drcsTotal;
 				let drcUrls = [];
 				let types = [];
-				for(let i = 0; i < drcsTotal; i++) {
-					let drcUrl = resBaseUrl + "export_"+i+".drc";
+				for (let i = 0; i < drcsTotal; i++) {
+					let drcUrl = resBaseUrl + "export_" + i + ".drc";
 					drcUrls.push(drcUrl)
 					types.push("drc");
 				}
-				console.log("drcUrls: ", drcUrls);
+				// console.log("drcUrls: ", drcUrls);
 
 				rscViewer.initSceneByUrls(drcUrls, types, (prog) => {
 					console.log("3d viewer drc model loading prog: ", prog);
-					if(prog >= 1.0) {
+					if (prog >= 1.0) {
 						viewerInfoDiv.innerHTML = "";
 						loadedModel = true;
 					}
 				}, 200);
 			})
+		} else {
+			// console.log("$$$ loading model resource, ", rt_phase_times);
+			showSpecInfo("loading model resource", rt_phase_times, viewerInfoDiv);
+			rt_phase_times++
 		}
 	}
 }
@@ -294,8 +340,84 @@ function sendACommonGetReq(purl, onload) {
 	}
 	req.send(null);
 }
+function parseRenderingTaskInfo(sdo) {
+	// var sdo = JSON.parse(req_response);
+	console.log("parseRenderingTaskInfo(), sdo: ", sdo);
+	let status = sdo.status
+
+	var div = document.getElementById("infoDiv");
+	let phase = sdo.phase;
+	if (rt_phase != phase) {
+		rt_phase = phase
+		rt_phase_times = 0
+	}
+	let keyStr = "";
+	let flag = false;
+	switch (phase) {
+		case "running":
+			if (sdo.progress < 6) {
+				showSpecInfo("正在解析模型数据", rt_phase_times);
+			} else {
+				div.innerHTML = `正在进行渲染: <b><font color="#008800">` + sdo.progress + `%</font></b>`
+			}
+			flag = true;
+			break;
+		case "new":
+			keyStr = `排队<b><font color="#880000">(` + sdo.teamIndex + "/" + sdo.teamLength + `)</font></b>等待可用的空闲渲染器`
+			showSpecInfo(keyStr, rt_phase_times);
+			break;
+		case "task_rendering_enter":
+			if (rt_phase_times > 2) {
+				showSpecInfo("配置渲染任务", rt_phase_times);
+			} else {
+				showSpecInfo("启动渲染任务", rt_phase_times);
+			}
+			break;
+		case "task_rendering_load_res":
+			// showSpecInfo("同步模型资源", rt_phase_times)
+			div.innerHTML = `同步模型资源: <b><font color="#008800">` + sdo.progress + `%</font></b>`
+			break;
+		case "task_rendering_begin":
+			showSpecInfo("准备渲染数据", rt_phase_times)
+			break;
+		case "finish":
+			if (taskStatus < 1) {
+				taskJsonObj.version = sdo.version;
+				taskStatus = 1
+				let sizes = sdo.sizes;
+				let time_ms = (Date.now() - startTime)
+				let time_s = Math.round(time_ms / 1000.0)
+				console.log("task finish, loss time: ", time_s + "s(" + time_ms + "ms), sdo.version: ", sdo.version);
+				div.innerHTML = `<b><font color="#008800">` + sizes[0] + "x" + sizes[1] + `</font></b>效果图渲染完成<br/><b>(总耗时` + time_s + `s)</b>`
+				taskSuccess(taskJsonObj.filepath, sdo.bgTransparent == 1)
+			}
+			break;
+		case "rtaskerror":
+			if (taskStatus < 2) {
+				taskStatus = 2
+				div.innerHTML = "渲染失败(模型数据不能正确解析)"
+				taskFailure()
+			}
+
+		case "query-re-rendering-task":
+			console.log("query-re-rendering-task, status: ", status);
+			if (status == 22) {
+				// ptupdateTimes = 2100
+				// taskStatus = 0;
+				// startTime = Date.now();
+				// clearSTInfoDivEles();
+				// reqstUpdate();
+				restartReqstUpdate();
+			}
+			break;
+		default:
+			break;
+	}
+	loadDrcModels(sdo.drcsTotal);
+	rt_phase_times++
+}
 function sendAGetReq(purl) {
-	if(taskStatus == 3) {
+	if (taskStatus == 3) {
 		return;
 	}
 	let req = new XMLHttpRequest();
@@ -310,79 +432,9 @@ function sendAGetReq(purl) {
 	};
 	req.onprogress = e => { };
 	req.onload = evt => {
+		// parseRenderingTaskInfo(req.response);
 		var sdo = JSON.parse(req.response);
-		console.log("sendAGetReq(), sdo: ", sdo);
-		let status = sdo.status
-
-		var div = document.getElementById("infoDiv");
-		// var div = curr3DViewerInfoDiv;
-		let phase = sdo.phase;
-		if (rt_phase != phase) {
-			rt_phase = phase
-			rt_phase_times = 0
-		}
-		let keyStr = ""
-		let flag = 0
-		switch (phase) {
-			case "running":
-				if (sdo.progress < 6) {
-					showSpecInfo("正在解析模型数据", rt_phase_times)
-				} else {
-					div.innerHTML = `正在进行渲染: <b><font color="#008800">` + sdo.progress + `%</font></b>`
-				}
-				break;
-			case "new":
-				keyStr = `排队<b><font color="#880000">(` + sdo.teamIndex + "/" + sdo.teamLength + `)</font></b>等待可用的空闲渲染器`
-				showSpecInfo(keyStr, rt_phase_times)
-				break;
-			case "task_rendering_enter":
-				if (rt_phase_times > 2) {
-					showSpecInfo("配置渲染任务", rt_phase_times)
-				} else {
-					showSpecInfo("启动渲染任务", rt_phase_times)
-				}
-				break;
-			case "task_rendering_load_res":
-				// showSpecInfo("同步模型资源", rt_phase_times)
-				div.innerHTML = `同步模型资源: <b><font color="#008800">` + sdo.progress + `%</font></b>`
-				break;
-			case "task_rendering_begin":
-				showSpecInfo("准备渲染数据", rt_phase_times)
-				break;
-			case "finish":
-				if (taskStatus < 1) {
-					taskStatus = 1
-					let sizes = sdo.sizes;
-					let time_ms = (Date.now() - startTime)
-					let time_s = Math.round(time_ms / 1000.0)
-					console.log("loss time: ", time_s + "s(" + time_ms + "ms)");
-					div.innerHTML = `<b><font color="#008800">` + sizes[0] + "x" + sizes[1] + `</font></b>效果图渲染完成<br/><b>(总耗时` + time_s + `s)</b>`
-					taskSuccess(taskJsonObj.filepath, sdo.bgTransparent == 1)
-				}
-				break;
-			case "rtaskerror":
-				if (taskStatus < 2) {
-					taskStatus = 2
-					div.innerHTML = "渲染失败(模型数据不能正确解析)"
-					taskFailure()
-				}
-
-			case "query-re-rendering-task":
-				console.log("query-re-rendering-task, status: ", status);
-				if (status == 22) {
-					ptupdateTimes = 2100
-					timeoutId = -1;
-					taskStatus = 0;
-					startTime = Date.now();
-					clearSTInfoDivEles();
-					reqstUpdate();
-				}
-				break;
-			default:
-				break;
-		}
-		loadDrcModels(sdo.drcsTotal);
-		rt_phase_times++
+		parseRenderingTaskInfo(sdo);
 	};
 	req.send(null);
 }
@@ -394,14 +446,18 @@ function createReqUrlStr(svrUrl, phase, progress, taskId, taskName, otherInfo = 
 	return url;
 }
 function notifyTaskInfoToSvr(phase, progress, taskId, taskName, otherInfo = "") {
-	// let url = taskReqSvrUrl + "?srcType=viewer&&phase=" + phase + "&progress=" + progress + otherInfo
-	// if (taskId > 0) {
-	// 	url += "&taskid=" + taskId + "&taskname=" + taskName
-	// }
 	let url = createReqUrlStr(taskReqSvrUrl, phase, progress, taskId, taskName, otherInfo)
 	sendAGetReq(url)
 }
 
+
+function restartReqstUpdate() {
+	ptupdateTimes = 2100
+	taskStatus = 0;
+	startTime = Date.now();
+	clearSTInfoDivEles();
+	reqstUpdate();
+}
 function reqstUpdate() {
 
 	if (timeoutId > -1) {
@@ -421,8 +477,8 @@ function reqstUpdate() {
 		console.log("task finish !!!!")
 		flag = true;
 	}
-	if(flag) {
-		if(drcModelLoading) {
+	if (flag) {
+		if (drcModelLoading) {
 			drcModelUpdate();
 		}
 	}
@@ -433,18 +489,37 @@ function drcModelUpdate() {
 	if (drcModelTimeId > -1) {
 		clearTimeout(drcModelTimeId);
 	}
-	// console.log("reqstUpdate() ... taskJsonObj: ", taskJsonObj)
 	if (drcModelLoading) {
-		// notifyTaskInfoToSvr("queryataskrst", 0, taskJsonObj.taskid, taskJsonObj.taskname, "")
 		let url = createReqUrlStr(taskReqSvrUrl, "queryataskrst", 0, taskJsonObj.taskid, taskJsonObj.taskname, "");
 		sendACommonGetReq(url, (purl, content) => {
 			console.log("### ###### drcModelUpdate() loaded, content: ", content);
 			var infoObj = JSON.parse(content);
-			loadDrcModels(infoObj.drcsTotal)
+			loadDrcModels(infoObj.drcsTotal);
 		})
 		drcModelTimeId = setTimeout(reqstUpdate, 800);
 	}
 }
+
+var syncTaskTimeId = -1
+function syncTaskUpdate() {
+
+	if (syncTaskTimeId > -1) {
+		clearTimeout(syncTaskTimeId);
+	}
+	let flag = drcModelLoading || taskStatus < 1;
+	if (!flag && taskJsonObj.taskid > 0) {
+		console.log("syncTaskUpdate(), taskJsonObj.taskid: ", taskJsonObj.taskid);
+		let url = createReqUrlStr(taskInfoGettingUrl, "syncAnAliveTask", 0, taskJsonObj.taskid, taskJsonObj.taskname, "");
+		sendACommonGetReq(url, (purl, content) => {
+			var infoObj = JSON.parse(content);
+			console.log("### ###### syncTaskUpdate() loaded, infoObj: ", infoObj);
+			// loadDrcModels(infoObj.drcsTotal);
+			updateTaskJsonData(infoObj);
+		})
+	}
+	syncTaskTimeId = setTimeout(syncTaskUpdate, 2500);
+}
+syncTaskUpdate();
 
 var xhr;
 var fileObj = null;
@@ -452,24 +527,23 @@ function readyUploadAFile() {
 	fileObj = document.getElementById("file_select").files[0];
 	console.log("A01 fileObj: ", fileObj);
 }
-function getRenderingParams() {
-	let params ="&sizes=" + rimgSizes;
-	params +=  getCameraDataParam();
-	params += "&rtBGTransparent=" + (rtBGTransparent?"1":"0");
-	return params
+function getRenderingParams(otherParams = "") {
+	let params = "&sizes=" + rimgSizes;
+	params += getCameraDataParam();
+	params += "&rtBGTransparent=" + (rtBGTransparent ? "1" : "0");
+	if (otherParams != "") {
+		params += otherParams;
+	}
+	return params;
 }
 function uploadAndSendRendering() {
-	if(fileObj == null) {
+	if (fileObj == null) {
 		return;
 	}
-	// let sizes = rimgSizes + ""
-	var url = hostUrl + "uploadRTData?srcType=viewer&phase=newrtask" + getRenderingParams();
-	// var url = hostUrl + "uploadRTData?srcType=viewer&&phase=newrtask&sizes=" + sizes;
-	// url +=  getCameraDataParam();
-	// url += "&rtBGTransparent=" + (rtBGTransparent?"1":"0");
-	console.log("UpladFile() call ...url: ", url);
-	// fileObj = document.getElementById("file_select").files[0];
-	console.log("A02 fileObj: ", fileObj);
+	let camdvs = [0.7071067690849304, -0.40824827551841736, 0.5773502588272095, 2.390000104904175, 0.7071067690849304, 0.40824827551841736, -0.5773502588272095, -2.390000104904175, 0, 0.8164965510368347, 0.5773502588272095, 2.390000104904175, 0, 0, 0, 1];
+	let camParam = "&camdvs=[" + camdvs + "]";
+	console.log("camParam: ", camParam);
+	var url = hostUrl + "uploadRTData?srcType=viewer&phase=newrtask" + getRenderingParams(camParam);
 	if (!fileObj) {
 		alert("the file dosen't exist !!!");
 		updatePage()
@@ -506,7 +580,7 @@ function uploadComplete(evt) {
 	var data = JSON.parse(str);
 	console.log("josn obj data: ", data);
 	if (data.success) {
-		taskJsonObj = data
+		setTaskJsonData(data);
 		console.log("上传成功！");
 		// alert("上传成功！");
 		reqstUpdate();
@@ -620,7 +694,7 @@ function createBtn(id, top, btnValue, callback) {
 	let btn = document.createElement("input");
 	btn.type = "button"
 	btn.value = btnValue;
-	if(id !== "") {
+	if (id !== "") {
 		btn.id = id;
 	}
 	btn.style.zIndex = "19";
@@ -639,7 +713,7 @@ let viewerInfoDiv = null;
 
 function initModelViewer(div) {
 
-	clearDivAllEles(div)
+	clearDivAllEles(div);
 
 	console.log("init mnodel view, div.parentNode: ", div.parentNode)
 	viewerDiv = create3DViewerDiv(0, 0, 256, 256);
@@ -651,28 +725,28 @@ function initModelViewer(div) {
 	div.appendChild(viewerInfoDiv);
 	viewerInfoDiv.innerHTML = "loading model resource...";
 	// curr3DViewerInfoDiv = infoDiv;
-	let btn = sendRenderingBtn = createBtn("send_rendering", 440, "发起渲染", () => {
+	let btn = sendRenderingBtn = createBtn("send_rendering", 490, "发起渲染", () => {
 		console.log("发起渲染...");
 		uploadAndSendRendering();
 		sendRenderingBtn.style.display = 'none';
 	});
 	div.appendChild(btn);
 
-	loadModule("static/html/RModelSCViewer.umd.js");
+	loadModule("static/html/RModelSCViewer.umd.min.js");
 }
 let rscViewer = null;
 let loadedModel = false;
 function getCameraDataParam(first = false) {
-	if(loadedModel) {
+	if (loadedModel) {
 		let key = first ? "" : "&";
-		return key + "camdvs=[" + rscViewer.getCameraData(0.01, true)+"]";
+		return key + "camdvs=[" + rscViewer.getCameraData(0.01, true) + "]";
 	}
 	return "";
 }
 function initRSCViewer() {
 	rscViewer = new RModelSCViewer.RModelSCViewer();
 	console.log("rscViewer: ", rscViewer);
-	rscViewer.initialize( viewerDiv, () => {
+	rscViewer.initialize(viewerDiv, () => {
 		//fileObj
 		// rscViewer.initSceneByFiles([fileObj], (prog) => {
 		// 	console.log("model loading prog: ", prog);
@@ -683,16 +757,19 @@ function initRSCViewer() {
 		// }, 200);
 	}, true);
 	// 增加三角面数量的信息显示
-	rscViewer.setForceRotate90( true );
-	rscViewer.setMouseDownListener( (evt) => {
+	rscViewer.setForceRotate90(true);
+	rscViewer.setMouseDownListener((evt) => {
 		console.log("viewer evt: ", evt);
 		// viewerInfoDiv.innerHTML = "";
-	 } );
+	});
 
 	document.onmousedown = () => {
 		console.log("mouse down.");
 		// let cameraData = rscViewer.getCameraData(0.01);
 		// console.log("cameraData: ", cameraData);
+	}
+	if (isApplyAliveTask()) {
+		initAliveTaskAt(aliveTaskIndex);
 	}
 }
 function loadModule(url) {
@@ -704,7 +781,6 @@ function loadModule(url) {
 	}
 	// req.onprogress = e => { };
 	req.onload = evt => {
-		// this.loadedData(req.response, url);
 
 		let scriptEle = document.createElement("script");
 		scriptEle.onerror = evt => {
@@ -721,4 +797,83 @@ function loadModule(url) {
 		}
 	}
 	req.send(null);
+}
+let aliveTasks = null;
+let aliveTaskIndex = -1
+function isApplyAliveTask() {
+	return aliveTaskIndex >= 0;
+}
+function updateTaskJsonData(taskInfo) {
+	if (taskJsonObj.version != taskInfo.version) {
+		console.log("### ###### updateTaskJsonData() need update task json data obj. XXXXXXXXXXXXXXX .");
+		setTaskJsonData(taskInfo);
+
+		setBGTransRBtnSt(taskInfo.bgTransparent === 1 ? "true" : "false", true);
+		// console.log("taskInfo.camdvs: ", taskInfo.camdvs);
+		rscViewer.updateCameraWithF32Arr16(taskInfo.camdvs);
+		rimgSizes = taskInfo.sizes;
+		let kvalue = rimgSizes[0] + "x" + rimgSizes[1];
+		setSizeBtnStatWithValue(kvalue, true);
+		parseRenderingTaskInfo(taskInfo);
+		let tphase = taskInfo.phase
+		if (tphase != "finish" && tphase != "error") {
+			// ptupdateTimes = 2100
+			// taskStatus = 0;
+			// startTime = Date.now();
+			// clearSTInfoDivEles();
+			// reqstUpdate()
+			restartReqstUpdate();
+		}
+	}
+}
+function initAliveTaskAt(index) {
+
+	sendRenderingBtn.style.display = 'none';
+	let taskInfo = aliveTasks[index];
+	updateTaskJsonData(taskInfo);
+}
+function gotoAliveTaskAt(index) {
+	console.log("gotoAliveTaskAt(), index: ", index);
+	aliveTaskIndex = index;
+	let div = document.getElementById("select_file_div");
+	initModelViewer(div);
+
+}
+function gotoTasksListPage() {
+	let div = document.getElementById("select_file_div");
+	clearDivAllEles(div);
+	for (let i = 0; i < aliveTasks.length; ++i) {
+		let br = document.createElement("br");
+		div.appendChild(br);
+
+		let link = document.createElement("a");
+		link.innerHTML = "选择第<" + (i + 1) + ">个渲染任务: " + aliveTasks[i].taskname;
+		link.href = "#";
+		link.addEventListener("click", () => {
+			gotoAliveTaskAt(i)
+		});
+		div.appendChild(link);
+		br = document.createElement("br");
+		div.appendChild(br);
+	}
+	let br = document.createElement("br");
+	div.appendChild(br);
+	br = document.createElement("br");
+	div.appendChild(br);
+}
+function syncAliveTasks(btn) {
+	console.log("syncAliveTasks(), btn: ", btn);
+	let url = createReqUrlStr(taskInfoGettingUrl, "syncAliveTasks", 0, 0, "none");
+	console.log("### ###### 01 syncAliveTasks(), url: ", url);
+	sendACommonGetReq(url, (purl, content) => {
+		var infoObj = JSON.parse(content);
+		aliveTasks = infoObj.tasks;
+		if (aliveTasks.length > 0) {
+			gotoTasksListPage();
+		} else {
+			alert("没有可以操作的其他渲染任务")
+		}
+		console.log("### ###### 02 syncAliveTasks(), infoObj: ", infoObj);
+	}
+	);
 }

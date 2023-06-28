@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"voxwebsvr.com/webfs"
@@ -18,8 +19,12 @@ func RenderingTask(g *gin.Context) {
 	taskname := g.DefaultQuery("taskname", "none")
 	srcType := g.DefaultQuery("srcType", "none")
 
+	t := time.Now()
+	msTime := t.UnixMilli()
+	timeStr := strconv.FormatInt(msTime, 10)
+
 	fmt.Println("RenderingTask, rTask("+taskid+"):"+phase, ", progress: ", progress, "%, taskname: ", taskname, " srcType: ", srcType)
-	infoStr := `{"phase":"` + phase + `","status":22}`
+	infoStr := `{"phase":"` + phase + `","status":22, "time":` + timeStr + `}`
 	hasTaskFlag := false
 	tid, errInt64 := strconv.ParseInt(taskid, 10, 64)
 	if errInt64 == nil {
@@ -28,6 +33,12 @@ func RenderingTask(g *gin.Context) {
 	var rtNode *RTaskInfoNode = &tempRTNode
 	if hasTaskFlag {
 		rtNode = rtTaskNodeMap[tid]
+
+		switch phase {
+		case "finish":
+			rtNode.Version++
+		default:
+		}
 		switch phase {
 		case "reqanewrtask", "rtaskreadydata", "queryataskrst", "query-re-rendering-task":
 			tempRTNode.Phase = phase
@@ -43,7 +54,7 @@ func RenderingTask(g *gin.Context) {
 	switch phase {
 	case "query-re-rendering-task":
 		fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
-		// failureFlag := true
+
 		if hasTaskFlag {
 			if rtNode.Phase == "finish" {
 				imgSizes := g.DefaultQuery("sizes", "512,512")
@@ -53,20 +64,16 @@ func RenderingTask(g *gin.Context) {
 				rtNode.Action = phase
 				rtNode.Phase = "new"
 				rtNode.Progress = 0
-				rtNode.RerenderingTimes++
-				// parts := strings.Split(imgSizes, ",")
-				// iw, _ := strconv.Atoi(parts[0])
-				// ih, _ := strconv.Atoi(parts[1])
-				// rtNode.Resolution = [2]int{iw, ih}
-				// rtNode.SetCamdvsWithStr(camdvs)
+				rtNode.Version++
+
 				rtNode.SetParamsWithStr(imgSizes, camdvs, rtBGTransparent)
 				rtWaitTaskNodes = append(rtWaitTaskNodes, rtNode)
 
 			} else {
-				infoStr = `{"phase":"` + phase + `","status":11}`
+				infoStr = `{"phase":"` + phase + `","status":11, "time":` + timeStr + `}`
 			}
 		} else {
-			infoStr = `{"phase":"` + phase + `","status":0}`
+			infoStr = `{"phase":"` + phase + `","status":0, "time":` + timeStr + `}`
 		}
 
 	case "rtaskreadydata":
@@ -80,6 +87,9 @@ func RenderingTask(g *gin.Context) {
 			rtNode = rtWaitTaskNodes[0]
 			rtNode.Phase = "task_rendering_enter"
 			rtWaitTaskNodes = append(rtWaitTaskNodes[:0], rtWaitTaskNodes[1:]...)
+			rtNode.RActive = true
+			rtNode.RerenderingTimes++
+			rtNode.Version++
 			infoStr = rtNode.GetTaskJsonStr()
 		}
 	case "queryataskrst":
@@ -114,14 +124,13 @@ func RenderingTask(g *gin.Context) {
 					"resUrl":"http://www.artvily.com/static/assets/obj/apple_01.obj"
 				}
 			]
-		}`
+			, "time":` + timeStr + `}`
 	}
 	g.String(http.StatusOK, fmt.Sprintf(infoStr))
 }
 
 func UploadRenderingTaskData(g *gin.Context) {
-	// infoStr := ``
-	// g.String(http.StatusOK, fmt.Sprintf(infoStr))
+
 	phase := g.DefaultQuery("phase", "none")
 	taskid := g.DefaultQuery("taskid", "0")
 	taskname := g.DefaultQuery("taskname", "none")
@@ -130,13 +139,7 @@ func UploadRenderingTaskData(g *gin.Context) {
 	fmt.Println("UploadRenderingTaskData, phase: ", phase, ", taskid: ", taskid, ", taskname: ", taskname, " srcType: ", srcType)
 	// single file uploading receive
 	filename := "none"
-	// tid, _ := strconv.ParseInt(taskid, 10, 64)
-	// hasTaskFlag := false
 	tid, _ := strconv.ParseInt(taskid, 10, 64)
-	// if errInt64 == nil {
-	// 	hasTaskFlag = HasRTTaskNodeByID(tid)
-	// }
-	// var rtNode *RTaskInfoNode = &tempRTNode
 
 	var status = 0
 	file, _ := g.FormFile("file")
@@ -168,17 +171,9 @@ func UploadRenderingTaskData(g *gin.Context) {
 					fileDir := uploadDir + taskname + "/"
 
 					var rtNode RTaskInfoNode
-					// rtNode.Action = "new"
-					// rtNode.Phase = "new"
-					// rtNode.Progress = 0
-					// rtNode.RerenderingTimes = 0
 					rtNode.Reset()
 
-					// parts := strings.Split(imgSizes, ",")
-					// iw, _ := strconv.Atoi(parts[0])
-					// ih, _ := strconv.Atoi(parts[1])
-					// rtNode.Resolution = [2]int{iw, ih}
-					// rtNode.SetResolutionWithSizeStr(imgSizes, camdvs)
+					fmt.Println("UploadRenderingTaskData(), camdvs: ", camdvs)
 					rtNode.SetParamsWithStr(imgSizes, camdvs, rtBGTransparent)
 
 					rtNode.Id = tid
@@ -229,6 +224,8 @@ func UploadRenderingTaskData(g *gin.Context) {
 	reqd.TaskName = taskname
 	reqd.Status = status
 	reqd.FilePath = filePath
+	reqd.Version = 0
+	reqd.UpdateTime()
 
 	jsonBytes, err := json.Marshal(reqd)
 	if err != nil {
@@ -238,42 +235,7 @@ func UploadRenderingTaskData(g *gin.Context) {
 	// c.String(http.StatusOK, fmt.Sprintf("'%s' uploaded!", file.Filename))
 	g.String(http.StatusOK, fmt.Sprintf("%s", jsonStr))
 }
-func GetRTaskInfo(g *gin.Context) {
-	phase := g.DefaultQuery("phase", "none")
-	taskid := g.DefaultQuery("taskid", "0")
-	taskname := g.DefaultQuery("taskname", "none")
-	srcType := g.DefaultQuery("srcType", "none")
 
-	fmt.Println("GetRTaskInfo, phase: ", phase, ", taskid: ", taskid, ", taskname: ", taskname, " srcType: ", srcType)
-
-	var status = 0
-
-	hasTaskFlag := false
-	tid, errInt64 := strconv.ParseInt(taskid, 10, 64)
-	if errInt64 == nil {
-		hasTaskFlag = HasRTTaskNodeByID(tid)
-	}
-	var rtNode *RTaskInfoNode = &tempRTNode
-	if hasTaskFlag {
-		rtNode = rtTaskNodeMap[tid]
-	}
-
-	var reqd UploadReqDef
-	reqd.Success = status == 22
-	reqd.TaskID = tid
-	reqd.TaskName = taskname
-	reqd.Status = status
-	reqd.FilePath = rtNode.ResDir + "draco/"
-	reqd.DrcsTotal = rtNode.ModelDrcsTotal
-
-	jsonBytes, err := json.Marshal(reqd)
-	if err != nil {
-		fmt.Println("error:", err)
-	}
-	jsonStr := string(jsonBytes)
-	// c.String(http.StatusOK, fmt.Sprintf("'%s' uploaded!", file.Filename))
-	g.String(http.StatusOK, fmt.Sprintf("%s", jsonStr))
-}
 func UploadRTaskFilesData(g *gin.Context) {
 	// infoStr := ``
 	// g.String(http.StatusOK, fmt.Sprintf(infoStr))
@@ -339,6 +301,7 @@ func UploadRTaskFilesData(g *gin.Context) {
 	reqd.TaskName = taskname
 	reqd.Status = status
 	reqd.FilePath = fileDir
+	reqd.UpdateTime()
 
 	jsonBytes, err := json.Marshal(reqd)
 	if err != nil {

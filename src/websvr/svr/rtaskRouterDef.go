@@ -5,17 +5,32 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type UploadReqDef struct {
 	TaskID    int64  `json:"taskid,int64"`
+	Version   int64  `json:"version,int64"`
 	FilePath  string `json:"filepath"`
 	TaskName  string `json:"taskname"`
 	Success   bool   `json:"success,bool"`
 	Status    int    `json:"status,int"`
 	DrcsTotal int    `json:"drcsTotal,int"`
 	FileName  string `json:"fileName"`
+	Time      int64  `json:"time"`
 	UUID      string `json:"-"` //忽略输出
+}
+
+func (self *UploadReqDef) UpdateTime() {
+	t := time.Now()
+	self.Time = t.UnixMilli()
+}
+func (self *UploadReqDef) GetJsonStr() string {
+	jsonBytes, err := json.Marshal(self)
+	if err != nil {
+		fmt.Println("error:", err)
+	}
+	return string(jsonBytes)
 }
 
 type RTaskInfoNode struct {
@@ -28,12 +43,19 @@ type RTaskInfoNode struct {
 	Camdvs           [16]float64 `json:"camdvs"`
 	Phase            string      `json:"phase"`
 	Action           string      `json:"action"`
+	Time             int64       `json:"time"`
+	Version          int64       `json:"version"`
 	AutoFitModelSize string      `json:"autoFitModelSize"`
 	Progress         int
 	RerenderingTimes int
 	ModelDrcsTotal   int
+	RActive          bool
 }
 
+func (self *RTaskInfoNode) UpdateTime() {
+	t := time.Now()
+	self.Time = t.UnixMilli()
+}
 func (self *RTaskInfoNode) Reset() {
 
 	self.Action = "new"
@@ -41,13 +63,11 @@ func (self *RTaskInfoNode) Reset() {
 	self.Progress = 0
 	self.RerenderingTimes = 0
 	self.ModelDrcsTotal = 0
+	self.Version = 0
+	self.RActive = false
 }
 func (self *RTaskInfoNode) SetCamdvsWithStr(camdvsStr string) {
 
-	// self.Action = "new"
-	// self.Phase = "new"
-	// self.Progress = 0
-	// self.RerenderingTimes = 0
 	fmt.Println("SetCamdvsWithStr() ### len(camdvsStr): ", len(camdvsStr))
 	var dvs [16]float64
 	if len(camdvsStr) > 16 {
@@ -80,9 +100,11 @@ func (self *RTaskInfoNode) SetParamsWithStr(sizesStr string, camdvs string, bgTr
 }
 
 func (self *RTaskInfoNode) GetViewStatusInfo(teamIndex int, teamLength int) string {
+	self.UpdateTime()
 	infoStr := `{"phase":"` + self.Phase + `","progress":` + strconv.Itoa(self.Progress)
-	infoStr += `,"taskid":` + strconv.FormatInt(self.Id, 10) + `,"status":22`
+	infoStr += `,"taskid":` + strconv.FormatInt(self.Id, 10) + `,"status":22, "time":` + strconv.FormatInt(self.Time, 10)
 	infoStr += `,"drcsTotal":` + strconv.Itoa(self.ModelDrcsTotal)
+	infoStr += `,"version":` + strconv.FormatInt(self.Version, 10)
 	switch self.Phase {
 	case "new":
 		infoStr += `, "teamIndex":` + strconv.Itoa(teamIndex) + `, "teamLength": ` + strconv.Itoa(teamLength)
@@ -91,10 +113,11 @@ func (self *RTaskInfoNode) GetViewStatusInfo(teamIndex int, teamLength int) stri
 		infoStr += `, "bgTransparent":` + strconv.Itoa(self.BGTransparent)
 	}
 	infoStr += `}`
-	fmt.Println("GetViewStatusInfo() ### infoStr: ", infoStr)
+	// fmt.Println("GetViewStatusInfo() ### infoStr: ", infoStr)
 	return infoStr
 }
 func (self *RTaskInfoNode) GetTaskJsonStr() string {
+	self.UpdateTime()
 	jsonBytes, err := json.Marshal(self)
 	if err != nil {
 		fmt.Println("error:", err)
