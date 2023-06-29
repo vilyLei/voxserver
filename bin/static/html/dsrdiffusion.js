@@ -340,6 +340,7 @@ function sendACommonGetReq(purl, onload) {
 	}
 	req.send(null);
 }
+// let progressScale = 100.0 + Math.round(Math.random()) * 10 - 5;
 function parseRenderingTaskInfo(sdo) {
 	// var sdo = JSON.parse(req_response);
 	console.log("parseRenderingTaskInfo(), sdo: ", sdo);
@@ -358,6 +359,13 @@ function parseRenderingTaskInfo(sdo) {
 			if (sdo.progress < 6) {
 				showSpecInfo("正在解析模型数据", rt_phase_times);
 			} else {
+				// let pro = Math.round(100.0 * sdo.progress / progressScale);
+				// if(pro < 1) {
+				// 	pro = 1
+				// } else if(pro > 99) {
+				// 	pro = 99
+				// }
+
 				div.innerHTML = `正在进行渲染: <b><font color="#008800">` + sdo.progress + `%</font></b>`
 			}
 			flag = true;
@@ -452,6 +460,7 @@ function notifyTaskInfoToSvr(phase, progress, taskId, taskName, otherInfo = "") 
 
 
 function restartReqstUpdate() {
+	// progressScale = 100.0 + Math.round(Math.random()) * 18 - 9;
 	ptupdateTimes = 2100
 	taskStatus = 0;
 	startTime = Date.now();

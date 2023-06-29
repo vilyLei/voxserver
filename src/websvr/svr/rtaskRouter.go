@@ -129,6 +129,8 @@ func RenderingTask(g *gin.Context) {
 	g.String(http.StatusOK, fmt.Sprintf(infoStr))
 }
 
+var dsrdiffusionUploadDir = "./static/dsrdiffusion/rtaskres/"
+
 func UploadRenderingTaskData(g *gin.Context) {
 
 	phase := g.DefaultQuery("phase", "none")
@@ -146,7 +148,7 @@ func UploadRenderingTaskData(g *gin.Context) {
 	filePath := ""
 	if file != nil {
 
-		uploadDir := "./static/uploadFiles/rtTask/"
+		uploadDir := dsrdiffusionUploadDir
 
 		filename = file.Filename
 		switch phase {
@@ -265,10 +267,10 @@ func UploadRTaskFilesData(g *gin.Context) {
 
 		files := form.File["files"]
 		fmt.Println("files.length: ", len(files))
-		// filePath := ""
+
 		if files != nil {
 
-			uploadDir := "./static/uploadFiles/rtTask/"
+			uploadDir := dsrdiffusionUploadDir
 
 			switch phase {
 			case "modelToDrc":
