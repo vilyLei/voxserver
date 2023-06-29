@@ -549,6 +549,7 @@ function uploadAndSendRendering() {
 	if (fileObj == null) {
 		return;
 	}
+	startTime = Date.now()
 	let camdvs = [0.7071067690849304, -0.40824827551841736, 0.5773502588272095, 2.390000104904175, 0.7071067690849304, 0.40824827551841736, -0.5773502588272095, -2.390000104904175, 0, 0.8164965510368347, 0.5773502588272095, 2.390000104904175, 0, 0, 0, 1];
 	let camParam = "&camdvs=[" + camdvs + "]";
 	console.log("camParam: ", camParam);

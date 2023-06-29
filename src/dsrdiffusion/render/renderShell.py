@@ -18,14 +18,16 @@ blender_command = "D:\programs\\blender\\blender.exe -b -P .\\renderingModelFile
 
 tilesTotal = 1
 tilesIndex = 0
-r_progress = 0.0
-dis_rprogress = 65
-base_rprogress = 20
+r_progress = 0
+dis_rprogress = 65 + random.randint(-1, 6)
+base_rprogress = 20 + random.randint(-2, 2)
 preTileSNList = [0 ,0,0]
 sys_rendererExePath = ""
 sys_renderingModulePath = ""
 sys_rtaskDir = ""
 
+sys_lossTime = 0
+sys_beginTime = 0
 
 rootDir = "D:/dev/webProj/"
 # rootDir = "D:/dev/webdev/"
@@ -78,8 +80,9 @@ def updateRenderStatus():
     global r_progress
     global statusData
     url = sys_rtaskDir + 'renderingStatus.json'
-
     rtask = statusData["rendering-task"]
+    # tempProgress = r_progress
+
     if rconfig is None:
         rconfig = getJsonObjFromFile( sys_rtaskDir + 'config.json' )
         ###
@@ -89,18 +92,20 @@ def updateRenderStatus():
     if r_progress >= 100:
         r_progress = 100
         rtask["phase"] = "finish"
-    pro = r_progress + random.randint(-3, 6)
-    if(pro < 1) :
-        pro = 1
-    elif pro > 99:
-        pro = 99
-    if r_progress == 100:
-            pro = 100
-    srcPro = rtask["progress"]
-    if srcPro < pro:
-        rtask["progress"] = pro
 
-    print("&$$$$$$$ updateRenderStatus(), r_progress: ", r_progress,", pro: ", pro)
+    # if abs(rtask["progress"] - r_progress) > 3:
+    #     tempProgress = r_progress + random.randint(-3, 3)
+    #     if(tempProgress < 1):
+    #         tempProgress = 1
+    #     elif tempProgress > 99:
+    #         tempProgress = 99
+
+    # if r_progress == 100:
+    #         tempProgress = 100
+
+    rtask["progress"] = r_progress
+
+    print("&$$$$$$$ updateRenderStatus(), r_progress: ", r_progress)
     # 将数据写入 JSON 格式的文件
     with open(url, 'w') as f:
         json.dump(statusData, f)
@@ -140,9 +145,9 @@ def getRTileProgress(line):
         k0 = (tfactors[1] * tstot  + sample_factors[1])
         k1 = (tfactors[2] * tstot)
         factor = k0/k1
-        pro = round(factor * dis_rprogress) + base_rprogress
-        if pro > r_progress:
-            r_progress = pro
+        tempProgress = round(factor * dis_rprogress) + base_rprogress
+        if tempProgress > r_progress:
+            r_progress = tempProgress
             print("###> rendering progress: ", r_progress, "%")
             updateRenderStatus()
         # print("#### tile rending, sample info: ", k0, k1, factor, round(factor * dis_rprogress), dis_rprogress)
@@ -192,12 +197,12 @@ def renderingStart():
         if "Fra:" in line:
             if " Denoising" in line:
                 print("## denoising.")
-                r_progress = 95
+                r_progress = 95 + random.randint(0, 4)
                 updateRenderStatus()
                 print("## rendering progress: ", r_progress, "%")
             elif " Finished" in line:
                 print("## rendering Finished.")
-                r_progress = 90
+                r_progress = 90 + random.randint(0, 6)
                 updateRenderStatus()
                 print("## rendering progress: ", r_progress, "%")
             elif " Tiles," in line:
@@ -247,7 +252,6 @@ def renderingStart():
                 print("## rendering progress: ", r_progress, "%")
         elif "(Saving:" in line:
             r_progress = 100
-            # updateRenderStatus()
             print("## rendering finish and saved a pic.")
             print("## rendering progress: ", r_progress, "%")
         elif "Blender quit" in line:
@@ -305,6 +309,8 @@ if __name__ == "__main__":
     argv = sys.argv
     # print("argv: \n", argv)
     print("bcRenderShell init ...")
+    # sys_beginTime = time.process_time()
+    sys_beginTime = time.perf_counter()
     if "--" in argv:
         argv = argv[argv.index("--") + 1:]
         # print("sub0 argv: \n", argv)
@@ -315,7 +321,10 @@ if __name__ == "__main__":
             # print("sys_rendererExePath: ", sys_rendererExePath)
             # print("sys_renderingModulePath: ", sys_renderingModulePath)
             initCfg()
+            beginTime = time.perf_counter()
             renderingStart()
+            lossTime = time.perf_counter() - sys_beginTime
+            print("####### bcRenderShell renderingStart ops, lossTime: ", lossTime)
             i = 0
     else:
         argv = []
@@ -323,7 +332,9 @@ if __name__ == "__main__":
     # renderingStart()
     if r_progress >= 100:
         updateRenderStatus()
-    print("####### bcRenderShell end ...")
+    # sys_lossTime = time.process_time() - sys_beginTime
+    sys_lossTime = time.perf_counter() - sys_beginTime
+    print("####### bcRenderShell end ..., lossTime: ", sys_lossTime)
 ################################################################################
 # D:/dev/webProj/voxblender/models/model01/apple01.glb
 # D:/dev/webProj/voxblender/models/model01/

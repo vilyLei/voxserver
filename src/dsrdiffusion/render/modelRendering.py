@@ -54,7 +54,7 @@ class RenderingCfg:
         cfg = self.configObj
         taskObj = cfg["task"]
         self.outputPath = self.taskRootDir + taskObj["outputPath"]
-        
+
         if "bgTransparent" in taskObj:
             self.bgTransparent = taskObj["bgTransparent"] == 1
             print("XXXXXXX self.bgTransparent: ", self.bgTransparent)
@@ -94,7 +94,7 @@ def updateCamWithCfg(cfg):
 
             camera_object = bpy.data.objects["Camera"]
             camera_object.matrix_world = cam_world_matrix
-            
+
             # Set camera field of view
             camera_object.data.angle = 45
             camera_object.data.clip_start = 0.1
@@ -106,14 +106,14 @@ def updateCamWithCfg(cfg):
 
 def getSceneObjsBounds():
     print("getObjsBounds() init ...")
-    
+
     minx, miny, minz = (999999.0,) * 3
     maxx, maxy, maxz = (-999999.0,) * 3
     mesh_objectDict = {}
     # create dict with meshes
     for m in bpy.data.meshes:
             mesh_objectDict[m.name] = []
-    
+
     # sizeValue = 0
     # attach objects to dict keys
     for obj in bpy.context.scene.objects:
@@ -139,10 +139,10 @@ def getSceneObjsBounds():
                         minz = v_world[2]
                     if v_world[2] > maxz:
                         maxz = v_world[2]
-    
+
     # for obj in meshObjs:
     #     # print("mesh obj: ", obj)
-    #     print("mesh list(obj.bound_box[0]): ", list(obj.bound_box[0]), obj.dimensions)        
+    #     print("mesh list(obj.bound_box[0]): ", list(obj.bound_box[0]), obj.dimensions)
 
     minV = (minx, miny, minz)
     maxV = (maxx, maxy, maxz)
@@ -187,7 +187,7 @@ def uniformScaleSceneObjs(dstSizeV):
     # create dict with meshes
     for m in bpy.data.meshes:
         mesh_objectDict[m.name] = []
-    
+
     # sizeValue = 0
     # attach objects to dict keys
     for obj in bpy.context.scene.objects:
@@ -217,18 +217,18 @@ def clearAllMeshesInScene():
     bpy.ops.object.select_by_type(type='MESH')
     bpy.ops.object.delete()
     #
-def clearRawIScene():    
+def clearRawIScene():
     obj = bpy.data.objects["Cube"]
     if obj:
         bpy.data.objects.remove(obj)
     else:
         print("has not the default Cube object in the current scene.")
 ################################################################################
-    
+
 def loadAObjMesh(obj_file):
     # 加载OBJ模型
     imported_object = bpy.ops.import_scene.obj(filepath=obj_file)
-    #    
+    #
 def loadAFbxMesh(fbx_file):
     # 加载FBX模型
     imported_object = bpy.ops.import_scene.fbx(filepath=fbx_file)
@@ -242,7 +242,7 @@ def loadAUsdMesh(usd_file):
     imported_object = bpy.ops.wm.usd_import(filepath=usd_file)
     #
 
-def loadAObjMeshFromCfg():    
+def loadAObjMeshFromCfg():
     cfgJson = sysRenderingCfg.configObj
     if "resource" in cfgJson:
         res = cfgJson["resource"]
@@ -270,7 +270,7 @@ def isBlendModelFile(index):
         res = resList[index]
         modelUrls = res["models"]
         url = modelUrls[0]
-        
+
     elif "resource" in cfgJson:
         res = cfgJson["resource"]
         modelUrls = res["models"]
@@ -285,7 +285,7 @@ def isBlendModelFile(index):
         # sys.stdout.flush()
         if resType == "blend" or resType == "bld":
             return True
-        
+
         # print("Fra:1 Model load end ...")
         # sys.stdout.flush()
         return False
@@ -293,7 +293,7 @@ def isBlendModelFile(index):
         return False
     ################################################
 
-def loadMeshAtFromCfg(index):   
+def loadMeshAtFromCfg(index):
     global envFilePath
     global sysRenderingCfg
     cfgJson = sysRenderingCfg.configObj
@@ -306,7 +306,7 @@ def loadMeshAtFromCfg(index):
         modelUrls = res["models"]
         url = sysRenderingCfg.taskRootDir + modelUrls[0]
         print("loadMeshAtFromCfg(), A model url: ", url)
-        
+
     elif "resource" in cfgJson:
         res = cfgJson["resource"]
         modelUrls = res["models"]
@@ -334,7 +334,7 @@ def loadMeshAtFromCfg(index):
         else:
             print("has not correct mesh data type ...")
             return False
-        
+
         print("Fra:1 Model load end ...")
         sys.stdout.flush()
         return True
@@ -364,17 +364,20 @@ def renderingStart():
     global sysRenderingCfg
     global envFilePath
     cfg = sysRenderingCfg
-    
+    beginTime = time.perf_counter()
     if not isBlendModelFile(0):
         clearAllMeshesInScene()
         loadMeshAtFromCfg(0)
 
     scaleFlag = uniformScaleSceneObjs((2.0, 2.0, 2.0))
-    
+
     if not updateCamWithCfg(cfg):
         print("####### size auto fit camera ...")
         objsFitToCamera()
 
+    lossTime = time.perf_counter() - beginTime
+
+    print("####### modelFileRendering res ops lossTime: ", lossTime)
     print("####### modelFileRendering envFilePath: ", envFilePath, ", cfg.bgTransparent: ", cfg.bgTransparent)
     # time.sleep(3.0)
 
@@ -406,19 +409,41 @@ def renderingStart():
         bg_tree.links.new(bg_node.outputs['Color'], bg_output.inputs['Color'])
 
     # 设置设备类型为GPU
-    bpy.context.scene.cycles.device = 'GPU'
-    bpy.context.scene.cycles.samples = 512
+    beginTime = time.perf_counter()
+
+    cyclesIns = bpy.context.scene.cycles
+    cyclesIns.device = 'GPU'
+
+    imgW = cfg.outputResolution[0]
+    imgH = cfg.outputResolution[1]
+
+    bpy.context.scene.render.use_compositing = True
+    cyclesIns.use_bvh_embree = True
+    cyclesIns.use_denoising = True
+    cyclesIns.denoising_store_passes = True
+    print("####### modelFileRendering outputResolution: ", imgW, imgW)
+    if imgW > 256 and imgH > 256:
+        cyclesIns.aa_samples = 128
+        cyclesIns.samples = 512
+    else:
+        cyclesIns.aa_samples = 8
+        cyclesIns.samples = 8
+        cyclesIns.diffuse_bounces = 1
+        cyclesIns.glossy_bounces = 1
+        cyclesIns.max_bounces = 4
+
+        # cyclesIns.preview_aa_samples = 2
+        # cyclesIns.preview_samples = 2
+        # cyclesIns.transmission_bounces = 2
+        # cyclesIns.transparent_max_bounces = 2
+        # print("mini rendering ...")
 
     # print("bpy.context.scene.cycles: ", bpy.context.scene.cycles)
-
-
-    # output_img_resolution = 512
-    # output_img_resolution = 4096 * 2
 
     renderer = bpy.context.scene.render
 
     renderer.engine = 'CYCLES'
-    renderer.threads = 8
+    # renderer.threads = 16
     # renderer.film_transparent = True
     if cfg.bgTransparent:
         renderer.image_settings.file_format='PNG'
@@ -439,10 +464,12 @@ def renderingStart():
             else:
                 renderer.filepath = cfg.outputPath + "bld_rendering.jpg"
     #################################################################################
-    
-    renderer.resolution_x = cfg.outputResolution[0]
-    renderer.resolution_y = cfg.outputResolution[1]
+
+    renderer.resolution_x = imgW
+    renderer.resolution_y = imgH
     bpy.ops.render.render(write_still=True)
+    lossTime = time.perf_counter() - beginTime
+    print("####### modelFileRendering rendering lossTime: ", lossTime)
 
 if __name__ == "__main__":
     # sys.stdout.write("modelFileRendering ######################### ...\n")
@@ -461,8 +488,10 @@ if __name__ == "__main__":
                 sysRenderingCfg.setRootDir(taskRootDir)
                 sysRenderingCfg.getConfigData()
                 print("taskRootDir: ", taskRootDir)
+                beginTime = time.perf_counter()
                 renderingStart()
-                i = 0
+                lossTime = time.perf_counter() - beginTime
+                print("####### modelFileRendering renderingStart ops lossTime: ", lossTime)
         else:
             argv = []
     except Exception as e:
