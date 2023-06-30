@@ -1,7 +1,6 @@
 #!/usr/bin/python
 # -*- coding: UTF-8 -*-
-# import os
-# import time
+import math
 import sys
 import json
 import bpy
@@ -96,7 +95,7 @@ def updateCamWithCfg(cfg):
             camera_object.matrix_world = cam_world_matrix
 
             # Set camera field of view
-            camera_object.data.angle = 45
+            camera_object.data.angle = math.pi * 45.0/180.0
             camera_object.data.clip_start = 0.1
             camera_object.data.clip_end = 20.0
             return True

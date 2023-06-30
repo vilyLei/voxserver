@@ -45,7 +45,8 @@ def exportObjs():
     # return
     process = subprocess.Popen(encode_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False, universal_newlines=True)
     for line in iter(process.stdout.readline, ""):
-        print(line, end="")
+        # print(line, end="")
+        print(line)
     process.stdout.close()
     process.wait()
     print("####### encodeAModelToDrcs::exportObjs() call end ...")
@@ -68,7 +69,8 @@ def encodeAObjFile(filePath, savingDir):
     # return
     process = subprocess.Popen(encode_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False, universal_newlines=True)
     for line in iter(process.stdout.readline, ""):
-        print(line, end="")
+        print(line)
+        # print(line, end="")
     process.stdout.close()
     process.wait()
     print("####### encodeAModelToDrcs::encodeStart() call end ...")
