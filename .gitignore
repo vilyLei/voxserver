@@ -38,5 +38,5 @@ src/websvr/static/bulesystem/
 bin/static/dsrdiffusion/rtaskres/
 bin/static/rtUploadFiles/
 bin/static/uploadFiles/
-dsrdiffusion/model/private/
+src/dsrdiffusion/model/private/
 *.exe~

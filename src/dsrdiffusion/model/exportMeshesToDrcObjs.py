@@ -24,7 +24,7 @@ def exportAMeshPerObj(savingDir):
     # create dict with meshes
     for m in bpy.data.meshes:
             mesh_objectDict[m.name] = []
-    
+
     for obj in bpy.context.scene.objects:
         # only for meshes
         if obj.type == 'MESH':
@@ -36,13 +36,13 @@ def exportAMeshPerObj(savingDir):
                 ### ###
     ### ########################################################
     index = 0
-    
+
     # target_file_dir = rootDir + 'voxblender/private/obj/scene01/export_test01.obj'
     # file_dir = rootDir + 'voxblender/private/obj/scene01/'
-    
+
     context = bpy.context
     viewlayer = context.view_layer
-    
+
     if not os.path.exists(savingDir):
         os.makedirs(savingDir)
     ########################################
@@ -56,7 +56,8 @@ def exportAMeshPerObj(savingDir):
                 # obj.select_set(True)
                 viewlayer.objects.active = obj
                 obj.select_set(True)
-                filePath = savingDir + "export_" + str(index) + ".obj"
+                # filePath = savingDir + "export_" + str(index) + ".obj"
+                filePath = savingDir + obj.data.name + ".obj"
                 index += 1
                 bpy.ops.export_scene.obj(filepath=filePath, use_selection = True, use_materials=False, use_triangles=True)
                 # bpy.ops.export_scene.obj(filepath=filePath, use_selection = True)
@@ -71,7 +72,7 @@ def clearAllMeshesInScene():
     bpy.ops.object.select_by_type(type='MESH')
     bpy.ops.object.delete()
     #
-def clearScene():    
+def clearScene():
     obj = bpy.data.objects["Cube"]
     if obj:
         bpy.data.objects.remove(obj)
@@ -96,8 +97,8 @@ def loadAUsdMesh(usd_file):
     #
 
 def loadModelWithUrl(url):
-    resType = url.split('.')[1]
-    resType = resType.lower()
+    ls = url.split('.')
+    resType = ls[len(ls) - 1].lower()
     print("######### loadModelWithUrl(), resType: ", resType)
     if resType == "obj":
             loadAObjMesh(url)
@@ -124,7 +125,7 @@ def exportObjs():
     # print("fileInfos: ", fileInfos)
     suffix = fileInfos[1][1:]
     suffix = suffix.lower()
-    
+
     modelFilePath = modelFilePath.replace("\\","/")
     modelFilePath = modelFilePath.replace("//","/")
     index = modelFilePath.rindex("/")
@@ -145,7 +146,7 @@ def exportObjs():
     # directory = os.path.dirname(blend_file_path)
     # target_file = rootDir + 'voxblender/private/obj/scene01/export_test01.obj'
     # bpy.ops.export_scene.obj(filepath=target_file)
-    
+
     exportAMeshPerObj( fileDir )
 
 # def encodeStart():
@@ -159,11 +160,11 @@ if __name__ == "__main__":
     if "--" in argv:
         argv = argv[argv.index("--") + 1:]
         # print("sub0 argv: \n", argv)
-        if len(argv) > 0:            
+        if len(argv) > 0:
             modelFilePath = argv[0].split("=")[1]
             exportObjs()
             # encodeStart()
-            
+
     else:
         argv = []
     # ### for test
@@ -172,4 +173,4 @@ if __name__ == "__main__":
     #     updateRenderStatus()
     print("####### exportMeshesToDrcObjs end ...")
 
-# D:\programs\blender\blender.exe -b -P .\exportMeshesToDrcObjs.py -- modelFilePath=scene01\scene01.fbx
+# D:\programs\blender\blender.exe -b -P .\exportMeshesToDrcObjs.py -- modelFilePath=.\private\apple02\apple02.glb

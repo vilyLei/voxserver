@@ -302,6 +302,32 @@ function loadDrcModels(total) {
 				var infoObj = JSON.parse(content);
 				console.log("loadDrcModels() loaded, infoObj: ", infoObj);
 				let resBaseUrl = getHostUrl(9090) + infoObj.filepath.slice(2);
+				let statusUrl = resBaseUrl + "status.json";
+				sendACommonGetReq(statusUrl, (pstatusUrl, content) => {
+					let statusObj = JSON.parse(content);
+					console.log("statusObj: ", statusObj);
+
+					let list = statusObj.list
+					let drcsTotal = list.length;
+					let drcUrls = [];
+					let types = [];
+					for (let i = 0; i < drcsTotal; i++) {
+						let drcUrl = resBaseUrl + list[i];
+						drcUrls.push(drcUrl)
+						types.push("drc");
+					}
+					console.log("drcUrls: ", drcUrls);
+
+					rscViewer.initSceneByUrls(drcUrls, types, (prog) => {
+						console.log("3d viewer drc model loading prog: ", prog);
+						if (prog >= 1.0) {
+							viewerInfoDiv.innerHTML = "";
+							loadedModel = true;
+						}
+					}, 200);
+				}
+				);
+				/*
 				let drcsTotal = infoObj.drcsTotal;
 				let drcUrls = [];
 				let types = [];
@@ -319,6 +345,7 @@ function loadDrcModels(total) {
 						loadedModel = true;
 					}
 				}, 200);
+				//*/
 			})
 		} else {
 			// console.log("$$$ loading model resource, ", rt_phase_times);
@@ -328,7 +355,9 @@ function loadDrcModels(total) {
 	}
 }
 function sendACommonGetReq(purl, onload) {
-
+	if (taskStatus == 3 || taskStatus == 2) {
+		return
+	}
 	let req = new XMLHttpRequest();
 	req.open("GET", purl, true);
 	req.onerror = function (err) {
@@ -405,6 +434,7 @@ function parseRenderingTaskInfo(sdo) {
 				taskStatus = 2
 				div.innerHTML = "渲染失败(模型数据不能正确解析)"
 				taskFailure()
+				return;
 			}
 
 		case "query-re-rendering-task":
@@ -425,7 +455,7 @@ function parseRenderingTaskInfo(sdo) {
 	rt_phase_times++
 }
 function sendAGetReq(purl) {
-	if (taskStatus == 3) {
+	if (taskStatus == 3 || taskStatus == 2) {
 		return;
 	}
 	let req = new XMLHttpRequest();
@@ -560,8 +590,9 @@ function uploadAndSendRendering() {
 		return;
 	}
 	let fileSize = Math.floor(fileObj.size / (1024 * 1024))
-	if (fileSize > 30) {
-		alert("模型文件超过30M, 带宽太小暂时不支持 !!!");
+	let maxSize = 30;
+	if (fileSize > maxSize) {
+		alert("模型文件超过"+maxSize+"M, 带宽太小暂时不支持 !!!");
 		updatePage()
 		return;
 	}

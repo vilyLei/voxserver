@@ -18,7 +18,8 @@ exportPyPath = ".\\exportMeshesToDrcObjs.py"
 
 statusData = {
     "rins":"encoder",
-    "phase":"finish"
+    "phase":"finish",
+    "list":[]
 }
 
 def writeStatusFile():
@@ -63,7 +64,9 @@ def encodeAObjFile(filePath, savingDir):
     # print("suffix: ", suffix)
     index = namePath.rindex("/")
     fname = namePath[index+1:]
-    fileSavingPath = savingDir + fname + ".drc"
+    fname = fname + ".drc"
+    statusData['list'].append(fname)
+    fileSavingPath = savingDir + fname
     encode_command = encoderPath + " -i " + filePath +" -o " + fileSavingPath + " -cl 10 -qp 11 -qt 10 -qn 10 -qg 8"
     print("encode_command: ", encode_command)
     # return
@@ -104,12 +107,17 @@ def encodeStart():
         os.makedirs(savingDir)
     # total = 0
     # return
-    fileNames = []
+    # filePathNames = []
+    # filePathNames = []
+    # name_list = statusData['list']
     for file in findAllObjFile(objsDir):
-        fileNames.append(objsDir + file)
+        # name_list.append(file)
+        encodeAObjFile(objsDir + file, savingDir)
+        # filePathNames.append(objsDir + file)
 
-    for i in range(0, len(fileNames)):
-        encodeAObjFile(fileNames[i], savingDir)
+    # for i in range(0, len(filePathNames)):
+    #     statusData.list.append(filePathNames[i])
+    #     encodeAObjFile(filePathNames[i], savingDir)
     ###
 
 if __name__ == "__main__":
@@ -135,4 +143,5 @@ if __name__ == "__main__":
         argv = []
     # ###
     print("####### encodeAModelToDrcs end ...")
-    # python .\encodeAModelToDrcs.py -- encoder=D:\dev\webdev\voxblender\modelEncode\draco_encoder.exe D:\programs\blender\blender.exe exportPy=D:\dev\webdev\voxblender\modelEncode\exportMeshesToDrcObjs.py modelFilePath=private\scene01\scene01.fbx
+    # python .\encodeAModelToDrcs.py -- encoder=.\draco_encoder.exe renderer=D:\programs\blender\blender.exe exportPy=.\exportMeshesToDrcObjs.py modelFilePath=private\apple02\apple02.glb
+    # python .\encodeAModelToDrcs.py -- encoder=D:\dev\webdev\voxblender\modelEncode\draco_encoder.exe renderer=D:\programs\blender\blender.exe exportPy=D:\dev\webdev\voxblender\modelEncode\exportMeshesToDrcObjs.py modelFilePath=private\scene01\scene01.fbx
