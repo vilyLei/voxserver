@@ -20,7 +20,6 @@ def exportAMeshPerObj(savingDir):
     # global rootDir
 
     mesh_objectDict = {}
-    mesh_objectDict = {}
     # create dict with meshes
     for m in bpy.data.meshes:
             mesh_objectDict[m.name] = []
