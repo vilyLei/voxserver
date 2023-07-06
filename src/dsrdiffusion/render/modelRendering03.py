@@ -531,10 +531,43 @@ def getModelFileTypeAt(index):
     if (res is not None) and url != "":
         resType = res["type"] + ""
     return resType
+    ################################################
 def isBlendModelFile(index):
 
     modelFileResType = getModelFileTypeAt(index)
     return modelFileResType == "blend" or modelFileResType == "bld"
+
+    global sysRenderingCfg
+    cfgJson = sysRenderingCfg.configObj
+    url = ""
+    res = None
+    resType = ""
+    if "resources" in cfgJson:
+        resList = cfgJson["resources"]
+        res = resList[index]
+        modelUrls = res["models"]
+        url = modelUrls[0]
+
+    elif "resource" in cfgJson:
+        res = cfgJson["resource"]
+        modelUrls = res["models"]
+        url = modelUrls[0]
+        # print("loadMeshAtFromCfg(), B model url: ", url)
+    else:
+        # print("has not mesh data ...")
+        return False
+    if (res is not None) and url != "":
+        resType = res["type"] + ""
+        # print("Fra:1 Model load begin ...")
+        # sys.stdout.flush()
+        if resType == "blend" or resType == "bld":
+            return True
+
+        # print("Fra:1 Model load end ...")
+        # sys.stdout.flush()
+        return False
+    else:
+        return False
     ################################################
 
 def loadMeshAtFromCfg(index):
@@ -593,6 +626,12 @@ def objsFitToCamera():
     print("objsFitToCamera ops ...")
     bpy.ops.view3d.camera_to_view_selected()
     #
+
+def load_handler(dummy):
+    print("### Load Handler:", bpy.data.filepath)
+    print("### Load dummy:", dummy)
+
+bpy.app.handlers.load_post.append(load_handler)
 
 def renderingExec():
 

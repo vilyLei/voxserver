@@ -52,7 +52,7 @@ class RenderingNodeMaterial:
     metallic =  0.5
     roughness =  0.5
     normalStrength =  1.0
-    uvScales =  (1.0, 1.0, 1.0)
+    uvScales =  (1.0, 1.0)
     rootDir = ''
     taskRootDir = ''
     def __init__(self):
@@ -61,8 +61,6 @@ class RenderingNodeMaterial:
         # print('RenderingNodeMaterial::buildFromJsonObj() ..., ', jsonObj)
         if 'type' in jsonObj:
            self.type = jsonObj['type']
-        if 'modelName' in jsonObj:
-           self.modelName = jsonObj['modelName']
         if 'color' in jsonObj:
            self.color = rgbUint24ToFloat3( jsonObj['color'] )
         if 'specular' in jsonObj:
@@ -72,8 +70,7 @@ class RenderingNodeMaterial:
         if 'normalStrength' in jsonObj:
            self.normalStrength = jsonObj['normalStrength']
         if 'uvScales' in jsonObj:
-           uvScales = jsonObj['uvScales']
-           self.uvScales = (uvScales[0], uvScales[1], 1.0)
+           self.uvScales = jsonObj['uvScales']
 class RenderingNodeCamera:
     __type__ = ''
     __updated__ = False
@@ -511,7 +508,7 @@ def loadAObjMeshFromCfg():
         print("has not mesh data ...")
     return False
 
-def getModelFileTypeAt(index):
+def isBlendModelFile(index):
 
     global sysRenderingCfg
     cfgJson = sysRenderingCfg.configObj
@@ -528,13 +525,22 @@ def getModelFileTypeAt(index):
         res = cfgJson["resource"]
         modelUrls = res["models"]
         url = modelUrls[0]
+        # print("loadMeshAtFromCfg(), B model url: ", url)
+    else:
+        # print("has not mesh data ...")
+        return False
     if (res is not None) and url != "":
         resType = res["type"] + ""
-    return resType
-def isBlendModelFile(index):
+        # print("Fra:1 Model load begin ...")
+        # sys.stdout.flush()
+        if resType == "blend" or resType == "bld":
+            return True
 
-    modelFileResType = getModelFileTypeAt(index)
-    return modelFileResType == "blend" or modelFileResType == "bld"
+        # print("Fra:1 Model load end ...")
+        # sys.stdout.flush()
+        return False
+    else:
+        return False
     ################################################
 
 def loadMeshAtFromCfg(index):
@@ -594,6 +600,12 @@ def objsFitToCamera():
     bpy.ops.view3d.camera_to_view_selected()
     #
 
+def load_handler(dummy):
+    print("### Load Handler:", bpy.data.filepath)
+    print("### Load dummy:", dummy)
+
+bpy.app.handlers.load_post.append(load_handler)
+
 def renderingExec():
 
     global sysRenderingCfg
@@ -609,7 +621,7 @@ def renderingExec():
         objsFitToCamera()
 
     lossTime = time.perf_counter() - beginTime
-    updateSceneMaterial()
+
     print("####### modelRendering res ops lossTime: ", lossTime)
     # time.sleep(3.0)
 
@@ -619,9 +631,6 @@ def renderingExec():
     # 设置设备类型为GPU
     beginTime = time.perf_counter()
 
-    renderer = bpy.context.scene.render
-    renderer.engine = 'CYCLES'
-    # renderer.threads = 16
     cyclesIns = bpy.context.scene.cycles
     cyclesIns.device = 'GPU'
 
@@ -635,9 +644,9 @@ def renderingExec():
     cyclesIns.use_denoising = True
     cyclesIns.denoising_store_passes = True
     print("####### modelRendering output resolution: ", imgW, imgW)
-    if imgW > 512 and imgH > 512:
+    if imgW > 256 and imgH > 256:
         cyclesIns.aa_samples = 128
-        cyclesIns.samples = 256
+        cyclesIns.samples = 512
     else:
         cyclesIns.aa_samples = 8
         cyclesIns.samples = 8
@@ -653,331 +662,15 @@ def renderingExec():
 
     # print("bpy.context.scene.cycles: ", bpy.context.scene.cycles)
 
+    renderer = bpy.context.scene.render
+    renderer.engine = 'CYCLES'
+    # renderer.threads = 16
+
     #################################################################################
 
     bpy.ops.render.render(write_still=True)
     lossTime = time.perf_counter() - beginTime
     print("####### modelRendering rendering lossTime: ", lossTime)
-
-scene_modelDict = {}
-def collectModelInfo():
-    global scene_modelDict
-    print("collectModelInfo() init ...")
-    # global rootDir
-
-    mesh_objectDict = {}
-    # create dict with meshes
-    for m in bpy.data.meshes:
-            mesh_objectDict[m.name] = []
-    context = bpy.context
-    ########################################
-    for obj in bpy.context.scene.objects:
-        if obj.type == 'MESH':
-            if obj.data.name in mesh_objectDict:
-                # print("collectModelInfo(), obj.name: ", obj.name)
-                # print("collectModelInfo(), obj.data.name: ", obj.data.name)
-                scene_modelDict[obj.data.name] = obj
-                ### ###
-    #
-def saveToBlendFile(ns):
-    blend_file_path = bpy.data.filepath
-    directory = os.path.dirname(blend_file_path)
-    target_file = os.path.join(directory, taskRootDir + ns +".blend")
-    bpy.ops.wm.save_as_mainfile(filepath=target_file)
-    ###
-def objsFitToCamera():
-    global scene_modelDict
-    # Select objects that will be rendered
-    for obj in context.scene.objects:
-        obj.select_set(False)
-    for obj in context.visible_objects:
-        if not (obj.hide_get() or obj.hide_render):
-            obj.select_set(True)
-    #
-    print("objsFitToCamera ops ...")
-    bpy.ops.view3d.camera_to_view_selected()
-    #
-def createUVShaderNode(mat_nodes, mat_links):
-    node_texCoord = mat_nodes.new("ShaderNodeTexCoord")
-    for i, o in enumerate(node_texCoord.outputs):
-        print("node_texCoord.outputs >>>: ", i, o.name)
-    # node_texCoord.outputs[2], UV
-    node_texCoord_mapping = mat_nodes.new("ShaderNodeMapping")
-    # node_texCoord_mapping.inputs[0], uv vtx data
-    # uv scale
-    node_texCoord_mapping.inputs[3].default_value = (1.0,1.0, 1.0)
-    link = mat_links.new(node_texCoord.outputs[2], node_texCoord_mapping.inputs[0])
-    for i, o in enumerate(node_texCoord_mapping.inputs):
-        print("node_texCoord_mapping.inputs >>>: ", i, o.name)
-    for i, o in enumerate(node_texCoord_mapping.outputs):
-        print("node_texCoord_mapping.outputs >>>: ", i, o.name)
-
-    # link = mat_links.new(node_texCoord_mapping.outputs[0], srcNode.inputs[0])
-    return node_texCoord_mapping
-
-
-def getShaderNodeFromNodeAt(currNode, linkIndex = 0):
-    currLinks = currNode.links
-    linksTotal = len(currLinks)
-    # print("getShaderNodeFromNode(), A currNode          ###: ", currNode)
-    # print("getShaderNodeFromNode(), A currNode.type          ###: ", currNode.type, ", linksTotal: ", linksTotal)
-    if linksTotal > 0:
-        currLink = currLinks[linkIndex]
-        return currLink.from_node
-    return None
-def getSrcOriginNode(currNode):
-
-    currLinks = currNode.links
-    linksTotal = len(currLinks)
-    # print("getSrcOriginNode(), A currNode          ###: ", currNode)
-    # print("getSrcOriginNode(), A currNode.type          ###: ", currNode.type, ", linksTotal: ", linksTotal)
-    if linksTotal > 0:
-        currLink = currLinks[0]
-        fromNode = currLink.from_node
-        if fromNode is not None:
-            # print("getSrcOriginNode(), B fromNode.type          ###: ", fromNode.type)
-            pnode = fromNode.inputs[0]
-            originNode = getSrcOriginNode(pnode)
-            if originNode is not None:
-                return originNode
-            else:
-                inputsTotal = len(fromNode.inputs)
-                if inputsTotal > 1:
-                    for i in range(1, inputsTotal):
-                        pnode = fromNode.inputs[i]
-                        originNode = getSrcOriginNode(pnode)
-                        if originNode is not None:
-                            return originNode
-
-                return fromNode
-        else:
-            return currNode
-    return None
-
-def uvMappingLinkTexNode(mat_links, uvMappingNode, texNode):
-    if texNode is not None:
-        if texNode.type == "TEX_IMAGE":
-            link = mat_links.new(uvMappingNode.outputs[0], texNode.inputs[0])
-            return True
-    return False
-
-def updateMetalAndRoughness(mat_nodes, mat_links, metallicNode, roughnessNode, uvMappingNode,  metallic, roughness):
-    ###
-    metallic_origin_Node = getSrcOriginNode( metallicNode )
-    roughness_origin_Node = getSrcOriginNode( roughnessNode )
-    # print("metallic_origin_Node: ", metallic_origin_Node)
-    # print(" metallic_origin_Node.type: ", metallic_origin_Node.type)
-    # print("roughness_origin_Node: ", roughness_origin_Node)
-    # print(" roughness_origin_Node.type: ", roughness_origin_Node.type)
-    if metallic_origin_Node is not None and roughness_origin_Node is not None:
-        print("has src origin node ...")
-        if metallic_origin_Node == roughness_origin_Node:
-            print("has same src origin node ...")
-            uvMappingLinkTexNode(mat_links, uvMappingNode, metallic_origin_Node)
-        else:
-            uvMappingLinkTexNode(mat_links, uvMappingNode, metallic_origin_Node)
-            uvMappingLinkTexNode(mat_links, uvMappingNode, roughness_origin_Node)
-    elif metallic_origin_Node is not None:
-        uvMappingLinkTexNode(mat_links, uvMappingNode, metallic_origin_Node)
-        roughnessNode.default_value = roughness
-    elif roughness_origin_Node is not None:
-        uvMappingLinkTexNode(mat_links, uvMappingNode, roughness_origin_Node)
-        metallicNode.default_value = metallic
-    else:
-        metallicNode.default_value = metallic
-        roughnessNode.default_value = roughness
-        print("updateMetalAndRoughness(), metallic: ", metallic, ", roughness: ", roughness)
-    ###
-    if metallic_origin_Node is not None and metallic_origin_Node.type == "TEX_IMAGE":
-        print("add a multiply node for metallic node.")
-        metallic_from_Node = getShaderNodeFromNodeAt(metallicNode, 0)
-        print("metallic_from_Node >>>: ", metallic_from_Node)
-        print("metallic_from_Node.type >>>: ", metallic_from_Node.type)
-        # operation
-        node_metallicMult = mat_nodes.new("ShaderNodeMath")
-        node_metallicMult.operation = 'MULTIPLY'
-        node_metallicMult.inputs[1].default_value = metallic
-        prependInsertShaderNodeLink(mat_links, metallicNode, 0, node_metallicMult, 0,0, 0)
-        # for i, o in enumerate(node_metallicMult.inputs):
-        #     print("node_metallicMult.inputs >>>: ", i, o.name)
-        # for i, o in enumerate(node_metallicMult.outputs):
-        #     print("node_metallicMult.outputs >>>: ", i, o.name)
-        # #prependInsertShaderNodeLink
-
-    if roughness_origin_Node is not None and roughness_origin_Node.type == "TEX_IMAGE":
-        print("add a multiply node for roughness node.")
-        roughness_from_Node = getShaderNodeFromNodeAt(roughnessNode, 0)
-        print("roughness_from_Node >>>: ", roughness_from_Node)
-        print("roughness_from_Node.type >>>: ", roughness_from_Node.type)
-        # operation
-        node_roughnessMult = mat_nodes.new("ShaderNodeMath")
-        node_roughnessMult.operation = 'MULTIPLY'
-        node_roughnessMult.inputs[1].default_value = roughness
-        prependInsertShaderNodeLink(mat_links, roughnessNode, 0, node_roughnessMult, 0,0, 0)
-
-        # for i, o in enumerate(node_roughnessMult.inputs):
-        #     print("node_roughnessMult.inputs >>>: ", i, o.name)
-        # for i, o in enumerate(node_roughnessMult.outputs):
-        #     print("node_roughnessMult.outputs >>>: ", i, o.name)
-        # #prependInsertShaderNodeLink
-
-def prependInsertShaderNodeLink(mat_links, currentNode, currNodeLinkIndex, newNode, outputIndex0, inputIndex0, outputIndex1):
-    currLink = currentNode.links[currNodeLinkIndex]
-    fromNode = currLink.from_node
-    mat_links.remove(currLink)
-    link0 = mat_links.new(fromNode.outputs[outputIndex0], newNode.inputs[inputIndex0])
-    link1 = mat_links.new(newNode.outputs[outputIndex1], currentNode)
-
-def appendInsertShaderNodeLink(mat_links, currentNode, currNodeLinkIndex, newNode, inputIndex0, outputIndex1, inputIndex1):
-    currLink = currentNode.links[currNodeLinkIndex]
-    toNode = currLink.to_node
-    mat_links.remove(currLink)
-    link0 = mat_links.new(currentNode, newNode.inputs[inputIndex0])
-    link1 = mat_links.new(newNode.outputs[outputIndex1], toNode.inputs[inputIndex1])
-
-def updateBaseColor(mat_nodes,mat_links, baseColorNode, uvMappingNode, baseColorRGB, baseColorAlpha):
-    baseColorNode_origin_Node = getSrcOriginNode( baseColorNode )
-    if baseColorNode_origin_Node is not None:
-        print("baseColorNode_origin_Node: ", baseColorNode_origin_Node)
-        print("baseColorNode_origin_Node.type: ", baseColorNode_origin_Node.type)
-    if uvMappingLinkTexNode(mat_links, uvMappingNode, baseColorNode_origin_Node):
-        print("base color src data is a tex")
-        node_colorMult = mat_nodes.new("ShaderNodeVectorMath")
-        # node_colorMult = mat_nodes.new("ShaderNodeMath")
-
-        # link = mat_links.new(srcNode.outputs[0], node_colorMult.inputs[0])
-        # link_colorMult_and_baseColor = mat_links.new(node_colorMult.outputs[0], matNode.inputs["Base Color"])
-        node_colorMult.operation = 'MULTIPLY'
-        node_colorMult.inputs[1].default_value = baseColorRGB
-        print("node_colorMult.type >>>: ", node_colorMult.type)
-        print("node_colorMult.operation >>>: ", node_colorMult.operation)
-        prependInsertShaderNodeLink(mat_links, baseColorNode, 0, node_colorMult, 0,0, 0)
-    else:
-        print("nbaseColorRGB >>>: ", baseColorRGB)
-        ls = baseColorRGB
-        color = (ls[0], ls[1], ls[2], baseColorAlpha)
-        baseColorNode.default_value = color
-
-def updateSpecular(mat_links, specularNode, uvMappingNode, specularValue):
-
-    specularNode_origin_Node = getSrcOriginNode( specularNode )
-    if not uvMappingLinkTexNode(mat_links, uvMappingNode, specularNode_origin_Node):
-        specularNode.default_value = specularValue
-        print("updateSpecular(), specularValue: ", specularValue)
-
-def updateNormal(mat_links, normalNode, uvMappingNode, normalStrength):
-
-    normalNode_origin_Node = getSrcOriginNode( normalNode )
-    if normalNode_origin_Node is not None:
-        print("normalNode_origin_Node: ", normalNode_origin_Node)
-        print("normalNode_origin_Node.type: ", normalNode_origin_Node.type)
-    if uvMappingLinkTexNode(mat_links, uvMappingNode, normalNode_origin_Node):
-        normalMapNode = getShaderNodeFromNodeAt(normalNode, 0)
-        if normalMapNode:
-            # Strength
-            # print("normalMapNode Strength: ", normalMapNode.inputs[0].default_value)
-            normalMapNode.inputs[0].default_value = normalStrength
-            # for i, o in enumerate(normalMapNode.inputs):
-            #     print("normalMapNode.inputs >>>: ", i, o.name)
-#
-def checkModelMaterial(currMaterial):
-    mat_nodes = currMaterial.node_tree.nodes
-    mat_links = currMaterial.node_tree.links
-    principled_bsdf = mat_nodes.get("Principled BSDF")
-    if principled_bsdf is None:
-        principled_bsdf = mat_nodes.new(type="ShaderNodeBsdfPrincipled")
-        print("         create a new Principled BSDF, principled_bsdf: ", principled_bsdf)
-        material_output = mat_nodes.get("Material Output")
-        if material_output is None:
-            material_output = mat_nodes.new(type="ShaderNodeOutputMaterial")
-        link = mat_links.new(principled_bsdf.outputs["BSDF"], material_output.inputs["Surface"])
-
-    print("         principled_bsdf: ", principled_bsdf)
-    #
-
-def updateModelMaterial(model, materialData = None):
-    # print("updateModelMaterial ops ...")
-
-    currMaterial = model.active_material
-    currMaterial.use_nodes = True
-    checkModelMaterial(currMaterial)
-    mat_nodes = currMaterial.node_tree.nodes
-    mat_links = currMaterial.node_tree.links
-    matNode = mat_nodes[0]
-
-
-    baseColorRGB = (1.5,0.2,0.3)
-    baseColorAlpha = 1.0
-    uvScales = (5.0,5.0, 1.0)
-    metallicValue = 0.7
-    roughnessValue = 0.2
-    specularValue = 0.0
-    normalStrength = 1.0
-    if materialData is not None:
-        baseColorRGB = materialData.color
-        uvScales = materialData.uvScales
-        metallicValue = materialData.metallic
-        roughnessValue = materialData.roughness
-        specularValue = materialData.specular
-        normalStrength = materialData.normalStrength
-
-    baseColorNode = matNode.inputs['Base Color']
-    metallicNode = matNode.inputs['Metallic']
-    roughnessNode = matNode.inputs['Roughness']
-    specularNode = matNode.inputs['Specular']
-    normalNode = matNode.inputs['Normal']
-    print("A 01 >>> >>> >>> >>> >>> >>> >>> >>> >>> >>> >>> >>>")
-
-    uvMappingNode = createUVShaderNode(mat_nodes, mat_links)
-    uvMappingNode.inputs[3].default_value = uvScales
-
-    print("A 02 >>> >>> >>> >>> >>> >>> >>> >>> >>> >>> >>> >>>")
-    updateBaseColor(mat_nodes,mat_links, baseColorNode, uvMappingNode, baseColorRGB, baseColorAlpha)
-
-    updateMetalAndRoughness(mat_nodes, mat_links, metallicNode, roughnessNode, uvMappingNode, metallicValue, roughnessValue)
-    updateSpecular(mat_links, specularNode, uvMappingNode, specularValue)
-
-    print("A 03 >>> >>> >>> >>> >>> >>> >>> >>> >>> >>> >>> >>>")
-    updateNormal(mat_links, normalNode, uvMappingNode, normalStrength)
-
-    # saveToBlendFile("queryCurrMaterial")
-
-    # for i, o in enumerate(baseColorNode):
-    # for k in baseColorNode:
-    #     print("baseColorNode >>>: ", k, )
-
-    # for i, o in enumerate(matNode.inputs):
-    #     print("matNode.inputs >>>: ", i, o.name)
-    #
-    #
-def updateModelsMaterial():
-    # print("updateAModelMaterialByName ops ...")
-
-    global sysRenderingCfg
-    cfg = sysRenderingCfg
-    materials = cfg.rtask.rnode.rmaterials
-    total = len(materials)
-    for i in range(0, total):
-        print("updateModelsMaterial(), materials[",i,"].modelName: ", materials[i].modelName)
-
-        model = scene_modelDict[materials[i].modelName]
-        updateModelMaterial(model, materials[i])
-
-    # updateAModelMaterialByName('apple_stem_model')
-    # updateAModelMaterialByName('apple_body_model')
-    # model0 = scene_modelDict['apple_stem_model']
-    # model1 = scene_modelDict['apple_body_model']
-    # # updateModelMaterial(model0)
-    # updateModelMaterial(model1)
-
-def updateSceneMaterial():
-    modelFileResType = getModelFileTypeAt(0)
-    if modelFileResType == "glb":
-        collectModelInfo()
-        updateModelsMaterial()
-    else:
-        print("updateSceneMaterial(), file type is not fit.")
-    #
 
 def startupSys(argv):
     if "--" in argv:
