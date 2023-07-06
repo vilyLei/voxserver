@@ -33,7 +33,8 @@
 			"env": {
 				"type": "",
 				"path": "",
-				"rotation": 60
+				"rotation": 60,
+				"brightness":0.7
 			},
 			"camera": {
 				"type": "perspective",
