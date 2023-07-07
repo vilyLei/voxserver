@@ -288,7 +288,8 @@ class RenderingTask:
         rnode = self.rnode
         rnode.rootDir = self.rootDir
         rnode.taskRootDir = self.taskRootDir
-        rnode.buildFromJsonObj(taskObj['rnode'])
+        if 'rnode' in taskObj:
+            rnode.buildFromJsonObj(taskObj['rnode'])
 
 class RenderingCfg:
     name = ''

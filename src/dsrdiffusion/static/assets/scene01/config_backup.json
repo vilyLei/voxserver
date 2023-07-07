@@ -1,0 +1,102 @@
+{
+	"renderer-proc": "./renderer.exe",
+	"renderer-instance": {
+		"name": "high-image-renderer",
+		"status": "stop"
+	},
+	"sys": {
+		"rootDir": "D:/dev/webProj/voxserver/src/dsrdiffusion/"
+	},
+	"resource": {
+		"type": "glb",
+		"models": [
+			"apple03.glb"
+		]
+	},
+	"task": {
+		"name": "rendering task",
+		"taskID": 2001,
+		"times": 2,
+		"rnode": {
+			"name": "rnode",
+			"unit": "m",
+			"output": {
+				"path": "",
+				"resolution": [
+					512,
+					512
+				],
+				"bgTransparent": 0,
+				"outputType": "single_image",
+				"bgColor": 53520
+			},
+			"env": {
+				"type": "inner_room",
+				"path": "",
+				"rotation": 60,
+				"brightness":0.7,
+				"ao":0.0
+			},
+			"camera": {
+				"type": "perspective",
+				"viewAngle": 50.0,
+				"near": 0.1,
+				"far": 20,
+				"matrix": [
+					0.9719609618186951,
+					0.23412324488162994,
+					-0.021865712478756905,
+					-0.09051531553268433,
+					-0.23514209687709808,
+					0.9677495956420898,
+					-0.09038208425045013,
+					-0.3741457760334015,
+					-1.5525289498441452e-8,
+					0.09298941493034363,
+					0.9956670999526978,
+					4.121664524078369,
+					-0,
+					-0,
+					-0,
+					1
+				]
+			},
+			"materials": [
+				{
+					"type": "bsdf",
+					"modelName": "apple_body_model",
+					"color": 43520,
+					"specular": 0.5,
+					"metallic": 1.0,
+					"roughness": 0.8,
+					"normalStrength": 1.0,
+					"uvScales": [
+						1.0,
+						1.0
+					]
+				},
+				{
+					"type": "bsdf",
+					"modelName": "apple_stem_model",
+					"color": 11162897,
+					"specular": 0.5,
+					"metallic": 0.5,
+					"roughness": 0.2,
+					"normalStrength": 1.0,
+					"uvScales": [
+						1.0,
+						1.0
+					]
+				}
+			],
+
+			"lights": [
+				{
+					"type": "point",
+					"power": 500,
+					"color": 11162897
+				}
+			]
+		}
+	}
+}

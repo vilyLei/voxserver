@@ -606,8 +606,8 @@ function uploadAndSendRendering() {
 
 	xhr.upload.onprogress = progressFunction;
 	xhr.upload.onloadstart = function () {
-		ot = new Date().getTime();
-		oloaded = 0;
+		// ot = new Date().getTime();
+		// oloaded = 0;
 	};
 
 	xhr.send(form);

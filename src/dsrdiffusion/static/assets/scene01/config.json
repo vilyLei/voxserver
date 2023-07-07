@@ -10,7 +10,7 @@
 	"resource": {
 		"type": "glb",
 		"models": [
-			"apple03.glb"
+			"apple02.glb"
 		]
 	},
 	"task": {
@@ -23,69 +23,64 @@
 			"output": {
 				"path": "",
 				"resolution": [
-					512,
-					512
+					800,
+					600
 				],
 				"bgTransparent": 0,
 				"outputType": "single_image",
-				"bgColor": 43520
+				"bgColor": 91786
 			},
 			"env": {
-				"type": "",
 				"path": "",
-				"rotation": 60,
-				"brightness":0.7
+				"type": "inner_room",
+				"brightness": 0.7,
+				"ao": 0,
+				"rotation": 0
 			},
 			"camera": {
-				"type": "perspective",
-				"viewAngle": 50.0,
-				"near": 0.1,
-				"far": 20,
 				"matrix": [
-					0.9719609618186951,
-					0.23412324488162994,
-					-0.021865712478756905,
-					-0.09051531553268433,
-					-0.23514209687709808,
-					0.9677495956420898,
-					-0.09038208425045013,
-					-0.3741457760334015,
-					-1.5525289498441452e-8,
-					0.09298941493034363,
-					0.9956670999526978,
-					4.121664524078369,
-					-0,
-					-0,
-					-0,
+					0.7071067690849304,
+					-0.40824827551841736,
+					0.5773502588272095,
+					2.390000104904175,
+					0.7071067690849304,
+					0.40824827551841736,
+					-0.5773502588272095,
+					-2.390000104904175,
+					0,
+					0.8164965510368347,
+					0.5773502588272095,
+					2.390000104904175,
+					0,
+					0,
+					0,
 					1
-				]
+				],
+				"type": "perspective",
+				"viewAngle": 45,
+				"near": 0.1,
+				"far": 20
 			},
 			"materials": [
 				{
-					"type": "default",
 					"modelName": "apple_body_model",
-					"color": 43520,
-					"specular": 0.5,
-					"metallic": 1.0,
-					"roughness": 0.8,
-					"normalStrength": 1.0,
 					"uvScales": [
-						1.0,
-						1.0
-					]
-				},
-				{
-					"type": "default",
-					"modelName": "apple_stem_model",
-					"color": 11162897,
+						1,
+						1
+					],
+					"type": "bsdf",
+					"color": 3368584,
 					"specular": 0.5,
 					"metallic": 0.5,
-					"roughness": 0.2,
-					"normalStrength": 1.0,
-					"uvScales": [
-						1.0,
-						1.0
-					]
+					"roughness": 0.5,
+					"normalStrength": 1
+				}
+			],
+			"lights": [
+				{
+					"type": "point",
+					"color": 11202235,
+					"power": 500
 				}
 			]
 		}
