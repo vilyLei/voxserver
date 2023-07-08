@@ -245,6 +245,16 @@ class RenderingNode:
             rnm.buildFromJsonObj(mobjs[i])
             self.rmaterials.append(rnm)
         print("self.rmaterials: ", self.rmaterials)
+    def updateUrls(self):
+
+        self.routput.rootDir = self.rootDir
+        self.routput.taskRootDir = self.taskRootDir
+
+        self.renv.rootDir = self.rootDir
+        self.renv.taskRootDir = self.taskRootDir
+
+        self.rcamera.rootDir = self.rootDir
+        self.rcamera.taskRootDir = self.taskRootDir
 
     def buildFromJsonObj(self, jsonObj):
         # print('RenderingNode::buildFromJsonObj() ..., ', jsonObj)
@@ -252,17 +262,12 @@ class RenderingNode:
         self.name = jsonObj['name']
         self.unit = jsonObj['unit']
         if 'output' in jsonObj:
-           self.routput.rootDir = self.rootDir
-           self.routput.taskRootDir = self.taskRootDir
            self.routput.buildFromJsonObj(jsonObj['output'])
 
         self.renv.bgTransparent = self.routput.bgTransparent
         if 'env' in jsonObj:
-           self.renv.rootDir = self.rootDir
-           self.renv.taskRootDir = self.taskRootDir
            self.renv.buildFromJsonObj(jsonObj['env'])
         if 'camera' in jsonObj:
-           self.rcamera.taskRootDir = self.taskRootDir
            self.rcamera.buildFromJsonObj(jsonObj['camera'])
         if 'materials' in jsonObj:
            self.buildMaterialsJsonObj(jsonObj['materials'])
@@ -278,16 +283,23 @@ class RenderingTask:
     rnode = RenderingNode()
     def __init__(self):
         self.__type__ = 'RenderingTask'
+    def updateUrls(self):
+        rnode = self.rnode
+        rnode.rootDir = self.rootDir
+        rnode.taskRootDir = self.taskRootDir
+        rnode.updateUrls()
 
     def buildFromJsonObj(self, jsonObj):
         print('RenderingTask::buildFromJsonObj() ...')
         taskObj = jsonObj['task']
-        self.name = taskObj['name']
+        if 'name' in taskObj:
+            self.name = taskObj['name']
         self.taskID = taskObj['taskID']
         self.times = taskObj['times']
         rnode = self.rnode
-        rnode.rootDir = self.rootDir
-        rnode.taskRootDir = self.taskRootDir
+        # rnode.rootDir = self.rootDir
+        # rnode.taskRootDir = self.taskRootDir
+        self.updateUrls()
         if 'rnode' in taskObj:
             rnode.buildFromJsonObj(taskObj['rnode'])
 

@@ -73,7 +73,7 @@ function taskSuccess(filepath, transparent) {
 	let suffix = transparent ? "png" : "jpg"
 	let i = filepath.lastIndexOf("/")
 	let imgDirUrl = hostUrl + filepath.slice(2, i + 1);
-	imgUrl = imgDirUrl + "bld_rendering_mini." + suffix + "?ver=" + Math.random() + "-" + Math.random(Date.now())
+	imgUrl = imgDirUrl + "bld_rendering_mini." + suffix + "?ver=" + Math.random() + "-" + Math.random(Date.now());
 	console.log("imgUrl: ", imgUrl);
 
 	var div = document.getElementById("imgDiv");
@@ -84,7 +84,7 @@ function taskSuccess(filepath, transparent) {
 	// var br = document.createElement("br");
 	// div.appendChild(br);
 
-	let big_imgUrl = imgDirUrl + "bld_rendering." + suffix + "?ver=" + Math.random() + "-" + Math.random(Date.now())
+	let big_imgUrl = imgDirUrl + "bld_rendering." + suffix + "?ver=" + Math.random() + "-" + Math.random(Date.now());
 	var link = document.createElement("a");
 	link.setAttribute("href", big_imgUrl);
 	link.setAttribute("target", "_blank");
@@ -294,7 +294,7 @@ function loadDrcModels(total) {
 		if (total > 0) {
 			console.log("### ######01 loadDrcModels(), ready load drc models, total: ", total);
 			drcModelLoading = false;
-			let params = ""
+			let params = "";
 			let url = createReqUrlStr(taskInfoGettingUrl, "modelToDrc", 0, taskJsonObj.taskid, taskJsonObj.taskname, params);
 			console.log("### ######02 loadDrcModels(), url: ", url);
 			sendACommonGetReq(url, (purl, content) => {
@@ -327,26 +327,7 @@ function loadDrcModels(total) {
 					}, 200);
 				}
 				);
-				/*
-				let drcsTotal = infoObj.drcsTotal;
-				let drcUrls = [];
-				let types = [];
-				for (let i = 0; i < drcsTotal; i++) {
-					let drcUrl = resBaseUrl + "export_" + i + ".drc";
-					drcUrls.push(drcUrl)
-					types.push("drc");
-				}
-				// console.log("drcUrls: ", drcUrls);
-
-				rscViewer.initSceneByUrls(drcUrls, types, (prog) => {
-					console.log("3d viewer drc model loading prog: ", prog);
-					if (prog >= 1.0) {
-						viewerInfoDiv.innerHTML = "";
-						loadedModel = true;
-					}
-				}, 200);
-				//*/
-			})
+			});
 		} else {
 			// console.log("$$$ loading model resource, ", rt_phase_times);
 			showSpecInfo("loading model resource", rt_phase_times, viewerInfoDiv);
@@ -598,16 +579,21 @@ function uploadAndSendRendering() {
 	}
 	var form = new FormData();
 	form.append("file", fileObj);
+	console.log("form url: ", url);
+	console.log("form fileObj: ", fileObj);
 
 	xhr = new XMLHttpRequest();
 	xhr.open("post", url, true);
-	xhr.onload = uploadComplete;
+	xhr.onload = evt => {
+		console.log("upload success !!!!");
+		uploadComplete();
+	};
 	xhr.onerror = uploadFailed;
 
 	xhr.upload.onprogress = progressFunction;
 	xhr.upload.onloadstart = function () {
-		// ot = new Date().getTime();
-		// oloaded = 0;
+		ot = new Date().getTime();
+		oloaded = 0;
 	};
 
 	xhr.send(form);
@@ -622,7 +608,7 @@ function uploadComplete(evt) {
 	console.log("josn obj data: ", data);
 	if (data.success) {
 		setTaskJsonData(data);
-		console.log("上传成功！");
+		console.log("A 上传成功！");
 		// alert("上传成功！");
 		reqstUpdate();
 	} else {

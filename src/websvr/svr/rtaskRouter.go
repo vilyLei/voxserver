@@ -146,11 +146,13 @@ func UploadRenderingTaskData(g *gin.Context) {
 	var status = 0
 	file, _ := g.FormFile("file")
 	filePath := ""
+	fmt.Println("UploadRenderingTaskData(), file != nil: ", (file != nil))
 	if file != nil {
 
 		uploadDir := dsrdiffusionUploadDir
 
 		filename = file.Filename
+		fmt.Println("UploadRenderingTaskData(), filename: ", filename)
 		switch phase {
 		case "newrtask":
 			// check file name suffix correctness
