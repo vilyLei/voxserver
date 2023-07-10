@@ -261,30 +261,7 @@ function initConfig() {
 
 	let kvalue = rimgSizes[0] + "x" + rimgSizes[1];
 	setSizeBtnStatWithValue(kvalue)
-	// let cname = "rtTaskInfo";
-	// let cvalue = getCookieByName(cname)
-	// if (cvalue != "") {
-	// 	kvalue = cvalue
-	// } else {
-	// 	setCookieByName(cname, kvalue)
-	// }
-	// var checks = document.getElementsByName("size_select_radio");
-	// for (let i = 0; i < checks.length; ++i) {
-	// 	// console.log("checks[i].value: ", checks[i].value);
-	// 	if (checks[i].value == kvalue) {
-	// 		checks[i].checked = true;
-	// 		sizeHandleChange(checks[i])
-	// 	}
-	// }
-
 	kvalue = rtBGTransparent ? "true" : "false";
-	// let cname = "rtBGTransparent";
-	// let cvalue = getCookieByName(cname)
-	// if (cvalue != "") {
-	// 	kvalue = cvalue
-	// } else {
-	// 	setCookieByName(cname, kvalue)
-	// }
 	setBGTransRBtnSt(kvalue);
 }
 let drcModelLoading = true
@@ -573,7 +550,7 @@ function uploadAndSendRendering() {
 	let fileSize = Math.floor(fileObj.size / (1024 * 1024))
 	let maxSize = 30;
 	if (fileSize > maxSize) {
-		alert("模型文件超过"+maxSize+"M, 带宽太小暂时不支持 !!!");
+		alert("模型文件超过" + maxSize + "M, 带宽太小暂时不支持 !!!");
 		updatePage()
 		return;
 	}
