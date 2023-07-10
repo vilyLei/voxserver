@@ -236,14 +236,15 @@ class RenderingNode:
     def __init__(self):
         self.__type__ = 'RenderingNode'
     def buildMaterialsJsonObj(self, mobjs):
-
-        total = len(mobjs)
-        for i in range(0, total):
-            rnm = RenderingNodeMaterial()
-            rnm.rootDir = self.rootDir
-            rnm.taskRootDir = self.taskRootDir
-            rnm.buildFromJsonObj(mobjs[i])
-            self.rmaterials.append(rnm)
+        self.rmaterials = []
+        if mobjs is not None:
+            total = len(mobjs)
+            for i in range(0, total):
+                rnm = RenderingNodeMaterial()
+                rnm.rootDir = self.rootDir
+                rnm.taskRootDir = self.taskRootDir
+                rnm.buildFromJsonObj(mobjs[i])
+                self.rmaterials.append(rnm)
         print("self.rmaterials: ", self.rmaterials)
     def updateUrls(self):
 

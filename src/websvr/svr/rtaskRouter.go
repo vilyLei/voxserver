@@ -148,6 +148,15 @@ func UploadRenderingTaskData(g *gin.Context) {
 	filename := "none"
 	tid, _ := strconv.ParseInt(taskid, 10, 64)
 
+	hasTaskFlag := false
+	tid, errInt64 := strconv.ParseInt(taskid, 10, 64)
+	if errInt64 == nil {
+		hasTaskFlag = HasRTTaskNodeByID(tid)
+	}
+	var rtNode *RTaskInfoNode = &tempRTNode
+	if hasTaskFlag {
+		rtNode = rtTaskNodeMap[tid]
+	}
 	var status = 0
 	file, _ := g.FormFile("file")
 	filePath := ""
@@ -222,11 +231,16 @@ func UploadRenderingTaskData(g *gin.Context) {
 			status = 22
 			fileDir := uploadDir + taskname + "/"
 			filePath = fileDir + filename
-			fmt.Println("uploading receive a rendering output pic file name: ", filename)
 
 			g.SaveUploadedFile(file, filePath)
 
-			webfs.ResizeImgAndSave(fileDir, filename, 128, 128)
+			rnode := rtNode.RNode
+			output := &rnode.Output
+			sizes := output.Resolution
+			total := webfs.ResizeToImgsAndSave(fileDir, filename, sizes[0], sizes[1])
+			rtNode.ImgsTotal = total
+			fmt.Println("uploading receive a rendering output pic file name: ", filename, ", imgs total: ", total)
+			// webfs.ResizeImgAndSave(fileDir, filename, 128, 128, "mini")
 		default:
 
 		}

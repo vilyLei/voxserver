@@ -33,6 +33,16 @@ func (self *UploadReqDef) GetJsonStr() string {
 	return string(jsonBytes)
 }
 
+type RTMaterialNode struct {
+	ModelName      string     `json:"modelName"`
+	UVScales       [2]float64 `json:"uvScales"`
+	Type           string     `json:"type"`
+	Color          uint       `json:"color"`
+	Specular       float64    `json:"specular"`
+	Metallic       float64    `json:"metallic"`
+	Roughness      float64    `json:"roughness"`
+	NormalStrength float64    `json:"normalStrength"`
+}
 type RTEnvNode struct {
 	Path       string  `json:"path"`
 	Type       string  `json:"type"`
@@ -45,7 +55,7 @@ type RTOutputNode struct {
 	OutputType    string `json:"outputType"`
 	Resolution    [2]int `json:"resolution"`
 	BGTransparent int    `json:"bgTransparent"`
-	BGColor       int    `json:"bgColor"`
+	BGColor       uint   `json:"bgColor"`
 }
 type RTRCameraNode struct {
 	Type      string      `json:"type"`
@@ -59,9 +69,10 @@ type RTRenderingNode struct {
 	Unit    string `json:"unit"`
 	Version int64  `json:"version"`
 
-	Camera RTRCameraNode `json:"camera"`
-	Output RTOutputNode  `json:"output"`
-	Env    RTEnvNode     `json:"env"`
+	Camera    RTRCameraNode    `json:"camera"`
+	Output    RTOutputNode     `json:"output"`
+	Env       RTEnvNode        `json:"env"`
+	Materials []RTMaterialNode `json:"materials"`
 }
 
 func (self *RTRenderingNode) setFromJson(rnodeJsonStr string) {
@@ -89,8 +100,8 @@ type RTaskInfoNode struct {
 	RerenderingTimes int
 	ModelDrcsTotal   int
 	RActive          bool
-
-	RNode *RTRenderingNode `json:"rnode"`
+	RNode            *RTRenderingNode `json:"rnode"`
+	ImgsTotal        int
 }
 
 func (self *RTaskInfoNode) UpdateTime() {
@@ -107,6 +118,7 @@ func (self *RTaskInfoNode) Reset() {
 	self.Version = 0
 	self.RActive = false
 	self.RNode = nil
+	self.ImgsTotal = 0
 }
 func (self *RTaskInfoNode) SetCamdvsWithStr(camdvsStr string) {
 
@@ -157,6 +169,7 @@ func (self *RTaskInfoNode) GetViewStatusInfo(teamIndex int, teamLength int) stri
 		sizes := output.Resolution
 		infoStr += `, "sizes":[` + strconv.Itoa(sizes[0]) + `,` + strconv.Itoa(sizes[1]) + `]`
 		infoStr += `, "bgTransparent":` + strconv.Itoa(output.BGTransparent)
+		infoStr += `, "imgsTotal":` + strconv.Itoa(self.ImgsTotal)
 	}
 	infoStr += `}`
 	// fmt.Println("GetViewStatusInfo() ### infoStr: ", infoStr)
