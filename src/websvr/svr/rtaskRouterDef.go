@@ -33,6 +33,45 @@ func (self *UploadReqDef) GetJsonStr() string {
 	return string(jsonBytes)
 }
 
+type RTEnvNode struct {
+	Path       string  `json:"path"`
+	Type       string  `json:"type"`
+	Brightness float64 `json:"brightness"`
+	AO         float64 `json:"ao"`
+	Rotation   float64 `json:"rotation"`
+}
+type RTOutputNode struct {
+	Path          string `json:"path"`
+	OutputType    string `json:"outputType"`
+	Resolution    [2]int `json:"resolution"`
+	BGTransparent int    `json:"bgTransparent"`
+	BGColor       int    `json:"bgColor"`
+}
+type RTRCameraNode struct {
+	Type      string      `json:"type"`
+	ViewAngle float64     `json:"viewAngle"`
+	Near      float64     `json:"near"`
+	Far       float64     `json:"far"`
+	Matrix    [16]float64 `json:"matrix"`
+}
+type RTRenderingNode struct {
+	Name    string `json:"name"`
+	Unit    string `json:"unit"`
+	Version int64  `json:"version"`
+
+	Camera RTRCameraNode `json:"camera"`
+	Output RTOutputNode  `json:"output"`
+	Env    RTEnvNode     `json:"env"`
+}
+
+func (self *RTRenderingNode) setFromJson(rnodeJsonStr string) {
+	err := json.Unmarshal([]byte(rnodeJsonStr), self)
+	if err != nil {
+		fmt.Printf("RTRenderingNode::setFromJson() Unmarshal failed, err: %v\n", err)
+	}
+	fmt.Println("RTRenderingNode::setFromJson(), self: ", self)
+}
+
 type RTaskInfoNode struct {
 	Id               int64       `json:"id"`
 	Name             string      `json:"name"`
@@ -50,6 +89,8 @@ type RTaskInfoNode struct {
 	RerenderingTimes int
 	ModelDrcsTotal   int
 	RActive          bool
+
+	RNode *RTRenderingNode `json:"rnode"`
 }
 
 func (self *RTaskInfoNode) UpdateTime() {
@@ -65,6 +106,7 @@ func (self *RTaskInfoNode) Reset() {
 	self.ModelDrcsTotal = 0
 	self.Version = 0
 	self.RActive = false
+	self.RNode = nil
 }
 func (self *RTaskInfoNode) SetCamdvsWithStr(camdvsStr string) {
 
@@ -105,12 +147,16 @@ func (self *RTaskInfoNode) GetViewStatusInfo(teamIndex int, teamLength int) stri
 	infoStr += `,"taskid":` + strconv.FormatInt(self.Id, 10) + `,"status":22, "time":` + strconv.FormatInt(self.Time, 10)
 	infoStr += `,"drcsTotal":` + strconv.Itoa(self.ModelDrcsTotal)
 	infoStr += `,"version":` + strconv.FormatInt(self.Version, 10)
+
+	rnode := self.RNode
+	output := rnode.Output
 	switch self.Phase {
 	case "new":
 		infoStr += `, "teamIndex":` + strconv.Itoa(teamIndex) + `, "teamLength": ` + strconv.Itoa(teamLength)
 	case "finish":
-		infoStr += `, "sizes":[` + strconv.Itoa(self.Resolution[0]) + `,` + strconv.Itoa(self.Resolution[1]) + `]`
-		infoStr += `, "bgTransparent":` + strconv.Itoa(self.BGTransparent)
+		sizes := output.Resolution
+		infoStr += `, "sizes":[` + strconv.Itoa(sizes[0]) + `,` + strconv.Itoa(sizes[1]) + `]`
+		infoStr += `, "bgTransparent":` + strconv.Itoa(output.BGTransparent)
 	}
 	infoStr += `}`
 	// fmt.Println("GetViewStatusInfo() ### infoStr: ", infoStr)

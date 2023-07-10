@@ -66,6 +66,10 @@ func RenderingTask(g *gin.Context) {
 				rtNode.Progress = 0
 				rtNode.Version++
 
+				rnodeJsonStr := g.DefaultQuery("rnode", `"rnode":{"name":"none","unit":"m","version:0}`)
+				fmt.Println("RenderingTask(), re-rendering, rnodeJsonStr: ", rnodeJsonStr)
+				rtNode.RNode.setFromJson(rnodeJsonStr)
+
 				rtNode.SetParamsWithStr(imgSizes, camdvs, rtBGTransparent)
 				rtWaitTaskNodes = append(rtWaitTaskNodes, rtNode)
 
@@ -79,7 +83,7 @@ func RenderingTask(g *gin.Context) {
 	case "rtaskreadydata":
 		rtNode.Phase = "task_rendering_parse_data"
 		fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
-
+	// from the renderer client
 	case "reqanewrtask":
 		fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
 		total := len(rtWaitTaskNodes)
@@ -92,6 +96,7 @@ func RenderingTask(g *gin.Context) {
 			rtNode.Version++
 			infoStr = rtNode.GetTaskJsonStr()
 		}
+	// from the user view client
 	case "queryataskrst":
 		fmt.Println("rTask("+taskid+"):"+phase+", progress: ", progress+"%")
 		if hasTaskFlag {
@@ -146,13 +151,13 @@ func UploadRenderingTaskData(g *gin.Context) {
 	var status = 0
 	file, _ := g.FormFile("file")
 	filePath := ""
-	fmt.Println("UploadRenderingTaskData(), file != nil: ", (file != nil))
+	// fmt.Println("UploadRenderingTaskData(), file != nil: ", (file != nil))
 	if file != nil {
 
 		uploadDir := dsrdiffusionUploadDir
 
 		filename = file.Filename
-		fmt.Println("UploadRenderingTaskData(), filename: ", filename)
+		// fmt.Println("UploadRenderingTaskData(), filename: ", filename)
 		switch phase {
 		case "newrtask":
 			// check file name suffix correctness
@@ -168,6 +173,9 @@ func UploadRenderingTaskData(g *gin.Context) {
 					imgSizes := g.DefaultQuery("sizes", "512,512")
 					camdvs := g.DefaultQuery("camdvs", "[]")
 					rtBGTransparent := g.DefaultQuery("rtBGTransparent", "0")
+
+					rnodeJsonStr := g.DefaultQuery("rnode", `"rnode":{"name":"none","unit":"m","version:0}`)
+					fmt.Println("UploadRenderingTaskData(), rnodeJsonStr: ", rnodeJsonStr)
 
 					tid = rtTaskID
 					taskid = strconv.FormatInt(rtTaskID, 10)
@@ -186,8 +194,11 @@ func UploadRenderingTaskData(g *gin.Context) {
 					rtNode.ResUrl = fileDir + filename
 					rtTaskNodeMap[tid] = &rtNode
 
-					rtWaitTaskNodes = append(rtWaitTaskNodes, &rtNode)
+					rnode := &RTRenderingNode{}
+					rnode.setFromJson(rnodeJsonStr)
+					rtNode.RNode = rnode
 
+					rtWaitTaskNodes = append(rtWaitTaskNodes, &rtNode)
 					// jsonBytes, err := json.Marshal(rtNode)
 					// if err != nil {
 					// 	fmt.Println("error:", err)

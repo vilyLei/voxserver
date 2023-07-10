@@ -41,3 +41,4 @@ bin/static/rtUploadFiles/
 bin/static/uploadFiles/
 src/dsrdiffusion/model/private/
 *.exe~
+*.exe
