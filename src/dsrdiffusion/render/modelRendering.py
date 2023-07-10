@@ -973,9 +973,9 @@ def updateModelsMaterial():
     total = len(materials)
     for i in range(0, total):
         print("updateModelsMaterial(), materials[",i,"].modelName: ", materials[i].modelName)
-
-        model = scene_modelDict[materials[i].modelName]
-        updateModelMaterial(model, materials[i])
+        if materials[i].modelName in scene_modelDict:
+           model = scene_modelDict[materials[i].modelName]
+           updateModelMaterial(model, materials[i])
 
     # updateAModelMaterialByName('apple_stem_model')
     # updateAModelMaterialByName('apple_body_model')
