@@ -136,6 +136,7 @@ class RenderingNodeEnv:
     path = ''
     rotation = 0
     bgTransparent = False
+    brightness = 0.5
     rootDir = ''
     taskRootDir = ''
     def __init__(self):
@@ -148,6 +149,9 @@ class RenderingNodeEnv:
            self.path = jsonObj['path']
         if 'rotation' in jsonObj:
            self.rotation = jsonObj['rotation']
+        if 'brightness' in jsonObj:
+           self.brightness = jsonObj['brightness']
+        #
     def apply(self):
         bpy.context.scene.render.film_transparent = self.bgTransparent
         bpy.context.scene.world.use_nodes = True
@@ -171,7 +175,7 @@ class RenderingNodeEnv:
             bg_node.image = bpy.data.images.load(envHdrFilePath)
             # Connect the environment texture to the background output
             bg_output = bg_tree.nodes['Background']
-            bg_output.inputs['Strength'].default_value = 0.5
+            bg_output.inputs['Strength'].default_value = self.brightness
             bg_tree.links.new(bg_node.outputs['Color'], bg_output.inputs['Color'])
 class RenderingNodeOutput:
     __type__ = ''
