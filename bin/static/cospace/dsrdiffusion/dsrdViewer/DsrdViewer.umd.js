@@ -2187,7 +2187,7 @@ class DsrdImageViewer {
       }
     });
     this.m_rscene.addEventListener(VoxRScene_1.EventBase.ENTER_FRAME, this, evt => {
-      // console.log("...");
+    //   console.log("...gfgf");
       const cam = this.m_rscene.getCamera();
 
       if (this.m_rsceneCamVer != cam.version) {
@@ -2199,7 +2199,8 @@ class DsrdImageViewer {
         delay--;
 
         if (delay < 1) {
-          delay = 30; // console.log("this.m_imgLoaded: ", this.m_imgLoaded, this.m_imgUrls.length);
+          delay = 30;
+		//   console.log("XXXXy A this.m_imgLoaded: ", this.m_imgLoaded, this.m_imgUrls.length);
 
           if (this.m_imgLoaded) {
             if (this.m_imgUrls.length > 0) {
@@ -2721,7 +2722,7 @@ var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_
     if (descriptor && descriptor.get !== getCurrentScript && document.currentScript) {
       return document.currentScript
     }
-  
+
     // IE 8-10 support script readyState
     // IE 11+ & Firefox support stack trace
     try {
@@ -2739,24 +2740,24 @@ var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_
         inlineScriptSourceRegExp,
         inlineScriptSource,
         scripts = document.getElementsByTagName('script'); // Live NodeList collection
-  
+
       if (scriptLocation === currentLocation) {
         pageSource = document.documentElement.outerHTML;
         inlineScriptSourceRegExp = new RegExp('(?:[^\\n]+?\\n){0,' + (line - 2) + '}[^<]*<script>([\\d\\D]*?)<\\/script>[\\d\\D]*', 'i');
         inlineScriptSource = pageSource.replace(inlineScriptSourceRegExp, '$1').trim();
       }
-  
+
       for (var i = 0; i < scripts.length; i++) {
         // If ready state is interactive, return the script tag
         if (scripts[i].readyState === 'interactive') {
           return scripts[i];
         }
-  
+
         // If src matches, return the script tag
         if (scripts[i].src === scriptLocation) {
           return scripts[i];
         }
-  
+
         // If inline source matches, return the script tag
         if (
           scriptLocation === currentLocation &&
@@ -2766,7 +2767,7 @@ var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_
           return scripts[i];
         }
       }
-  
+
       // If no match, return null
       return null;
     }

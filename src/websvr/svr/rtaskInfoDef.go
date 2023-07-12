@@ -7,17 +7,14 @@ import (
 )
 
 type RAliveTaskInfoNode struct {
-	TaskID           int64       `json:"taskid,int64"`
-	TaskName         string      `json:"taskname"`
-	Phase            string      `json:"phase"`
-	FilePath         string      `json:"filepath"`
-	DrcsTotal        int         `json:"drcsTotal,int"`
-	Progress         int         `json:"progress,int"`
-	Resolution       [2]int      `json:"sizes"`
-	BGTransparent    int         `json:"bgTransparent"`
-	Camdvs           [16]float64 `json:"camdvs"`
-	RerenderingTimes int         `json:"rerenderingTimes"`
-	Version          int64       `json:"version"`
+	TaskID           int64  `json:"taskid,int64"`
+	TaskName         string `json:"taskname"`
+	Phase            string `json:"phase"`
+	FilePath         string `json:"filepath"`
+	DrcsTotal        int    `json:"drcsTotal,int"`
+	Progress         int    `json:"progress,int"`
+	RerenderingTimes int    `json:"rerenderingTimes"`
+	Version          int64  `json:"version"`
 }
 
 func (self *RAliveTaskInfoNode) CopyFromRTaskInfoNode(v *RTaskInfoNode) {
@@ -28,9 +25,6 @@ func (self *RAliveTaskInfoNode) CopyFromRTaskInfoNode(v *RTaskInfoNode) {
 		self.FilePath = v.ResUrl
 		self.Progress = v.Progress
 		self.DrcsTotal = v.ModelDrcsTotal
-		self.Resolution = v.Resolution
-		self.BGTransparent = v.BGTransparent
-		self.Camdvs = v.Camdvs
 		self.RerenderingTimes = v.RerenderingTimes
 		self.Version = v.Version
 	}

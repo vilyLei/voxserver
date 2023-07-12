@@ -334,38 +334,7 @@ def updateCamWithCfg(cfg):
     camNode = cfg.rtask.rnode.rcamera
     # print("######### updateCamWithCfg(), camNode: ", camNode)
     return camNode.apply()
-
-    taskObj = cfg.configObj["task"]
-    if "camdvs" in taskObj:
-        cdvs = taskObj["camdvs"]
-        if len(cdvs) != 16:
-            return False
-        print("updateCamWithCfg(), cdvs: ", cdvs)
-        cdvsList = toTuplesByStepN(cdvs)
-
-        px = cdvsList[0][3]
-        py = cdvsList[1][3]
-        pz = cdvsList[2][3]
-
-        dis = px * px + py * py + pz * pz
-        if(dis > 0.01):
-            cam_world_matrix = Matrix()
-            cam_world_matrix[0] = cdvsList[0]
-            cam_world_matrix[1] = cdvsList[1]
-            cam_world_matrix[2] = cdvsList[2]
-            cam_world_matrix[3] = cdvsList[3]
-
-            camera_object = bpy.data.objects["Camera"]
-            camera_object.matrix_world = cam_world_matrix
-
-            # Set camera field of view
-            camera_object.data.angle = math.pi * 45.0/180.0
-            camera_object.data.clip_start = 0.1
-            camera_object.data.clip_end = 20.0
-            return True
-            #
     #
-    return False
 
 def getSceneObjsBounds():
     print("getObjsBounds() init ...")

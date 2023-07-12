@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -180,18 +179,15 @@ func (self *RTRenderingNode) copyFrom(srcNode *RTRenderingNode) {
 }
 
 type RTaskInfoNode struct {
-	Id               int64       `json:"id"`
-	Name             string      `json:"name"`
-	ResUrl           string      `json:"resUrl"`
-	ResDir           string      `json:"resDir"`
-	Resolution       [2]int      `json:"resolution"`
-	BGTransparent    int         `json:"bgTransparent"`
-	Camdvs           [16]float64 `json:"camdvs"`
-	Phase            string      `json:"phase"`
-	Action           string      `json:"action"`
-	Time             int64       `json:"time"`
-	Version          int64       `json:"version"`
-	AutoFitModelSize string      `json:"autoFitModelSize"`
+	Id               int64  `json:"id"`
+	Name             string `json:"name"`
+	ResUrl           string `json:"resUrl"`
+	ResDir           string `json:"resDir"`
+	Phase            string `json:"phase"`
+	Action           string `json:"action"`
+	Time             int64  `json:"time"`
+	Version          int64  `json:"version"`
+	AutoFitModelSize string `json:"autoFitModelSize"`
 	Progress         int
 	RerenderingTimes int
 	ModelDrcsTotal   int
@@ -216,38 +212,38 @@ func (self *RTaskInfoNode) Reset() {
 	self.RNode = nil
 	self.ImgsTotal = 0
 }
-func (self *RTaskInfoNode) SetCamdvsWithStr(camdvsStr string) {
 
-	fmt.Println("SetCamdvsWithStr() ### len(camdvsStr): ", len(camdvsStr))
-	var dvs [16]float64
-	if len(camdvsStr) > 16 {
-		camdvsStr = camdvsStr[1 : len(camdvsStr)-1]
-		parts := strings.Split(camdvsStr, ",")
-		fmt.Println("SetCamdvsWithStr() ### camdvsStr: ", camdvsStr)
-		fmt.Println("SetCamdvsWithStr() ### len(parts): ", len(parts))
-		// s := fmt.Sprintf("%f", 678.3567)
-		// for i, substr := range parts {
-		for i := 0; i < len(parts); i++ {
-			if value, err := strconv.ParseFloat(parts[i], 64); err == nil {
-				// fmt.Println(s) // 3.14159265
-				dvs[i] = value
-			}
-		}
+// func (self *RTaskInfoNode) SetCamdvsWithStr(camdvsStr string) {
+// 	fmt.Println("SetCamdvsWithStr() ### len(camdvsStr): ", len(camdvsStr))
+// 	var dvs [16]float64
+// 	if len(camdvsStr) > 16 {
+// 		camdvsStr = camdvsStr[1 : len(camdvsStr)-1]
+// 		parts := strings.Split(camdvsStr, ",")
+// 		fmt.Println("SetCamdvsWithStr() ### camdvsStr: ", camdvsStr)
+// 		fmt.Println("SetCamdvsWithStr() ### len(parts): ", len(parts))
+// 		// s := fmt.Sprintf("%f", 678.3567)
+// 		// for i, substr := range parts {
+// 		for i := 0; i < len(parts); i++ {
+// 			if value, err := strconv.ParseFloat(parts[i], 64); err == nil {
+// 				// fmt.Println(s) // 3.14159265
+// 				dvs[i] = value
+// 			}
+// 		}
 
-		fmt.Println("SetCamdvsWithStr() ### dvs: ", dvs)
-	}
-	self.Camdvs = dvs
-}
+// 		fmt.Println("SetCamdvsWithStr() ### dvs: ", dvs)
+// 	}
+// 	self.Camdvs = dvs
+// }
 
-func (self *RTaskInfoNode) SetParamsWithStr(sizesStr string, camdvs string, bgTransparent string) {
-	parts := strings.Split(sizesStr, ",")
-	iw, _ := strconv.Atoi(parts[0])
-	ih, _ := strconv.Atoi(parts[1])
-	self.Resolution = [2]int{iw, ih}
-	iflag, _ := strconv.Atoi(bgTransparent)
-	self.BGTransparent = iflag
-	self.SetCamdvsWithStr(camdvs)
-}
+// func (self *RTaskInfoNode) SetParamsWithStr(sizesStr string, camdvs string, bgTransparent string) {
+// 	parts := strings.Split(sizesStr, ",")
+// 	iw, _ := strconv.Atoi(parts[0])
+// 	ih, _ := strconv.Atoi(parts[1])
+// 	self.Resolution = [2]int{iw, ih}
+// 	iflag, _ := strconv.Atoi(bgTransparent)
+// 	self.BGTransparent = iflag
+// 	self.SetCamdvsWithStr(camdvs)
+// }
 
 func (self *RTaskInfoNode) GetViewStatusInfo(teamIndex int, teamLength int) string {
 	self.UpdateTime()
@@ -278,7 +274,6 @@ func (self *RTaskInfoNode) GetTaskJsonStr() string {
 		fmt.Println("error:", err)
 	}
 	jsonStr := string(jsonBytes)
-	// fmt.Println("RenderingTask(), jsonStr: ", jsonStr)
 	jsonStr = `{"phase":"` + self.Phase + `", "task":` + jsonStr + `,"status":22}`
 	return jsonStr
 }

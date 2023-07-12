@@ -57,10 +57,10 @@ func RenderingTask(g *gin.Context) {
 
 		if hasTaskFlag {
 			if rtNode.Phase == "finish" {
-				imgSizes := g.DefaultQuery("sizes", "512,512")
-				camdvs := g.DefaultQuery("camdvs", "[]")
-				rtBGTransparent := g.DefaultQuery("rtBGTransparent", "0")
-				fmt.Println("rTask("+taskid+"):"+phase+", ready re-rendering, imgSizes: ", imgSizes)
+				// imgSizes := g.DefaultQuery("sizes", "512,512")
+				// camdvs := g.DefaultQuery("camdvs", "[]")
+				// rtBGTransparent := g.DefaultQuery("rtBGTransparent", "0")
+				fmt.Println("rTask(" + taskid + "):" + phase + ", ready re-rendering")
 				rtNode.Action = phase
 				rtNode.Phase = "new"
 				rtNode.Progress = 0
@@ -72,7 +72,7 @@ func RenderingTask(g *gin.Context) {
 				currRTRNode.setFromJson(rnodeJsonStr)
 				rtNode.RNode.copyFrom(&currRTRNode)
 
-				rtNode.SetParamsWithStr(imgSizes, camdvs, rtBGTransparent)
+				// rtNode.SetParamsWithStr(imgSizes, camdvs, rtBGTransparent)
 				rtWaitTaskNodes = append(rtWaitTaskNodes, rtNode)
 
 			} else {
@@ -181,9 +181,9 @@ func UploadRenderingTaskData(g *gin.Context) {
 					status = 22
 					fmt.Println("UploadRenderingTaskData(), upload receive file.Size: ", file.Size, "bytes")
 
-					imgSizes := g.DefaultQuery("sizes", "512,512")
-					camdvs := g.DefaultQuery("camdvs", "[]")
-					rtBGTransparent := g.DefaultQuery("rtBGTransparent", "0")
+					// imgSizes := g.DefaultQuery("sizes", "512,512")
+					// camdvs := g.DefaultQuery("camdvs", "[]")
+					// rtBGTransparent := g.DefaultQuery("rtBGTransparent", "0")
 
 					rnodeJsonStr := g.DefaultQuery("rnode", `"rnode":{"name":"none","unit":"m","version:0}`)
 					fmt.Println("UploadRenderingTaskData(), rnodeJsonStr: ", rnodeJsonStr)
@@ -196,8 +196,8 @@ func UploadRenderingTaskData(g *gin.Context) {
 					var rtNode RTaskInfoNode
 					rtNode.Reset()
 
-					fmt.Println("UploadRenderingTaskData(), camdvs: ", camdvs)
-					rtNode.SetParamsWithStr(imgSizes, camdvs, rtBGTransparent)
+					// fmt.Println("UploadRenderingTaskData(), camdvs: ", camdvs)
+					// rtNode.SetParamsWithStr(imgSizes, camdvs, rtBGTransparent)
 
 					rtNode.Id = tid
 					rtNode.Name = taskname
@@ -221,7 +221,7 @@ func UploadRenderingTaskData(g *gin.Context) {
 
 					rtTaskID += 1
 
-					fmt.Println("UploadRenderingTaskData(), taskname: ", taskname, ", rtNode.Resolution: ", rtNode.Resolution)
+					fmt.Println("UploadRenderingTaskData(), taskname: ", taskname)
 					fmt.Println("UploadRenderingTaskData(), len(rtWaitTaskNodes): ", len(rtWaitTaskNodes))
 					fmt.Println("UploadRenderingTaskData(), upload receive a new rendering task file name: ", filename)
 
