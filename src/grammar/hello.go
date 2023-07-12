@@ -29,12 +29,26 @@ func testMap() {
 
 func main() {
 	// slice := []int{1, 2, 3, 4, 5}
+	// copyTest()
+	// return
 	slice := []int{1}
 	fmt.Println("A slice: ", slice)
 	first := slice[0]
 	slice = append(slice[:0], slice[1:]...)
 	fmt.Println("B slice: ", slice)
 	fmt.Println("C first: ", first)
+}
+func copyTest() {
+	int_a_Arr := [2]int{11, 12}
+	int_b_Arr := [2]int{13, 14}
+	fmt.Println("A int_a_Arr: ", int_a_Arr)
+	fmt.Println("A int_b_Arr: ", int_b_Arr)
+	fmt.Println("--------- copy -----------")
+	int_b_Arr = int_a_Arr
+	int_a_Arr[0] = 15
+	int_a_Arr[1] = 16
+	fmt.Println("B int_a_Arr: ", int_a_Arr)
+	fmt.Println("B int_b_Arr: ", int_b_Arr)
 }
 func main1() {
 

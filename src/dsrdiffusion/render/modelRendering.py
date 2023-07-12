@@ -917,6 +917,12 @@ def updateModelMaterial(model, materialData = None):
     # print("updateModelMaterial ops ...")
 
     currMaterial = model.active_material
+    if currMaterial is None:
+        mat = bpy.data.materials.new(name=model.data.name+"_material")
+        model.data.materials.append(mat)
+        currMaterial = model.active_material
+        print("updateModelMaterial(), add a new material...")
+        #
     currMaterial.use_nodes = True
     checkModelMaterial(currMaterial)
     mat_nodes = currMaterial.node_tree.nodes
@@ -1031,5 +1037,6 @@ if __name__ == "__main__":
 # D:\programs\blender\blender.exe -b -P .\modelRendering.py -- rtaskDir=D:/dev/webProj/voxblender/models/model01/
 # D:\programs\blender\blender.exe -b -P .\modelRendering.py -- rtaskDir=D:/dev/webdev/minirsvr/src/renderingsvr/static/sceneres/v1ModelRTask2001/
 # D:\programs\blender\blender.exe -b -P .\modelRendering.py -- rtaskDir=D:/dev/webProj/minirsvr/src/renderingsvr/static/sceneres/v1ModelRTask2001/
+# D:\programs\blender\blender.exe -b -P .\modelRendering.py -- rtaskDir=D:/dev/webProj/minirsvr/src/renderingsvr/static/sceneres/v1ModelRTask2004/
 # D:\programs\blender\blender.exe -b -P .\modelRendering.py -- rtaskDir=D:/dev/webProj/voxserver/src/dsrdiffusion/static/assets/scene01/
 # D:\programs\blender\blender.exe -b D:/dev/webProj/minirsvr/src/renderingsvr/static/sceneres/v1ModelRTask2003/scene01.blend -P .\modelRendering.py -- rtaskDir=D:/dev/webProj/minirsvr/src/renderingsvr/static/sceneres/v1ModelRTask2003/

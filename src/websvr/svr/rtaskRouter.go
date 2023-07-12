@@ -68,7 +68,9 @@ func RenderingTask(g *gin.Context) {
 
 				rnodeJsonStr := g.DefaultQuery("rnode", `"rnode":{"name":"none","unit":"m","version:0}`)
 				fmt.Println("RenderingTask(), re-rendering, rnodeJsonStr: ", rnodeJsonStr)
-				rtNode.RNode.setFromJson(rnodeJsonStr)
+				// rtNode.RNode.setFromJson(rnodeJsonStr)
+				currRTRNode.setFromJson(rnodeJsonStr)
+				rtNode.RNode.copyFrom(&currRTRNode)
 
 				rtNode.SetParamsWithStr(imgSizes, camdvs, rtBGTransparent)
 				rtWaitTaskNodes = append(rtWaitTaskNodes, rtNode)
@@ -204,7 +206,9 @@ func UploadRenderingTaskData(g *gin.Context) {
 					rtTaskNodeMap[tid] = &rtNode
 
 					rnode := &RTRenderingNode{}
-					rnode.setFromJson(rnodeJsonStr)
+					// rnode.setFromJson(rnodeJsonStr)
+					currRTRNode.setFromJson(rnodeJsonStr)
+					rnode.copyFrom(&currRTRNode)
 					rtNode.RNode = rnode
 
 					rtWaitTaskNodes = append(rtWaitTaskNodes, &rtNode)

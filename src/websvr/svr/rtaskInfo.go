@@ -53,6 +53,13 @@ func GetRTaskInfo(g *gin.Context) {
 			fmt.Println("GetRTaskInfo, syncAnAliveTask, taskid: ", taskid, ", taskname: ", taskname, " srcType: ", srcType)
 			g.String(http.StatusOK, fmt.Sprintf("%s", rtiNode.GetJsonStr()))
 		}
+	case "syncAnAliveTaskInfo":
+		if hasTaskFlag {
+			// var rtiNode RAliveTaskInfoNode
+			// rtiNode.CopyFromRTaskInfoNode(rtNode)
+			fmt.Println("GetRTaskInfo, syncAnAliveTask, taskid: ", taskid, ", taskname: ", taskname, " srcType: ", srcType)
+			g.String(http.StatusOK, fmt.Sprintf("%s", rtNode.GetTaskJsonStr()))
+		}
 
 	case "syncAliveTasks":
 		var rtsiNode RAliveTasksInfoNode

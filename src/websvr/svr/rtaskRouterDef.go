@@ -42,7 +42,26 @@ type RTMaterialNode struct {
 	Metallic       float64    `json:"metallic"`
 	Roughness      float64    `json:"roughness"`
 	NormalStrength float64    `json:"normalStrength"`
+	Act            string     `json:"act"` // its values: add, del, update
 }
+
+func (self *RTMaterialNode) copyFrom(srcNode *RTMaterialNode) {
+	if self != srcNode {
+		if srcNode.ModelName != "" && (self.ModelName == "" || self.ModelName == srcNode.ModelName) {
+			self.ModelName = srcNode.ModelName
+			self.UVScales = srcNode.UVScales
+			self.Type = srcNode.Type
+			self.Color = srcNode.Color
+			self.Specular = srcNode.Specular
+			self.Metallic = srcNode.Metallic
+			self.Roughness = srcNode.Roughness
+			self.NormalStrength = srcNode.NormalStrength
+			self.Act = srcNode.Act
+			fmt.Println("RTMaterialNode::copyFrom(), ModelName: ", self.ModelName)
+		}
+	}
+}
+
 type RTEnvNode struct {
 	Path       string  `json:"path"`
 	Type       string  `json:"type"`
@@ -50,6 +69,19 @@ type RTEnvNode struct {
 	AO         float64 `json:"ao"`
 	Rotation   float64 `json:"rotation"`
 }
+
+func (self *RTEnvNode) copyFrom(srcNode *RTEnvNode) {
+	if self != srcNode {
+		// if srcNode.Name != "" && (self.Name == "" || self.Name == srcNode.Name) {
+		self.Path = srcNode.Path
+		self.Type = srcNode.Type
+		self.Brightness = srcNode.Brightness
+		self.AO = srcNode.AO
+		self.Rotation = srcNode.Rotation
+		// }
+	}
+}
+
 type RTOutputNode struct {
 	Path          string `json:"path"`
 	OutputType    string `json:"outputType"`
@@ -57,6 +89,19 @@ type RTOutputNode struct {
 	BGTransparent int    `json:"bgTransparent"`
 	BGColor       uint   `json:"bgColor"`
 }
+
+func (self *RTOutputNode) copyFrom(srcNode *RTOutputNode) {
+	if self != srcNode {
+		// if srcNode.Name != "" && (self.Name == "" || self.Name == srcNode.Name) {
+		self.Path = srcNode.Path
+		self.OutputType = srcNode.OutputType
+		self.Resolution = srcNode.Resolution
+		self.BGTransparent = srcNode.BGTransparent
+		self.BGColor = srcNode.BGColor
+		// }
+	}
+}
+
 type RTRCameraNode struct {
 	Type      string      `json:"type"`
 	ViewAngle float64     `json:"viewAngle"`
@@ -64,6 +109,19 @@ type RTRCameraNode struct {
 	Far       float64     `json:"far"`
 	Matrix    [16]float64 `json:"matrix"`
 }
+
+func (self *RTRCameraNode) copyFrom(srcNode *RTRCameraNode) {
+	if self != srcNode {
+		// if srcNode.Name != "" && (self.Name == "" || self.Name == srcNode.Name) {
+		self.Type = srcNode.Type
+		self.ViewAngle = srcNode.ViewAngle
+		self.Far = srcNode.Far
+		self.Near = srcNode.Near
+		self.Matrix = srcNode.Matrix
+		// }
+	}
+}
+
 type RTRenderingNode struct {
 	Name    string `json:"name"`
 	Unit    string `json:"unit"`
@@ -81,6 +139,44 @@ func (self *RTRenderingNode) setFromJson(rnodeJsonStr string) {
 		fmt.Printf("RTRenderingNode::setFromJson() Unmarshal failed, err: %v\n", err)
 	}
 	fmt.Println("RTRenderingNode::setFromJson(), self: ", self)
+}
+func (self *RTRenderingNode) copyFrom(srcNode *RTRenderingNode) {
+
+	if self != srcNode {
+		if (srcNode.Name != "") && (self.Name == "" || self.Name == srcNode.Name) {
+
+			self.Name = srcNode.Name
+			self.Unit = srcNode.Unit
+			self.Camera.copyFrom(&srcNode.Camera)
+			self.Output.copyFrom(&srcNode.Output)
+			self.Env.copyFrom(&srcNode.Env)
+
+			if srcNode.Materials != nil {
+				src_total := len(srcNode.Materials)
+				if src_total > 0 {
+					for i := 0; i < src_total; i++ {
+						srcM := &srcNode.Materials[i]
+						flag := true
+						dst_total := len(self.Materials)
+						for j := 0; j < dst_total; j++ {
+							if self.Materials[j].ModelName == srcM.ModelName {
+								flag = false
+								self.Materials[j].copyFrom(srcM)
+								break
+							}
+						}
+						if flag {
+							fmt.Println("RTRenderingNode::copyFrom(), add a new material ModelName: ", srcM.ModelName)
+							self.Materials = append(self.Materials, *srcM)
+							// self.Materials = append(self.Materials, srcNode.Materials[i])
+						}
+					}
+					var ms []RTMaterialNode
+					srcNode.Materials = ms
+				}
+			}
+		}
+	}
 }
 
 type RTaskInfoNode struct {
@@ -192,6 +288,7 @@ var rtTaskVer string = "v1"
 var rtWaitTaskNodes []*RTaskInfoNode
 
 var tempRTNode RTaskInfoNode
+var currRTRNode RTRenderingNode
 
 // rendering task map
 var rtTaskNodeMap map[int64]*RTaskInfoNode
