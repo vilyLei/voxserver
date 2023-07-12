@@ -994,9 +994,11 @@ def updateModelsMaterial():
     # # updateModelMaterial(model0)
     # updateModelMaterial(model1)
 
+materialModelType = {"glb":1, "obj": 1, "usdc": 1,"usdz":1}
 def updateSceneMaterial():
     modelFileResType = getModelFileTypeAt(0)
-    if modelFileResType == "glb":
+    # if modelFileResType == "glb" or modelFileResType == "obj":
+    if modelFileResType in materialModelType:
         collectModelInfo()
         updateModelsMaterial()
     else:
