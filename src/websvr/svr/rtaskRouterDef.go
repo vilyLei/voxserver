@@ -186,6 +186,7 @@ type RTaskInfoNode struct {
 	Phase            string `json:"phase"`
 	Action           string `json:"action"`
 	Time             int64  `json:"time"`
+	CTime            int64  `json:"ctime"` // creation time point
 	Version          int64  `json:"version"`
 	AutoFitModelSize string `json:"autoFitModelSize"`
 	Progress         int
@@ -202,6 +203,8 @@ func (self *RTaskInfoNode) UpdateTime() {
 }
 func (self *RTaskInfoNode) Reset() {
 
+	t := time.Now()
+	self.CTime = t.UnixMilli()
 	self.Action = "new"
 	self.Phase = "new"
 	self.Progress = 0

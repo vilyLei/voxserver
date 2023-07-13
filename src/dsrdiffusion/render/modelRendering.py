@@ -89,7 +89,7 @@ class RenderingNodeCamera:
     def isUpdated(self):
         return self.__updated__
     def buildFromJsonObj(self, jsonObj):
-        print('RenderingNodeCamera::buildFromJsonObj() ... TTTTTTTTTTTTTTTTTTT')
+        # print('RenderingNodeCamera::buildFromJsonObj() ... TTTTTTTTTTTTTTTTTTT')
         # print('RenderingNodeCamera::buildFromJsonObj() ..., ', jsonObj)
         if 'type' in jsonObj:
            self.type = jsonObj['type']

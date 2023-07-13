@@ -15,6 +15,8 @@ type RAliveTaskInfoNode struct {
 	Progress         int    `json:"progress,int"`
 	RerenderingTimes int    `json:"rerenderingTimes"`
 	Version          int64  `json:"version"`
+	Time             int64  `json:"time"`
+	CTime            int64  `json:"ctime"` // creation time point
 }
 
 func (self *RAliveTaskInfoNode) CopyFromRTaskInfoNode(v *RTaskInfoNode) {
@@ -27,6 +29,8 @@ func (self *RAliveTaskInfoNode) CopyFromRTaskInfoNode(v *RTaskInfoNode) {
 		self.DrcsTotal = v.ModelDrcsTotal
 		self.RerenderingTimes = v.RerenderingTimes
 		self.Version = v.Version
+		self.Time = v.Time
+		self.CTime = v.CTime
 	}
 }
 
