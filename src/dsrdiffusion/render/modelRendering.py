@@ -753,6 +753,8 @@ def getSrcOriginNode(currNode):
         currLink = currLinks[0]
         fromNode = currLink.from_node
         if fromNode is not None:
+            if fromNode.inputs is None or len(fromNode.inputs) < 1:
+                return currNode
             # print("getSrcOriginNode(), B fromNode.type          ###: ", fromNode.type)
             pnode = fromNode.inputs[0]
             originNode = getSrcOriginNode(pnode)
