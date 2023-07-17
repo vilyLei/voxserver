@@ -1041,6 +1041,10 @@ class DsrdUI {
     }
   }
 
+  setRTDataFromRNode(rnode) {
+    console.log("DsrdUI::setRTDataFromRNode(), rnode: ", rnode);
+  }
+
   getRTJsonStrByKeyNames(keyNames, parentEnabled = true) {
     let total = keyNames.length;
     let jsonStr = "";
@@ -1172,18 +1176,50 @@ const SettingDataPanel_1 = __webpack_require__("a7c5");
 
 const DataItemComponent_1 = __webpack_require__("9bbe");
 
-const URLFilter_1 = __importDefault(__webpack_require__("7aa4"));
+const URLFilter_1 = __importDefault(__webpack_require__("d33d"));
 
 class MaterialDataPanel extends SettingDataPanel_1.SettingDataPanel {
   constructor() {
-    super(); // modelName = "apple_body_model";
-
+    super();
+    this.m_preModelName = "";
+    this.m_unlockDataChanged = true;
     this.modelNames = [];
     this.uvScales = [1.0, 1.0];
   }
 
+  test() {// let jsonStr = `{
+    // 	"modelName":"export_0",
+    // 	"color":889977,
+    // 	"specular":0.6,
+    // 	"metallic": 0.7,
+    // 	"roughness": 0.1,
+    // 	"normalStrength": 1.5,
+    // 	"uvScales": [
+    // 		12,
+    // 		13
+    // 	]}`;
+    // let jsonObj = JSON.parse(jsonStr);
+    // this.setJsonObj(jsonObj);
+    // this.rscViewer.modelScene.setMaterialParamToNodeByJsonObj("export_0",jsonObj);
+    // this.getJsonStr();
+  }
+
+  setJsonObj(jsonObj) {
+    super.setJsonObj(jsonObj);
+
+    if (jsonObj["uvScales"]) {
+      let uvScales = jsonObj["uvScales"];
+      this.setStringValueToItem("uvScaleX", uvScales[0] + "");
+      this.setStringValueToItem("uvScaleY", uvScales[1] + "");
+    }
+  }
+
   setModelNamesWithUrls(urls) {
     if (urls && urls.length > 0) {
+      if (this.modelNames.length > 0) {
+        this.m_preModelName = this.modelNames[0];
+      }
+
       this.modelNames = [];
 
       for (let i = 0; i < urls.length; i++) {
@@ -1194,6 +1230,20 @@ class MaterialDataPanel extends SettingDataPanel_1.SettingDataPanel {
 
         this.modelNames.push(ns); // console.log("setModelNameWithUrl(), ns: >" + ns + "<");
       }
+
+      if (this.modelNames.length > 0) {
+        const mns = this.modelNames[0];
+
+        if (this.m_preModelName != mns) {
+          const ms = this.rscViewer.modelScene;
+          let jsonObj = ms.getMaterialJsonObjFromNode(mns);
+          this.m_unlockDataChanged = false; // jsonObj = {color:0xffffff} as any;
+          // console.log("vvvvvvvvvvv jsonObj: ", jsonObj);
+
+          this.setJsonObj(jsonObj);
+          this.m_unlockDataChanged = true; // ms.setMaterialParamToNodeByJsonObj(mns, jsonObj);
+        }
+      }
     } else {
       this.modelNames = [];
     }
@@ -1202,6 +1252,19 @@ class MaterialDataPanel extends SettingDataPanel_1.SettingDataPanel {
   }
 
   getJsonStr(beginStr = "{", endStr = "}") {
+    // let jsonObj: any = { materials: null };
+    // jsonObj.materials = this.rscViewer.modelScene.getMaterialJsonObjs();
+    let jsonObj = this.rscViewer.modelScene.getMaterialJsonObjs(); // let materials = this.rscViewer.modelScene.getMaterialJsonObjs();
+    // for (let i = 0; i < materials.length; i++) {
+    // }
+
+    let jsonStr = `"materials":${JSON.stringify(jsonObj)}`; // jsonStr = jsonStr.slice(1, jsonStr.length - 1)
+
+    console.log("xxxx materials jsonStr: ", jsonStr);
+    return jsonStr;
+  }
+
+  getJsonStr2(beginStr = "{", endStr = "}") {
     let jsonBody = "";
 
     if (this.modelNames.length > 0) {
@@ -1211,8 +1274,8 @@ class MaterialDataPanel extends SettingDataPanel_1.SettingDataPanel {
         const modelName = ls[i];
 
         if (modelName != "") {
-          let uvSX = this.getItemCompByKeyName("uvScale_x").getParam();
-          let uvSY = this.getItemCompByKeyName("uvScale_y").getParam();
+          let uvSX = this.getItemCompByKeyName("uvScaleX").getParam();
+          let uvSY = this.getItemCompByKeyName("uvScaleY").getParam();
           let uvScales = [uvSX.numberValue, uvSY.numberValue];
           let jsonStr = `${beginStr}"modelName":"${modelName}", "uvScales":[${uvScales}],"act":"update"`; // return super.getJsonStr(jsonStr,endStr);
 
@@ -1229,6 +1292,16 @@ class MaterialDataPanel extends SettingDataPanel_1.SettingDataPanel {
   }
 
   init(viewerLayer) {
+    // this.m_viewerLayer.onmousedown = evt => {
+    // 	console.log("viewerLayer.onmousedown() ...");
+    // 	// this.test();
+    // 	window.onkeydown = evt => {
+    // 		console.log("viewerLayer.onkeydown() ...");
+    // 		if(evt.key == 'u') {
+    // 			this.getJsonStr();
+    // 		}
+    // 	};
+    // };
     let params = [];
     let param = new DataItemComponent_1.DataItemComponentParam();
     param.keyName = "type";
@@ -1289,7 +1362,7 @@ class MaterialDataPanel extends SettingDataPanel_1.SettingDataPanel {
     param.toNumber();
     params.push(param);
     param = new DataItemComponent_1.DataItemComponentParam();
-    param.keyName = "uvScale_x";
+    param.keyName = "uvScaleX";
     param.name = "X轴UV缩放";
     param.numberValue = 1.0;
     param.inputType = "number";
@@ -1301,7 +1374,7 @@ class MaterialDataPanel extends SettingDataPanel_1.SettingDataPanel {
     param.toNumber();
     params.push(param);
     param = new DataItemComponent_1.DataItemComponentParam();
-    param.keyName = "uvScale_y";
+    param.keyName = "uvScaleY";
     param.name = "Y轴UV缩放";
     param.numberValue = 1.0;
     param.inputType = "number";
@@ -1313,13 +1386,52 @@ class MaterialDataPanel extends SettingDataPanel_1.SettingDataPanel {
     param.toNumber();
     params.push(param);
     this.m_params = params;
+
+    let onchange = keyName => {
+      console.log("on change...keyName: ", keyName);
+
+      if (this.m_unlockDataChanged) {
+        this.rscViewer.imgViewer.setViewImageAlpha(0.1);
+        let jsonStr = "";
+
+        switch (keyName) {
+          case "uvScaleX":
+          case "uvScaleY":
+            let uvSX = this.getItemCompByKeyName("uvScaleX").getParam();
+            let uvSY = this.getItemCompByKeyName("uvScaleY").getParam();
+            let uvScales = [uvSX.numberValue, uvSY.numberValue];
+            jsonStr = `{"uvScales":[${uvScales}]}`;
+            break;
+
+          default:
+            let item = this.getItemParamByKeyName(keyName);
+            jsonStr = `{${item.getJsonStr()}}`;
+            break;
+        }
+
+        let jsonObj = JSON.parse(jsonStr);
+        let nls = this.modelNames;
+        const ms = this.rscViewer.modelScene;
+
+        for (let i = 0; i < nls.length; i++) {
+          console.log("onchange, jsonObj: ", jsonObj);
+          ms.setMaterialParamToNodeByJsonObj(nls[i], jsonObj);
+        }
+      }
+    };
+
     let startY = 45;
     let disY = 31;
     let py = 0;
 
     for (let i = 0; i < params.length; ++i) {
-      this.createItemComponent(startY + py, params[i]);
+      let param = params[i];
+      this.createItemComponent(startY + py, param);
       py += disY;
+
+      if (param.editEnabled) {
+        param.onchange = onchange;
+      }
     }
   }
 
@@ -1562,263 +1674,6 @@ exports.RModelUploadingUI = RModelUploadingUI;
 
 /***/ }),
 
-/***/ "3b73":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-/***************************************************************************/
-
-/*                                                                         */
-
-/*  Copyright 2018-2023 by                                                 */
-
-/*  Vily(vily313@126.com)                                                  */
-
-/*                                                                         */
-
-/***************************************************************************/
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-class RendererDevice {
-  /**
-   * set web html body background color
-   * @param color a color string, the default value is "white"
-   */
-  static SetWebBodyColor(color = "white") {
-    const body = document.body;
-    body.style.background = color;
-  }
-
-  static SetLanguage(language) {
-    RendererDevice.s_language = language;
-  }
-
-  static IsChineseLanguage() {
-    let lg = RendererDevice.GetLanguage();
-    return lg == "zh-CN";
-  }
-
-  static GetLanguage() {
-    if (RendererDevice.s_language != "") {
-      return RendererDevice.s_language;
-    }
-
-    RendererDevice.s_language = navigator.language;
-    return RendererDevice.s_language;
-  }
-
-  static SetThreadEnabled(boo) {
-    RendererDevice.s_threadEnabled = boo;
-  }
-
-  static GetThreadEnabled() {
-    return RendererDevice.s_threadEnabled;
-  }
-
-  static GetDebugEnabled() {
-    return RendererDevice.s_debugEnabled;
-  }
-
-  static SetDebugEnabled(boo) {
-    RendererDevice.s_debugEnabled = boo;
-  }
-
-  static SetDevicePixelRatio(dpr) {
-    RendererDevice.s_devicePixelRatio = dpr;
-  }
-
-  static GetDevicePixelRatio() {
-    return RendererDevice.s_devicePixelRatio;
-  }
-
-  static Initialize(infoArr) {
-    if (RendererDevice.s_inited) {
-      RendererDevice.s_inited = false;
-      RendererDevice.s_WEBGL_VER = infoArr[0];
-      RendererDevice.TestMobileWeb();
-      RendererDevice.s_language = navigator.language + "";
-    }
-  }
-  /**
-   * 返回当前是不是window操作系统 PC端
-   */
-
-
-  static IsWindowsPCOS() {
-    return !(RendererDevice.IsSafariWeb() || RendererDevice.IsMobileWeb());
-  }
-  /**
-   * 得到windows系统环境下当前浏览器是否使用独立显卡。集显 integrated video card, 独显 external video card
-   * get whether the gpu is external video card in window os
-   * @returns get whether the gpu is external video card in window os
-   */
-
-
-  static IsWinExternalVideoCard() {
-    if (RendererDevice.s_winExternalVideoCardFlag > 0) {
-      return RendererDevice.s_winExternalVideoCardFlag == 2;
-    }
-
-    let flag = RendererDevice.IsSafariWeb() || RendererDevice.IsMobileWeb();
-
-    if (!flag) {
-      flag = RendererDevice.GPU_RENDERER.indexOf("Intel(R)") < 0;
-    }
-
-    RendererDevice.s_winExternalVideoCardFlag = flag ? 2 : 1;
-    /**
-     * webgl_renderer:  ANGLE (Intel, Intel(R) UHD Graphics 630 Direct3D11 vs_5_0 ps_5_0, D3D11-25.20.100.6617)
-     */
-
-    return RendererDevice.s_winExternalVideoCardFlag == 2;
-  }
-
-  static TestSafariWeb() {
-    //return /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent);
-    return /Safari/.test(navigator.userAgent) && /Mac OS/.test(navigator.userAgent);
-  }
-
-  static IsWebGL1() {
-    return RendererDevice.s_WEBGL_VER == 1;
-  }
-
-  static IsWebGL2() {
-    return RendererDevice.s_WEBGL_VER == 2;
-  }
-
-  static IsMobileWeb() {
-    if (RendererDevice.s_mobileFlag > 0) {
-      return RendererDevice.s_mobileFlag == 2;
-    }
-
-    return RendererDevice.TestMobileWeb();
-  }
-
-  static IsSafariWeb() {
-    if (RendererDevice.s_safariFlag > 0) {
-      return RendererDevice.s_safariFlag == 2;
-    }
-
-    RendererDevice.s_safariFlag = RendererDevice.TestSafariWeb() ? 2 : 1;
-    return RendererDevice.s_safariFlag == 2;
-  }
-
-  static IsIOS() {
-    if (RendererDevice.s_IOS_Flag > 0) {
-      return RendererDevice.s_IOS_Flag == 2;
-    }
-
-    let boo = false;
-
-    if (/iPad|iPhone|iPod/.test(navigator.platform)) {
-      boo = true;
-    } else {
-      boo = navigator.maxTouchPoints != undefined && navigator.maxTouchPoints > 2 && /MacIntel/.test(navigator.platform);
-    }
-
-    RendererDevice.s_IOS_Flag = boo ? 2 : 1;
-    return boo;
-  }
-
-  static IsIpadOS() {
-    if (RendererDevice.s_IPad_Flag > 0) {
-      return RendererDevice.s_IPad_Flag == 2;
-    }
-
-    let boo = navigator.maxTouchPoints > 0 && navigator.maxTouchPoints > 2 && /MacIntel/.test(navigator.platform);
-
-    if (!boo && /iPod|iPad|iPadPro|iPodPro/i.test(navigator.userAgent)) {
-      boo = true;
-    }
-
-    RendererDevice.s_IPad_Flag = boo ? 2 : 1;
-    return boo;
-  }
-
-  static IsAndroidOS() {
-    if (RendererDevice.s_Android_Flag > 0) {
-      return RendererDevice.s_Android_Flag == 2;
-    }
-
-    let boo = RendererDevice.TestMobileWeb();
-
-    if (boo && /Android|Linux/i.test(navigator.userAgent)) {
-      boo = true;
-    } else {
-      boo = false;
-    }
-
-    RendererDevice.s_Android_Flag = boo ? 2 : 1;
-    return boo;
-  }
-
-  static TestMobileWeb() {
-    if (RendererDevice.s_mobileFlag > 0) {
-      return RendererDevice.s_mobileFlag == 2;
-    }
-
-    if (/mobile/.test(location.href)) {
-      RendererDevice.s_mobileFlag = 2;
-      return RendererDevice.s_mobileFlag == 2;
-    }
-
-    if (/Android/i.test(navigator.userAgent)) {
-      if (/Mobile/i.test(navigator.userAgent)) {
-        RendererDevice.s_mobileFlag = 2;
-        return RendererDevice.s_mobileFlag == 2;
-      } else {
-        RendererDevice.s_mobileFlag = 1;
-        return RendererDevice.s_mobileFlag == 2;
-      }
-    } else if (/webOS|iPhone|iPod|iPad|iPodPro|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-      RendererDevice.s_mobileFlag = 2;
-      return RendererDevice.s_mobileFlag == 2;
-    }
-
-    RendererDevice.s_mobileFlag = 1;
-    return RendererDevice.s_mobileFlag == 2;
-  }
-
-}
-
-RendererDevice.s_inited = true;
-RendererDevice.s_WEBGL_VER = 2;
-RendererDevice.s_devicePixelRatio = 1.0;
-RendererDevice.s_mobileFlag = 0;
-RendererDevice.s_safariFlag = 0;
-RendererDevice.s_Android_Flag = 0;
-RendererDevice.s_IOS_Flag = 0;
-RendererDevice.s_IPad_Flag = 0;
-RendererDevice.s_winExternalVideoCardFlag = 0;
-/**
- * zh-CN, en-US, ect....
- */
-
-RendererDevice.s_language = "";
-RendererDevice.s_debugEnabled = true;
-RendererDevice.GPU_VENDOR = "unknown";
-RendererDevice.GPU_RENDERER = "unknown";
-RendererDevice.MAX_TEXTURE_SIZE = 4096;
-RendererDevice.MAX_RENDERBUFFER_SIZE = 4096;
-RendererDevice.MAX_VIEWPORT_WIDTH = 4096;
-RendererDevice.MAX_VIEWPORT_HEIGHT = 4096; // for debug
-
-RendererDevice.SHOWLOG_ENABLED = false;
-RendererDevice.SHADERCODE_TRACE_ENABLED = false; // true: force vertex shader precision to highp
-
-RendererDevice.VERT_SHADER_PRECISION_GLOBAL_HIGHP_ENABLED = true; // true: force fragment shader precision to highp
-
-RendererDevice.FRAG_SHADER_PRECISION_GLOBAL_HIGHP_ENABLED = true; // worker multi threads enabled yes or no
-
-RendererDevice.s_threadEnabled = true;
-exports.default = RendererDevice;
-
-/***/ }),
-
 /***/ "3b8d":
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -1896,7 +1751,24 @@ class ModelScene {
             rviewer.initSceneByUrls(drcUrls, types, prog => {
               console.log("3d viewer drc model loading prog: ", prog);
 
-              if (prog >= 1.0) {}
+              if (prog >= 1.0) {
+                // console.log("xxxxvvv this.data.rnode: ", this.data.rnode);
+                let rnode = this.data.rnode;
+
+                if (rnode) {
+                  let materials = rnode.materials;
+
+                  if (materials) {
+                    for (let i = 0; i < materials.length; ++i) {
+                      let mo = materials[i]; //mo.modelName
+
+                      this.m_rscViewer.modelScene.setMaterialParamToNodeByJsonObj(mo.modelName, mo);
+                    }
+                  }
+
+                  this.data.rtJsonData.setRTDataFromRNode(this.data.rnode);
+                }
+              }
             }, 200);
             rviewer.imgViewer.setViewImageFakeAlpha(0.1);
           }
@@ -2128,7 +2000,7 @@ class CameraDataPanel extends SettingDataPanel_1.SettingDataPanel {
   }
 
   getCamMatrixData() {
-    return this.rscViewer.getCameraData(0.01, true); // return [];
+    return this.rscViewer.camView.getCameraData(0.01, true); // return [];
   }
 
   getJsonStr(beginStr = "{", endStr = "}") {
@@ -2644,124 +2516,6 @@ exports.RTaskRquest = RTaskRquest;
 
 /***/ }),
 
-/***/ "7aa4":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-class URLFilter {
-  static getDomain(url) {
-    var urlReg = /http:\/\/([^\/]+)/i;
-    let domain = url.match(urlReg);
-    return domain != null && domain.length > 0 ? domain[0] : "";
-  }
-
-  static getHostUrl(port, end = "/") {
-    let host = location.href;
-    let domain = URLFilter.getDomain(host);
-    let nsList = domain.split(":");
-    host = nsList[0] + ":" + nsList[1];
-    return port ? host + ":" + port + "/" : domain + end;
-  }
-
-  static isEnabled() {
-    let hostUrl = window.location.href;
-    return hostUrl.indexOf(".artvily.com") > 0;
-  }
-
-  static filterUrl(url) {
-    if (url.indexOf("blob:") < 0) {
-      let hostUrl = window.location.href;
-
-      if (hostUrl.indexOf(".artvily.") > 0) {
-        hostUrl = "http://www.artvily.com:9090/";
-        url = hostUrl + url;
-      }
-    }
-
-    return url;
-  }
-
-  static getFileName(url, lowerCase = false, force = false) {
-    if (url.indexOf("blob:") < 0 || force) {
-      let i = url.lastIndexOf("/");
-
-      if (i < 0) {
-        return "";
-      }
-
-      let j = url.lastIndexOf(".", url.length);
-
-      if (j < 0) {
-        return "";
-      }
-
-      if (i + 2 < j) {
-        let str = url.slice(i + 1, j);
-
-        if (lowerCase) {
-          return str.toLocaleLowerCase();
-        }
-
-        return str;
-      }
-    }
-
-    return "";
-  }
-
-  static getFileNameAndSuffixName(url, lowerCase = false, force = false) {
-    if (url.indexOf("blob:") < 0 || force) {
-      let i = url.lastIndexOf("/");
-      let j = url.lastIndexOf(".", url.length);
-
-      if (j < 0) {
-        return "";
-      }
-
-      let str = url.slice(i + 1);
-
-      if (lowerCase) {
-        return str.toLocaleLowerCase();
-      }
-
-      return str;
-    }
-
-    return "";
-  }
-
-  static getFileSuffixName(url, lowerCase = false, force = false) {
-    if (url.indexOf("blob:") < 0 || force) {
-      let j = url.lastIndexOf(".", url.length);
-
-      if (j < 0) {
-        return "";
-      }
-
-      let str = url.slice(j + 1);
-
-      if (lowerCase) {
-        return str.toLocaleLowerCase();
-      }
-
-      return str;
-    }
-
-    return "";
-  }
-
-}
-
-exports.default = URLFilter;
-
-/***/ }),
-
 /***/ "7d31":
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -2812,7 +2566,7 @@ class DsrdScene {
         }
 
         let camMatrix = cam.matrix;
-        console.log("camMatrix: ", camMatrix);
+        console.log("updateDataWithCurrRNode(), camMatrix: ", camMatrix);
 
         if (camMatrix !== undefined) {
           this.setCameraWithF32Arr16(camMatrix);
@@ -2838,15 +2592,16 @@ class DsrdScene {
     params[2] = far * 100.0; //const params = this.m_camParams;
 
     if (this.m_rscViewerInited) {
-      this.rscViewer.setCamProjectParam(params[0], params[1], params[2]);
+      this.rscViewer.camView.setCamProjectParam(params[0], params[1], params[2]);
     }
   }
 
   setCameraWithF32Arr16(camvs16) {
+    console.log("DsrdScene::setCameraWithF32Arr16(), xxx.");
     this.m_camvs16 = camvs16;
 
     if (this.m_rscViewerInited && this.m_camvs16) {
-      this.rscViewer.updateCameraWithF32Arr16(this.m_camvs16);
+      this.rscViewer.camView.updateCameraWithF32Arr16(this.m_camvs16);
     }
   }
 
@@ -2859,7 +2614,6 @@ class DsrdScene {
   }
 
   init3DScene() {
-    // let rscViewer = new SceneViewer.SceneViewer();
     let rscViewer = new DsrdViewer.DsrdViewer();
     let selfT = this;
     selfT.rscViewer = rscViewer;
@@ -2883,7 +2637,7 @@ class DsrdScene {
       const params = this.m_camParams;
 
       if (params) {
-        this.rscViewer.setCamProjectParam(params[0], params[1], params[2]);
+        this.rscViewer.camView.setCamProjectParam(params[0], params[1], params[2]);
       }
 
       if (this.m_camvs16) {
@@ -3044,6 +2798,7 @@ class DataItemComponentParam {
     this.numberMaxValue = 0xffffff;
     this.floatNumberEnabled = false;
     this.autoEncoding = true;
+    this.onchange = null;
   }
 
   getJsonStr() {
@@ -3066,25 +2821,22 @@ class DataItemComponentParam {
 
   toColor() {
     this.compType = "color";
-  }
+  } // updateColorInput(input: HTMLInputElement): void {
+  // 	let str = checkCSSHexRGBColorStr(input.value);
+  // 	input.value = str + this.unit;
+  // 	this.numberValue = parseInt("0x" + str);
+  // }
+  // updateFloatNumberInput(input: HTMLInputElement): void {
+  // 	let str = checkFloatNumberStr(input.value, this.numberMinValue, this.numberMaxValue);
+  // 	input.value = str + this.unit;
+  // 	this.numberValue = parseFloat(str);
+  // }
+  // updateIntegerNumberInput(input: HTMLInputElement): void {
+  // 	let str = checkIntegerNumberStr(input.value, this.numberMinValue, this.numberMaxValue);
+  // 	input.value = str + this.unit;
+  // 	this.numberValue = parseInt(str);
+  // }
 
-  updateColorInput(input) {
-    let str = checkCSSHexRGBColorStr(input.value);
-    input.value = str + this.unit;
-    this.numberValue = parseInt("0x" + str);
-  }
-
-  updateFloatNumberInput(input) {
-    let str = checkFloatNumberStr(input.value, this.numberMinValue, this.numberMaxValue);
-    input.value = str + this.unit;
-    this.numberValue = parseFloat(str);
-  }
-
-  updateIntegerNumberInput(input) {
-    let str = checkIntegerNumberStr(input.value, this.numberMinValue, this.numberMaxValue);
-    input.value = str + this.unit;
-    this.numberValue = parseInt(str);
-  }
 
   updateColorValueStr(valueStr) {
     let str = checkCSSHexRGBColorStr(valueStr);
@@ -3100,17 +2852,27 @@ class DataItemComponentParam {
     let str = checkIntegerNumberStr(valueStr, this.numberMinValue, this.numberMaxValue);
     this.numberValue = parseInt(str);
   }
+  /**
+   * @param valueStr value string
+   * @param syncViewing the default value is true
+   */
+
 
   updateValueWithStr(valueStr, syncViewing = true) {
-    console.log("updateValueWithStr(), this.compType: ", this.compType, ", valueStr: ", valueStr, ", syncViewing: ", syncViewing);
+    // console.log("updateValueWithStr(), this.compType: ", this.compType, ", valueStr: ", valueStr, ", syncViewing: ",syncViewing);
+    let changed = false;
 
     switch (this.compType) {
       case "color":
-        this.updateColorValueStr(valueStr);
+        let preColor = this.numberValue;
+        this.updateColorValueStr(valueStr); // this.updateFloatNumberValueStr(valueStr);
+
+        changed = this.numberValue != preColor;
         break;
 
       case "number":
-        console.log("ZZZZZZ this.floatNumberEnabled: ", this.floatNumberEnabled);
+        console.log("ZZZZZZ this.floatNumberEnabled: ", this.floatNumberEnabled, ", valueStr: ", valueStr);
+        let preNumV = this.numberValue;
 
         if (this.floatNumberEnabled) {
           this.updateFloatNumberValueStr(valueStr);
@@ -3118,19 +2880,30 @@ class DataItemComponentParam {
           this.updateIntegerNumberValueStr(valueStr);
         }
 
+        changed = Math.abs(this.numberValue - preNumV) > 0.0001;
         break;
 
       case "text":
+        let preText = "";
+
+        if (this.textContent !== undefined) {
+          preText = this.textContent;
+        } else if (this.textValue !== undefined) {
+          preText = this.textValue;
+        }
+
         if (this.textContent !== undefined) {
           this.textContent = valueStr;
         } else if (this.textValue !== undefined) {
           this.textValue = valueStr;
         }
 
+        changed = valueStr != preText;
         break;
 
       case "boolean":
         valueStr = valueStr.toLowerCase();
+        let boo = this.booleanValue;
 
         switch (valueStr) {
           case "是":
@@ -3148,6 +2921,7 @@ class DataItemComponentParam {
             break;
         }
 
+        changed = boo != this.booleanValue;
         break;
 
       default:
@@ -3156,6 +2930,10 @@ class DataItemComponentParam {
 
     if (syncViewing) {
       this.displayToViewer();
+    }
+
+    if (changed && this.onchange && this.editEnabled) {
+      this.onchange(this.keyName);
     }
   }
 
@@ -3177,12 +2955,9 @@ class DataItemComponentParam {
         switch (this.compType) {
           case "color":
             if (this.inputType == "text") {
-              // input.onkeyup = evt => {
-              // input.onkeyup = evt => {
-              // 	this.updateColorContent(input);
-              // }
               input.onblur = evt => {
-                this.updateColorInput(input);
+                // this.updateColorInput(input);
+                this.updateValueWithStr(input.value);
               };
             }
 
@@ -3191,23 +2966,14 @@ class DataItemComponentParam {
           default:
             if (this.inputType == "number") {
               if (this.floatNumberEnabled) {
-                // input.onkeyup = evt => {
-                // 	// let str = checkFloatNumberStr( input.value, this.numberMinValue, this.numberMaxValue );
-                // 	// input.value = str + this.unit;
-                // 	// this.numberValue = parseFloat(str);
-                // 	this.updateFloatNumberInput(input);
-                // }
                 input.onblur = evt => {
-                  this.updateFloatNumberInput(input);
+                  // this.updateFloatNumberInput(input);
+                  this.updateValueWithStr(input.value);
                 };
               } else {
-                // input.onkeyup = evt => {
-                // 	let str = checkIntegerNumberStr( input.value, this.numberMinValue, this.numberMaxValue );
-                // 	input.value = str + this.unit;
-                // 	this.numberValue = parseInt(str);
-                // }
                 input.onblur = evt => {
-                  this.updateIntegerNumberInput(input);
+                  // this.updateIntegerNumberInput(input);
+                  this.updateValueWithStr(input.value);
                 };
               }
             }
@@ -3221,7 +2987,7 @@ class DataItemComponentParam {
         case "boolean":
           div.onmouseup = evt => {
             this.booleanValue = !this.booleanValue;
-            this.displayToViewer();
+            this.updateValueWithStr(this.booleanValue + ""); // this.displayToViewer();
           };
 
           break;
@@ -3402,7 +3168,7 @@ Object.defineProperty(exports, "__esModule", {
 
 const ButtonDivItem_1 = __webpack_require__("47c8");
 
-const DropFileController_1 = __webpack_require__("bb2b");
+const DropFileController_1 = __webpack_require__("c32b");
 
 const RModelUploadingUI_1 = __webpack_require__("3a06");
 
@@ -3688,7 +3454,7 @@ const DataItemComponentParam_1 = __webpack_require__("8448");
 
 exports.DataItemComponentParam = DataItemComponentParam_1.DataItemComponentParam;
 
-const RendererDevice_1 = __importDefault(__webpack_require__("3b73"));
+const EnvSysDevice_1 = __importDefault(__webpack_require__("ebbb"));
 
 class DataItemComponent {
   constructor() {
@@ -3705,7 +3471,7 @@ class DataItemComponent {
     this.m_areaHeight = height;
     this.m_viewerLayer = viewerLayer;
     this.m_param = param;
-    this.m_isMobileWeb = RendererDevice_1.default.IsMobileWeb(); // this.m_isMobileWeb = true;
+    this.m_isMobileWeb = EnvSysDevice_1.default.IsMobileWeb(); // this.m_isMobileWeb = true;
 
     this.init(viewerLayer, param);
   }
@@ -3814,6 +3580,44 @@ class SettingDataPanel {
     viewerLayer.appendChild(this.m_container);
     this.init(viewerLayer);
     this.setVisible(false);
+  }
+
+  setJsonObj(jsonObj) {
+    this.setJsonDataToItems(jsonObj);
+  }
+
+  setStringValueToItem(keyName, valueStr) {
+    if (keyName != "") {
+      const item = this.getItemParamByKeyName(keyName);
+
+      if (item) {
+        item.updateValueWithStr(valueStr + "", true);
+      }
+    }
+  }
+
+  setJsonDataToItems(jsonObj) {
+    if (jsonObj != null) {
+      for (var key in jsonObj) {
+        if (jsonObj[key]) {
+          const item = this.getItemParamByKeyName(key);
+
+          if (item) {
+            // console.log("bbbbbbbbbb key: ", key, ", item.compType: ", item.compType);
+            switch (item.compType) {
+              case "color":
+                item.updateValueWithStr(jsonObj[key].toString(16), true);
+                break;
+
+              default:
+                item.updateValueWithStr(jsonObj[key] + "", true);
+                break;
+            }
+          } //item.numberValue = jsonObj[keyStr];
+
+        }
+      }
+    }
   }
 
   getName() {
@@ -4314,7 +4118,7 @@ exports.ParamInputPanel = ParamInputPanel;
 
 /***/ }),
 
-/***/ "bb2b":
+/***/ "c32b":
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4626,6 +4430,299 @@ exports.RTaskProcess = RTaskProcess;
 
 /***/ }),
 
+/***/ "d33d":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+class URLFilter {
+  static getDomain(url) {
+    var urlReg = /http:\/\/([^\/]+)/i;
+    let domain = url.match(urlReg);
+    return domain != null && domain.length > 0 ? domain[0] : "";
+  }
+
+  static getHostUrl(port, end = "/") {
+    let host = location.href;
+    let domain = URLFilter.getDomain(host);
+    let nsList = domain.split(":");
+    host = nsList[0] + ":" + nsList[1];
+    return port ? host + ":" + port + "/" : domain + end;
+  }
+
+  static isEnabled() {
+    let hostUrl = window.location.href;
+    return hostUrl.indexOf(".artvily.com") > 0;
+  }
+
+  static filterUrl(url) {
+    if (url.indexOf("blob:") < 0) {
+      let hostUrl = window.location.href;
+
+      if (hostUrl.indexOf(".artvily.") > 0) {
+        hostUrl = "http://www.artvily.com:9090/";
+        url = hostUrl + url;
+      }
+    }
+
+    return url;
+  }
+
+  static getFileName(url, lowerCase = false, force = false) {
+    if (url.indexOf("blob:") < 0 || force) {
+      let i = url.lastIndexOf("/");
+
+      if (i < 0) {
+        return "";
+      }
+
+      let j = url.lastIndexOf(".", url.length);
+
+      if (j < 0) {
+        return "";
+      }
+
+      if (i + 2 < j) {
+        let str = url.slice(i + 1, j);
+
+        if (lowerCase) {
+          return str.toLocaleLowerCase();
+        }
+
+        return str;
+      }
+    }
+
+    return "";
+  }
+
+  static getFileNameAndSuffixName(url, lowerCase = false, force = false) {
+    if (url.indexOf("blob:") < 0 || force) {
+      let i = url.lastIndexOf("/");
+      let j = url.lastIndexOf(".", url.length);
+
+      if (j < 0) {
+        return "";
+      }
+
+      let str = url.slice(i + 1);
+
+      if (lowerCase) {
+        return str.toLocaleLowerCase();
+      }
+
+      return str;
+    }
+
+    return "";
+  }
+
+  static getFileSuffixName(url, lowerCase = false, force = false) {
+    if (url.indexOf("blob:") < 0 || force) {
+      let j = url.lastIndexOf(".", url.length);
+
+      if (j < 0) {
+        return "";
+      }
+
+      let str = url.slice(j + 1);
+
+      if (lowerCase) {
+        return str.toLocaleLowerCase();
+      }
+
+      return str;
+    }
+
+    return "";
+  }
+
+}
+
+exports.default = URLFilter;
+
+/***/ }),
+
+/***/ "ebbb":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+/***************************************************************************/
+
+/*                                                                         */
+
+/*  Copyright 2018-2023 by                                                 */
+
+/*  Vily(vily313@126.com)                                                  */
+
+/*                                                                         */
+
+/***************************************************************************/
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+class EnvSysDevice {
+  /**
+   * set web html body background color
+   * @param color a color string, the default value is "white"
+   */
+  static SetWebBodyColor(color = "white") {
+    const body = document.body;
+    body.style.background = color;
+  }
+
+  static SetLanguage(language) {
+    EnvSysDevice.s_language = language;
+  }
+
+  static IsChineseLanguage() {
+    let lg = EnvSysDevice.GetLanguage();
+    return lg == "zh-CN";
+  }
+
+  static GetLanguage() {
+    if (EnvSysDevice.s_language != "") {
+      return EnvSysDevice.s_language;
+    }
+
+    EnvSysDevice.s_language = navigator.language;
+    return EnvSysDevice.s_language;
+  }
+
+  static GetDevicePixelRatio() {
+    return window.devicePixelRatio;
+  }
+  /**
+   * 返回当前是不是window操作系统 PC端
+   */
+
+
+  static IsWindowsPCOS() {
+    return !(EnvSysDevice.IsSafariWeb() || EnvSysDevice.IsMobileWeb());
+  }
+
+  static TestSafariWeb() {
+    //return /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent);
+    return /Safari/.test(navigator.userAgent) && /Mac OS/.test(navigator.userAgent);
+  }
+
+  static IsMobileWeb() {
+    if (EnvSysDevice.s_mobileFlag > 0) {
+      return EnvSysDevice.s_mobileFlag == 2;
+    }
+
+    return EnvSysDevice.TestMobileWeb();
+  }
+
+  static IsSafariWeb() {
+    if (EnvSysDevice.s_safariFlag > 0) {
+      return EnvSysDevice.s_safariFlag == 2;
+    }
+
+    EnvSysDevice.s_safariFlag = EnvSysDevice.TestSafariWeb() ? 2 : 1;
+    return EnvSysDevice.s_safariFlag == 2;
+  }
+
+  static IsIOS() {
+    if (EnvSysDevice.s_IOS_Flag > 0) {
+      return EnvSysDevice.s_IOS_Flag == 2;
+    }
+
+    let boo = false;
+
+    if (/iPad|iPhone|iPod/.test(navigator.platform)) {
+      boo = true;
+    } else {
+      boo = navigator.maxTouchPoints != undefined && navigator.maxTouchPoints > 2 && /MacIntel/.test(navigator.platform);
+    }
+
+    EnvSysDevice.s_IOS_Flag = boo ? 2 : 1;
+    return boo;
+  }
+
+  static IsIpadOS() {
+    if (EnvSysDevice.s_IPad_Flag > 0) {
+      return EnvSysDevice.s_IPad_Flag == 2;
+    }
+
+    let boo = navigator.maxTouchPoints > 0 && navigator.maxTouchPoints > 2 && /MacIntel/.test(navigator.platform);
+
+    if (!boo && /iPod|iPad|iPadPro|iPodPro/i.test(navigator.userAgent)) {
+      boo = true;
+    }
+
+    EnvSysDevice.s_IPad_Flag = boo ? 2 : 1;
+    return boo;
+  }
+
+  static IsAndroidOS() {
+    if (EnvSysDevice.s_Android_Flag > 0) {
+      return EnvSysDevice.s_Android_Flag == 2;
+    }
+
+    let boo = EnvSysDevice.TestMobileWeb();
+
+    if (boo && /Android|Linux/i.test(navigator.userAgent)) {
+      boo = true;
+    } else {
+      boo = false;
+    }
+
+    EnvSysDevice.s_Android_Flag = boo ? 2 : 1;
+    return boo;
+  }
+
+  static TestMobileWeb() {
+    if (EnvSysDevice.s_mobileFlag > 0) {
+      return EnvSysDevice.s_mobileFlag == 2;
+    }
+
+    if (/mobile/.test(location.href)) {
+      EnvSysDevice.s_mobileFlag = 2;
+      return EnvSysDevice.s_mobileFlag == 2;
+    }
+
+    if (/Android/i.test(navigator.userAgent)) {
+      if (/Mobile/i.test(navigator.userAgent)) {
+        EnvSysDevice.s_mobileFlag = 2;
+        return EnvSysDevice.s_mobileFlag == 2;
+      } else {
+        EnvSysDevice.s_mobileFlag = 1;
+        return EnvSysDevice.s_mobileFlag == 2;
+      }
+    } else if (/webOS|iPhone|iPod|iPad|iPodPro|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+      EnvSysDevice.s_mobileFlag = 2;
+      return EnvSysDevice.s_mobileFlag == 2;
+    }
+
+    EnvSysDevice.s_mobileFlag = 1;
+    return EnvSysDevice.s_mobileFlag == 2;
+  }
+
+}
+
+EnvSysDevice.s_mobileFlag = 0;
+EnvSysDevice.s_safariFlag = 0;
+EnvSysDevice.s_Android_Flag = 0;
+EnvSysDevice.s_IOS_Flag = 0;
+EnvSysDevice.s_IPad_Flag = 0;
+/**
+ * zh-CN, en-US, ect....
+ */
+
+EnvSysDevice.s_language = "";
+exports.default = EnvSysDevice;
+
+/***/ }),
+
 /***/ "edb0":
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -4652,8 +4749,7 @@ const RTaskSystem_1 = __webpack_require__("b66b");
 
 const HtmlDivUtils_1 = __webpack_require__("7191");
 
-const RendererDevice_1 = __importDefault(__webpack_require__("3b73")); // declare var CURR_PAGE_ST_INFO_LIST: any;
-
+const EnvSysDevice_1 = __importDefault(__webpack_require__("ebbb"));
 
 class DsrdShell {
   constructor() {
@@ -4684,7 +4780,7 @@ class DsrdShell {
 
     if (this.m_init) {
       this.m_init = false;
-      this.m_isMobileWeb = RendererDevice_1.default.IsMobileWeb();
+      this.m_isMobileWeb = EnvSysDevice_1.default.IsMobileWeb();
       const rsc = this.m_rscene;
       this.m_modelScene = rsc.modelScene;
       const rtsys = this.m_rtaskSys;
@@ -4898,9 +4994,9 @@ class DsrdShell {
       this.m_rtaskBeginUI.initialize(beginUILayer, width * 2, height);
     } else {
       this.m_rtaskBeginUI.initialize(beginUILayer, width, height * 2);
-    }
+    } // this.m_rtaskBeginUI.open();
 
-    this.m_rtaskBeginUI.open();
+
     let win = window;
     let flagInfo = win["CURR_PAGE_ST_INFO_LIST"]; // console.log("xxxxxxx flagInfo: ", flagInfo);
 

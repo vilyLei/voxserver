@@ -87,352 +87,7 @@ module.exports =
 /************************************************************************/
 /******/ ({
 
-/***/ "0efa":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-const ModuleLoader_1 = __webpack_require__("75f5");
-
-class T_CoMaterial {
-  constructor() {
-    this.m_init = true;
-  }
-
-  initialize(callback = null, url = "") {
-    this.m_init = !this.isEnabled();
-
-    if (this.m_init) {
-      this.m_init = false;
-
-      if (url == "" || url === undefined) {
-        url = "static/cospace/coMaterial/CoMaterial.umd.min.js";
-      }
-
-      new ModuleLoader_1.ModuleLoader(1, () => {
-        if (callback != null && this.isEnabled()) callback([url]);
-      }).load(url);
-      return true;
-    }
-
-    return false;
-  }
-
-  isEnabled() {
-    return typeof CoMaterial !== "undefined";
-  }
-  /**
-   * create a Color4 instance
-   * @param pr the default vaue is 1.0
-   * @param pg the default vaue is 1.0
-   * @param pb the default vaue is 1.0
-   * @param pa the default vaue is 1.0
-   */
-
-
-  createColor4(pr, pg, pb, pa) {
-    return CoMaterial.createColor4(pr, pg, pb, pa);
-  }
-  /**
-   * build default 3d entity rendering material
-   * @param normalEnabled the default value is false
-   */
-
-
-  createDefaultMaterial(normalEnabled) {
-    return CoMaterial.createDefaultMaterial(normalEnabled);
-  }
-  /**
-   * build 3d line entity rendering material
-   * @param dynColorEnabled the default value is true
-   */
-
-
-  createLineMaterial(dynColorEnabled) {
-    return CoMaterial.createLineMaterial(dynColorEnabled);
-  }
-  /**
-   * build 3d quad line entity rendering material
-   * @param dynColorEnabled the default value is false
-   */
-
-
-  createQuadLineMaterial(dynColorEnabled) {
-    return CoMaterial.createQuadLineMaterial(dynColorEnabled);
-  }
-
-  createShaderMaterial(shd_uniqueName) {
-    return CoMaterial.createShaderMaterial(shd_uniqueName);
-  }
-
-  createMaterial(dcr) {
-    return CoMaterial.createMaterial(dcr);
-  }
-
-  creatMaterialContextParam() {
-    return CoMaterial.creatMaterialContextParam();
-  }
-
-  createMaterialContext() {
-    return CoMaterial.createMaterialContext();
-  }
-
-}
-
-const VoxMaterial = new T_CoMaterial();
-exports.VoxMaterial = VoxMaterial;
-
-/***/ }),
-
-/***/ "1eb2":
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-// This file is imported into lib/wc client bundles.
-
-if (typeof window !== 'undefined') {
-  var currentScript = window.document.currentScript
-  if (true) {
-    var getCurrentScript = __webpack_require__("8875")
-    currentScript = getCurrentScript()
-
-    // for backward compatibility, because previously we directly included the polyfill
-    if (!('currentScript' in document)) {
-      Object.defineProperty(document, 'currentScript', { get: getCurrentScript })
-    }
-  }
-
-  var src = currentScript && currentScript.src.match(/(.+\/)[^/]+\.js(\?.*)?$/)
-  if (src) {
-    __webpack_require__.p = src[1] // eslint-disable-line
-  }
-}
-
-// Indicate to webpack that this file can be concatenated
-/* unused harmony default export */ var _unused_webpack_default_export = (null);
-
-
-/***/ }),
-
-/***/ "2564":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-/**
- * 将加载逻辑打包的loader
- */
-
-class PackedLoader {
-  /**
-   * @param times 记录总共需要的完成操作的响应次数。这个次数可能是由load直接产生，也可能是由于别的地方驱动。
-   * @param callback 完成所有响应的之后的回调
-   */
-  constructor(times, callback = null, urlChecker = null) {
-    this.m_uid = PackedLoader.s_uid++;
-    this.m_urlChecker = null;
-    this.m_oneTimes = true;
-    this.m_loaderMap = null;
-    this.m_callback = callback;
-    this.m_times = times;
-    this.m_urlChecker = urlChecker;
-  }
-
-  setUrlChecker(urlChecker = null) {
-    this.m_urlChecker = urlChecker;
-    return this;
-  }
-
-  getUrlChecker() {
-    return this.m_urlChecker;
-  }
-
-  getUid() {
-    return this.m_uid;
-  }
-
-  setCallback(callback) {
-    this.m_callback = callback;
-    return this;
-  }
-
-  addLoader(m) {
-    if (m != null && m != this) {
-      if (this.isFinished()) {
-        m.use();
-      } else {
-        if (this.m_loaderMap == null) {
-          this.m_loaderMap = new Map();
-        }
-
-        let map = this.m_loaderMap;
-
-        if (!map.has(m.getUid())) {
-          map.set(m.getUid(), m);
-        }
-      }
-    }
-
-    return this;
-  }
-
-  isFinished() {
-    return this.m_times == 0;
-  }
-
-  useOnce() {
-    if (this.m_oneTimes) {
-      this.m_oneTimes = false;
-      this.use();
-    }
-  }
-
-  use() {
-    if (this.m_times > 0) {
-      this.m_times--;
-
-      if (this.isFinished()) {
-        if (this.m_callback != null) {
-          this.m_callback();
-          this.m_callback = null;
-
-          if (this.m_loaderMap != null) {
-            for (let [key, value] of this.m_loaderMap) {
-              value.use();
-            }
-
-            this.m_loaderMap = null;
-          }
-        }
-      }
-    }
-  }
-
-  hasModuleByUrl(url) {
-    return PackedLoader.loadedMap.has(url);
-  }
-
-  load(url) {
-    if (url == "") {
-      return this;
-    }
-
-    if (this.m_urlChecker != null) {
-      url = this.m_urlChecker(url);
-    }
-
-    let loadedMap = PackedLoader.loadedMap;
-
-    if (loadedMap.has(url)) {
-      this.use();
-      return;
-    }
-
-    let loadingMap = PackedLoader.loadingMap;
-
-    if (loadingMap.has(url)) {
-      let list = loadingMap.get(url);
-
-      for (let i = 0; i < list.length; ++i) {
-        if (list[i] == this) {
-          return;
-        }
-      }
-
-      list.push(this);
-      return;
-    }
-
-    loadingMap.set(url, [this]);
-    this.loadData(url);
-    return this;
-  }
-  /**
-   * subclass need override this function
-   * @param url data url
-   */
-
-
-  loadData(url) {
-    let codeLoader = new XMLHttpRequest();
-    codeLoader.open("GET", url, true);
-
-    codeLoader.onerror = function (err) {
-      console.error("load error: ", err);
-    }; // codeLoader.onprogress = e => { };
-
-
-    codeLoader.onload = evt => {
-      // this.loadedData(codeLoader.response, url);
-      this.loadedUrl(url);
-    };
-
-    codeLoader.send(null);
-  }
-  /**
-   * subclass need override this function
-   * @param data loaded data
-   * @param url data url
-   */
-
-
-  loadedData(data, url) {
-    console.log("module js file loaded, url: ", url); // let scriptEle: HTMLScriptElement = document.createElement("script");
-    // scriptEle.onerror = evt => {
-    // 	console.error("module script onerror, e: ", evt);
-    // };
-    // scriptEle.type = "text/javascript";
-    // scriptEle.innerHTML = data;
-    // document.head.appendChild(scriptEle);
-  }
-  /**
-   * does not override this function
-   * @param url http req url
-   */
-
-
-  loadedUrl(url) {
-    let loadedMap = PackedLoader.loadedMap;
-    let loadingMap = PackedLoader.loadingMap;
-    loadedMap.set(url, 1);
-    let list = loadingMap.get(url);
-
-    for (let i = 0; i < list.length; ++i) {
-      list[i].use();
-    }
-
-    loadingMap.delete(url);
-  }
-
-  getDataByUrl(url) {
-    return null;
-  }
-
-  clearAllData() {}
-
-  destroy() {
-    this.m_urlChecker = null;
-  }
-
-}
-
-PackedLoader.s_uid = 0;
-PackedLoader.loadedMap = new Map();
-PackedLoader.loadingMap = new Map();
-exports.PackedLoader = PackedLoader;
-
-/***/ }),
-
-/***/ "2a2b":
+/***/ "033e":
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -448,1713 +103,13 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
-const URLFilter_1 = __importDefault(__webpack_require__("7aa4"));
+const VoxRScene_1 = __webpack_require__("622b");
 
-const ModuleLoader_1 = __webpack_require__("75f5");
+const VoxEntity_1 = __webpack_require__("12c7");
 
-class CoModuleVersion {
-  constructor(infoObj) {
-    this.m_infoObj = null;
-    this.m_verMap = new Map();
-    this.forceFiltering = false;
+const ImageResLoader_1 = __importDefault(__webpack_require__("2c06"));
 
-    if (infoObj != null) {
-      this.m_infoObj = infoObj;
-      const versionInfo = this.m_infoObj;
-      const versionInfoMap = this.m_verMap;
-      let items = versionInfo.items;
-
-      for (let i = 0; i < items.length; ++i) {
-        const ia = items[i];
-        versionInfoMap.set(ia.name, ia);
-
-        if (ia.type) {
-          if (ia.type == "dir") {
-            let ls = ia.items;
-
-            for (let i = 0; i < ls.length; ++i) {
-              const ib = ls[i];
-              versionInfoMap.set(ib.name, ib);
-            }
-          }
-        }
-      }
-    }
-  }
-
-  filterUrl(url) {
-    let isDL = url.indexOf("/dracoLib/") > 0;
-
-    if (isDL) {
-      let name = URLFilter_1.default.getFileNameAndSuffixName(url, true);
-
-      if (this.m_verMap.has(name)) {
-        let item = this.m_verMap.get(name);
-        url += "?ver=" + item.ver;
-      }
-    } else {
-      let name = URLFilter_1.default.getFileName(url, true);
-
-      if (this.m_verMap.has(name)) {
-        let item = this.m_verMap.get(name);
-        url += "?ver=" + item.ver;
-      }
-    }
-
-    return url;
-  }
-
-}
-
-exports.CoModuleVersion = CoModuleVersion;
-
-function toReleaseUrl(url, host) {
-  let i = url.lastIndexOf("/");
-  let j = url.indexOf(".", i);
-  let fileName = url.slice(i, j);
-
-  if (url.indexOf(".umd.") > 0) {
-    fileName = fileName.toLocaleLowerCase();
-    url = host + url.slice(0, i) + fileName + ".js";
-  } else {
-    url = host + url;
-  }
-
-  if (fileName == "") {
-    console.error("err: ", url);
-    console.error("i, j: ", i, j);
-  }
-
-  console.log("toReleaseUrl(), fileName:-" + fileName + "-");
-  console.log("toReleaseUrl(), new url: ", url);
-  return url;
-}
-
-class CoModuleLoader extends ModuleLoader_1.ModuleLoader {
-  /**
-   * @param times 记录总共需要的加载完成操作的响应次数。这个次数可能是由load直接产生，也可能是由于别的地方驱动。
-   * @param callback 完成所有响应的之后的回调
-   */
-  constructor(times, callback = null, versionFilter = null) {
-    super(times, callback, null);
-    this.forceFiltering = false;
-
-    let urlChecker = url => {
-      console.log("XX MMMM XXXX init url: ", url);
-
-      if (url.indexOf(".artvily.") > 0) {
-        return url;
-      }
-
-      let hostUrl = window.location.href;
-      url = url.trim();
-
-      if (hostUrl.indexOf(".artvily.") > 0 || this.forceFiltering) {
-        console.log(">>>>> NNNN 1 >>>>>>>>>>>>>>>>"); // hostUrl = "http://localhost:9000/test/";
-
-        if (CoModuleLoader.urlHostFilterEnabled) {
-          if (!this.forceFiltering) {
-            hostUrl = "http://www.artvily.com:9090/";
-          } else {
-            hostUrl = URLFilter_1.default.getHostUrl("9090");
-          }
-        } // let i = url.lastIndexOf("/");
-        // let j = url.indexOf(".", i);
-        // let fileName = url.slice(i, j);
-        // if (url.indexOf(".umd.") > 0) {
-        // 	fileName = fileName.toLocaleLowerCase();
-        // 	url = hostUrl + url.slice(0, i) + fileName + ".js";
-        // } else {
-        // 	url = hostUrl + url;
-        // }
-
-
-        url = toReleaseUrl(url, hostUrl);
-
-        if (versionFilter) {
-          url = versionFilter.filterUrl(url);
-        }
-
-        return url;
-      } else {
-        if (CoModuleLoader.forceReleaseEnabled) {
-          url = toReleaseUrl(url, "");
-        }
-      }
-
-      if (versionFilter) {
-        url = versionFilter.filterUrl(url);
-      }
-
-      return url;
-    };
-
-    this.setUrlChecker(urlChecker);
-  }
-
-}
-
-CoModuleLoader.urlHostFilterEnabled = true;
-CoModuleLoader.forceReleaseEnabled = false;
-exports.CoModuleLoader = CoModuleLoader;
-
-/***/ }),
-
-/***/ "2e41":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-const ICoTransformRecorder_1 = __webpack_require__("4427");
-
-exports.ICoTransformRecorder = ICoTransformRecorder_1.ICoTransformRecorder;
-
-const ITransformController_1 = __webpack_require__("8ccd");
-
-exports.ITransformController = ITransformController_1.ITransformController;
-
-const IFloorLineGrid_1 = __webpack_require__("c333");
-
-exports.IFloorLineGrid = IFloorLineGrid_1.IFloorLineGrid;
-
-const IUIRectLine_1 = __webpack_require__("5b9f");
-
-exports.IUIRectLine = IUIRectLine_1.IUIRectLine;
-
-const IRectFrameQuery_1 = __webpack_require__("d07b");
-
-exports.IRectFrameQuery = IRectFrameQuery_1.IRectFrameQuery;
-
-const ModuleLoader_1 = __webpack_require__("75f5");
-
-var UserEditEvent = null;
-exports.UserEditEvent = UserEditEvent;
-
-class T_Lib_VoxModelEdit {
-  constructor() {
-    this.m_init = true;
-  }
-
-  initialize(callback = null, url = "") {
-    console.log("T_Lib_VoxModelEdit::initialize(), ", this.isEnabled());
-
-    if (this.isEnabled()) {
-      exports.UserEditEvent = UserEditEvent = Lib_VoxModelEdit.UserEditEvent;
-    }
-
-    this.m_init = !this.isEnabled();
-
-    if (this.m_init) {
-      this.m_init = false;
-
-      if (url == "" || url === undefined) {
-        url = "static/cospace/modelEdit/Lib_VoxModelEdit.umd.min.js";
-      }
-
-      if (callback) {
-        new ModuleLoader_1.ModuleLoader(1, () => {
-          if (this.isEnabled()) callback([url]);
-        }).load(url);
-      }
-
-      return true;
-    }
-
-    return false;
-  }
-
-  isEnabled() {
-    return typeof Lib_VoxModelEdit !== "undefined";
-  }
-
-  get UserEditEvent() {
-    return Lib_VoxModelEdit.UserEditEvent;
-  }
-
-  createTransformRecorder() {
-    return Lib_VoxModelEdit.createTransformRecorder();
-  }
-
-  createTransformController() {
-    return Lib_VoxModelEdit.createTransformController();
-  }
-
-  createFloorLineGrid() {
-    return Lib_VoxModelEdit.createFloorLineGrid();
-  }
-
-  createUIRectLine() {
-    return Lib_VoxModelEdit.createUIRectLine();
-  }
-
-  createRectFrameQuery() {
-    return Lib_VoxModelEdit.createRectFrameQuery();
-  }
-
-}
-
-const VoxModelEdit = new T_Lib_VoxModelEdit();
-exports.VoxModelEdit = VoxModelEdit;
-
-/***/ }),
-
-/***/ "3347":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-var CoModuleNS;
-
-(function (CoModuleNS) {
-  CoModuleNS["ctmParser"] = "ctmGeomParser";
-  CoModuleNS["objParser"] = "objGeomParser";
-  CoModuleNS["dracoParser"] = "dracoGeomParser";
-  CoModuleNS["pngParser"] = "pngParser";
-  CoModuleNS["fbxFastParser"] = "fbxFastParser";
-  CoModuleNS["threadCore"] = "threadCore";
-  CoModuleNS["coSpaceApp"] = "coSpaceApp";
-})(CoModuleNS || (CoModuleNS = {}));
-
-exports.CoModuleNS = CoModuleNS;
-/**
- * 数据文件类型，例如 ctm, draco
- */
-
-var CoDataFormat;
-
-(function (CoDataFormat) {
-  CoDataFormat["Undefined"] = "undefined-format";
-  CoDataFormat["CTM"] = "ctm";
-  CoDataFormat["Draco"] = "draco";
-  CoDataFormat["OBJ"] = "obj";
-  CoDataFormat["FBX"] = "fbx";
-  CoDataFormat["GLB"] = "glb";
-  CoDataFormat["Jpg"] = "jpg";
-  CoDataFormat["Png"] = "png";
-  CoDataFormat["Gif"] = "gif";
-})(CoDataFormat || (CoDataFormat = {}));
-
-exports.CoDataFormat = CoDataFormat;
-var CoModuleFileType;
-
-(function (CoModuleFileType) {
-  CoModuleFileType["JS"] = "js-text";
-  CoModuleFileType["Binasy"] = "binary";
-})(CoModuleFileType || (CoModuleFileType = {}));
-
-exports.CoModuleFileType = CoModuleFileType;
-
-/***/ }),
-
-/***/ "36c5":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-class SceneAccessor {
-  constructor() {}
-
-  renderBegin(rendererScene) {
-    let p = rendererScene.getRenderProxy();
-    p.clearDepth(1.0);
-  }
-
-  renderEnd(rendererScene) {}
-
-}
-
-exports.SceneAccessor = SceneAccessor;
-
-/***/ }),
-
-/***/ "39ed":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-var __importDefault = this && this.__importDefault || function (mod) {
-  return mod && mod.__esModule ? mod : {
-    "default": mod
-  };
-};
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-const CoModuleLoader_1 = __webpack_require__("2a2b");
-
-const UserEditEvent_1 = __webpack_require__("7d28");
-
-const VoxRScene_1 = __webpack_require__("d1de");
-
-const VoxUIInteraction_1 = __webpack_require__("634f");
-
-const VoxUI_1 = __webpack_require__("3edd");
-
-const VoxMaterial_1 = __webpack_require__("0efa");
-
-const VoxMath_1 = __webpack_require__("f042");
-
-const VoxModelEdit_1 = __webpack_require__("2e41");
-
-const CoModelTeamLoader_1 = __webpack_require__("fd42");
-
-const URLFilter_1 = __importDefault(__webpack_require__("7aa4"));
-
-const HttpFileLoader_1 = __webpack_require__("5b39");
-
-const VecValueFilter_1 = __webpack_require__("4a3f");
-
-const EntityLayouter_1 = __webpack_require__("77da");
-/**
- * cospace renderer
- */
-
-
-class DsrdViewerBase {
-  constructor() {
-    this.m_verTool = null;
-    this.m_teamLoader = new CoModelTeamLoader_1.CoModelTeamLoader();
-    this.m_edit3DUIRScene = null;
-    this.m_graph = null;
-    this.m_rscene = null;
-    this.m_uiScene = null;
-    this.m_mi = null;
-    this.m_posV0 = null;
-    this.m_posV1 = null;
-    this.m_transCtr = null;
-    this.m_selectFrame = null;
-    this.m_valueFilter = new VecValueFilter_1.VecValueFilter();
-    this.m_map = new Map();
-    this.m_layouter = new EntityLayouter_1.EntityLayouter();
-    this.m_entityQuery = null;
-    this.m_entities = [];
-    this.m_modelTexUrl = "";
-  }
-
-  loadInfo() {
-    let url = "static/cospace/info.json";
-    url = URLFilter_1.default.filterUrl(url);
-    let httpLoader = new HttpFileLoader_1.HttpFileLoader();
-    httpLoader.load(url, (data, url) => {
-      console.log("loadInfo loaded data: ", data);
-      this.m_verTool = new CoModuleLoader_1.CoModuleVersion(data);
-      this.initEngineModule();
-    }, null, null, "json");
-  }
-
-  initEngineModule() {
-    let url = "static/cospace/engine/uiInteract/CoUIInteraction.umd.js";
-    let uiInteractML = new CoModuleLoader_1.CoModuleLoader(2, () => {}, this.m_verTool);
-    let url0 = "static/cospace/engine/renderer/CoRenderer.umd.js";
-    let url1 = "static/cospace/engine/rscene/CoRScene.umd.js";
-    let url2 = "static/cospace/math/CoMath.umd.js";
-    let url3 = "static/cospace/ageom/CoAGeom.umd.js";
-    let url5 = "static/cospace/comesh/CoMesh.umd.js";
-    let url6 = "static/cospace/coentity/CoEntity.umd.js";
-    let url7 = "static/cospace/particle/CoParticle.umd.js";
-    let url8 = "static/cospace/coMaterial/CoMaterial.umd.js";
-    let url9 = " static/cospace/cotexture/CoTexture.umd.js";
-    let url10 = "static/cospace/ui/Lib_VoxUI.umd.js";
-    let url11 = "static/cospace/modelEdit/Lib_VoxModelEdit.umd.js";
-    new CoModuleLoader_1.CoModuleLoader(2, () => {
-      if (VoxRScene_1.VoxRScene.isEnabled()) {
-        new CoModuleLoader_1.CoModuleLoader(3, () => {
-          new CoModuleLoader_1.CoModuleLoader(6, () => {
-            console.log("modules loaded ...");
-            VoxRScene_1.VoxRScene.initialize();
-            VoxMath_1.VoxMath.initialize();
-            VoxModelEdit_1.VoxModelEdit.initialize();
-            this.initRenderer();
-            this.initMouseInteract();
-            this.createEditEntity();
-            this.initUIScene();
-          }, this.m_verTool).load(url3).load(url6).load(url7).load(url9).load(url10).load(url11);
-        }, this.m_verTool).load(url2).load(url5).load(url8);
-      }
-    }, this.m_verTool).addLoader(uiInteractML).load(url0).load(url1);
-    uiInteractML.load(url);
-  }
-
-  initMouseInteract() {
-    const mi = VoxUIInteraction_1.VoxUIInteraction.createMouseInteraction();
-    mi.initialize(this.m_rscene, 0).setAutoRunning(true, 1);
-    this.m_mi = mi;
-    this.m_posV0 = VoxMath_1.VoxMath.createVec3();
-    this.m_posV1 = VoxMath_1.VoxMath.createVec3();
-  }
-
-  createDiv(px, py, pw, ph) {
-    let div = document.createElement("div");
-    div.style.width = pw + "px";
-    div.style.height = ph + "px";
-    document.body.appendChild(div);
-    div.style.display = "bolck";
-    div.style.left = px + "px";
-    div.style.top = py + "px";
-    div.style.position = "absolute";
-    div.style.display = "bolck";
-    div.style.position = "absolute";
-    return div;
-  }
-
-  initRenderer() {}
-
-  initUIScene() {
-    let uisc = this.m_uiScene = VoxUI_1.VoxUI.createUIScene(this.m_graph);
-    uisc.texAtlasNearestFilter = true;
-    uisc.rscene.addEventListener(VoxRScene_1.MouseEvent.MOUSE_BG_DOWN, this, this.uiMouseDownListener);
-    uisc.rscene.addEventListener(VoxRScene_1.MouseEvent.MOUSE_UP, this, this.uiMouseUpListener);
-    uisc.rscene.addEventListener(VoxRScene_1.MouseEvent.MOUSE_MOVE, this, this.uiMouseMoveListener);
-    this.initUIEntities();
-    this.m_entityQuery = VoxModelEdit_1.VoxModelEdit.createRectFrameQuery();
-    this.m_entityQuery.initialize(this.m_rscene);
-
-    if (this.m_selectFrame == null) {
-      this.m_selectFrame = VoxModelEdit_1.VoxModelEdit.createUIRectLine();
-      this.m_selectFrame.initialize(uisc.rscene);
-      this.m_selectFrame.enable();
-    }
-
-    let rscene = this.m_rscene; // rscene.addEventListener(CoRScene.MouseEvent.MOUSE_BG_DOWN, this, this.mouseBgDownListener);
-
-    rscene.addEventListener(VoxRScene_1.KeyboardEvent.KEY_DOWN, this, this.keyDown);
-    rscene.addEventListener(VoxRScene_1.MouseEvent.MOUSE_BG_CLICK, this, this.mouseBGClickListener);
-    rscene.addEventListener(VoxRScene_1.MouseEvent.MOUSE_UP, this, this.mouseUpListener, true, true);
-  }
-
-  createBtn(uuid, text, px, py, group) {
-    let textColor = VoxMaterial_1.VoxMaterial.createColor4(1, 1, 1, 1);
-    let btn = VoxUI_1.VoxUI.createTextLabelButton(uuid, text, 100, 50, textColor);
-    btn.setXY(px, py);
-    this.m_uiScene.addEntity(btn);
-    btn.addEventListener(VoxRScene_1.MouseEvent.MOUSE_UP, this, this.btnMouseUpListener);
-    group.addButton(btn);
-    return btn;
-  }
-
-  createSelectBtn(px, py, ns, uuid, selectNS, deselectNS, flag) {
-    let selectBar = VoxUI_1.VoxUI.createSelectionEntity();
-    selectBar.uuid = uuid;
-    let colors = [0xff5dbea3, 0xff33b249, 0xff5adbb5, 0xff33b249];
-    selectBar.setBGColorsWithARGBUint32(colors);
-    selectBar.initialize(this.m_uiScene, ns, selectNS, deselectNS, 30);
-    selectBar.addEventListener(VoxRScene_1.SelectionEvent.SELECT, this, this.selectChange);
-
-    if (flag) {
-      selectBar.select(false);
-    } else {
-      selectBar.deselect(false);
-    }
-
-    selectBar.setXY(px, py);
-    this.m_uiScene.addEntity(selectBar);
-    return selectBar;
-  }
-
-  selectChange(evt) {
-    console.log("selectChange(), evt.flag: ", evt.flag);
-    this.m_valueFilter.setAbsorbing(evt.flag);
-  }
-
-  initUIEntities() {
-    this.m_btnGroup0 = VoxUI_1.VoxUI.createSelectButtonGroup();
-    this.m_btnGroup1 = VoxUI_1.VoxUI.createSelectButtonGroup();
-    this.m_btnGroup2 = VoxUI_1.VoxUI.createSelectButtonGroup();
-    let tx = 10;
-    let ty = 10; // let absorbBtn = this.createSelectBtn(tx, ty + 30 + 520, "吸附", "absorb", "ON", "OFF", false);
-    // let localBtn = this.createBtn("local", "局部坐标", tx, ty + 30 + 450, this.m_btnGroup0);
-    // let globalBtn = this.createBtn("global", "全局坐标", tx, ty + 30 + 380, this.m_btnGroup0);
-    // ty += 50;
-    // let moveBtn = this.createBtn("move", "移动", tx, ty + 120, this.m_btnGroup1);
-    // let rotateBtn = this.createBtn("rotate", "旋转", tx, ty + 60, this.m_btnGroup1);
-    // let scaleBtn = this.createBtn("scale", "缩放", tx, ty, this.m_btnGroup1);
-    // ty -= 50;
-    // // let redoBtn = this.createBtn("redo", "重做", tx, ty + 30, this.m_btnGroup2);
-    // // let undoBtn = this.createBtn("undo", "撤销", tx, ty - 40, this.m_btnGroup2);
-    // // this.m_btnGroup0.selectButton(globalBtn);
-    // this.m_btnGroup1.selectButton(moveBtn);
-    // // this.m_btnGroup2.selectButton(moveBtn);
-  }
-
-  createEditEntity() {
-    let edit3dsc = this.m_edit3DUIRScene;
-    this.m_transCtr = VoxModelEdit_1.VoxModelEdit.createTransformController();
-    const tc = this.m_transCtr;
-    tc.initialize(edit3dsc);
-    tc.addEventListener(UserEditEvent_1.UserEditEvent.EDIT_BEGIN, this, this.trans3DEditBegin);
-    tc.addEventListener(UserEditEvent_1.UserEditEvent.EDIT_END, this, this.trans3DEditEnd);
-    this.m_transCtr.setCtrlValueFilter(this.m_valueFilter);
-    this.m_prevPos = VoxMath_1.VoxMath.createVec3();
-    this.m_currPos = VoxMath_1.VoxMath.createVec3();
-    this.m_keyInterac = VoxUIInteraction_1.VoxUIInteraction.createKeyboardInteraction();
-    const ki = this.m_keyInterac;
-    ki.initialize(this.m_rscene);
-    let Key = VoxRScene_1.Keyboard;
-    let type = ki.createKeysEventType([Key.CTRL, Key.Y]);
-    ki.addKeysDownListener(type, this, this.keyCtrlYDown);
-    type = ki.createKeysEventType([Key.CTRL, Key.Z]);
-    ki.addKeysDownListener(type, this, this.keyCtrlZDown);
-    this.m_recoder = VoxModelEdit_1.VoxModelEdit.createTransformRecorder();
-  }
-
-  keyCtrlZDown(evt) {
-    this.m_recoder.undo();
-    let list = this.m_recoder.getCurrList();
-    this.selectEntities(list);
-  }
-
-  keyCtrlYDown(evt) {
-    this.m_recoder.redo();
-    let list = this.m_recoder.getCurrList();
-    this.selectEntities(list);
-  }
-
-  trans3DEditBegin(evt) {
-    console.log("XXXXXXXX Edit begin...");
-    let list = evt.currentTarget.getTargetEntities();
-    let st = this.m_rscene.getStage3D();
-    this.m_prevPos.setXYZ(st.mouseX, st.mouseY, 0);
-    this.m_recoder.saveBegin(list);
-    this.m_selectFrame.disable();
-  }
-
-  trans3DEditEnd(evt) {
-    console.log("XXXXXXXX Edit end...", this.m_prevPos, this.m_currPos);
-    let st = this.m_rscene.getStage3D();
-    this.m_currPos.setXYZ(st.mouseX, st.mouseY, 0);
-
-    if (VoxMath_1.Vector3D.Distance(this.m_prevPos, this.m_currPos) > 0.5) {
-      console.log("XXXXXXXX Edit transforming success ...");
-      let list = evt.currentTarget.getTargetEntities();
-      console.log("XXXXXXXX Edit transforming entity list: ", list);
-      this.m_recoder.saveEnd(list);
-    } else {
-      this.m_recoder.saveEnd(null);
-    }
-
-    this.m_selectFrame.enable();
-  }
-
-  uiMouseDownListener(evt) {
-    console.log("DsrdViewer::uiMouseDownListener(), evt: ", evt); // this.m_selectFrame.begin(evt.mouseX, evt.mouseY);
-  }
-
-  uiMouseUpListener(evt) {
-    console.log("DsrdViewer::uiMouseUpListener(), evt: ", evt); // if (this.m_selectFrame.isSelectEnabled()) {
-    // 	let b = this.m_selectFrame.bounds;
-    // 	console.log("DsrdViewer::uiMouseUpListener(), b: ", b);
-    // 	let list = this.m_entityQuery.getEntities(b.min, b.max);
-    // 	console.log("list: ", list);
-    // 	this.selectEntities(list);
-    // }
-    // this.m_selectFrame.end(evt.mouseX, evt.mouseY);
-  }
-
-  uiMouseMoveListener(evt) {
-    // console.log("DsrdViewer::uiMouseMoveListener(), evt: ", evt);
-    // console.log("ui move (x, y): ", evt.mouseX, evt.mouseY);
-    this.m_selectFrame.move(evt.mouseX, evt.mouseY);
-  }
-
-  btnMouseUpListener(evt) {
-    console.log("btnMouseUpListener(), evt.uuid: ", evt.uuid);
-    let uuid = evt.uuid;
-
-    switch (uuid) {
-      case "local":
-        this.m_transCtr.toLocal();
-        break;
-
-      case "global":
-        this.m_transCtr.toGlobal();
-        break;
-
-      case "move":
-        this.m_transCtr.toTranslation();
-        break;
-
-      case "scale":
-        this.m_transCtr.toScale();
-        break;
-
-      case "rotate":
-        this.m_transCtr.toRotation();
-        this;
-        break;
-
-      case "redo":
-        this.keyCtrlYDown(null);
-        break;
-
-      case "undo":
-        this.keyCtrlZDown(null);
-        break;
-
-      default:
-        break;
-    }
-  }
-
-  createTexByUrl(url = "", saving = true) {
-    let map = this.m_map;
-    url = url != "" ? url : "static/assets/box.jpg";
-    url = URLFilter_1.default.filterUrl(url);
-
-    if (map.has(url)) {
-      return map.get(url);
-    }
-
-    let tex = this.m_rscene.textureBlock.createImageTex2D();
-
-    if (saving) {
-      map.set(url, tex);
-    }
-
-    const request = new XMLHttpRequest();
-    request.open("GET", url, true);
-    request.responseType = "blob";
-
-    request.onload = e => {
-      let img = new Image();
-
-      img.onload = evt => {
-        tex.setDataFromImage(img, 0, 0, 0, false);
-      };
-
-      let pwin = window;
-      var imageUrl = (pwin.URL || pwin.webkitURL).createObjectURL(request.response);
-      img.src = imageUrl;
-    };
-
-    request.onerror = e => {
-      console.error("load error binary image buffer request.status: ", request.status, "url:", url);
-    };
-
-    request.send(null);
-    return tex;
-  }
-
-  keyDown(evt) {
-    console.log("DsrdViewer::keyDown() ..., evt.keyCode: ", evt.keyCode);
-    let KEY = VoxRScene_1.Keyboard;
-
-    switch (evt.keyCode) {
-      case KEY.W:
-        this.m_transCtr.toTranslation();
-        break;
-
-      case KEY.E:
-        this.m_transCtr.toScale();
-        break;
-
-      case KEY.R:
-        this.m_transCtr.toRotation();
-        break;
-
-      default:
-        break;
-    }
-  }
-
-  loadModels() {
-    let baseUrl = "static/private/";
-    let url = baseUrl + "obj/base.obj";
-    url = baseUrl + "fbx/base4.fbx";
-    url = "static/assets/fbx/base4.fbx";
-    console.log("loadModels() init...");
-    url = URLFilter_1.default.filterUrl(url);
-    let loader = this.m_teamLoader;
-    loader.verTool = this.m_verTool;
-    loader.load([url], (models, transforms) => {
-      this.m_layouter.layoutReset();
-
-      for (let i = 0; i < models.length; ++i) {
-        this.createEntity(models[i], transforms != null ? transforms[i] : null, 1.0);
-      }
-
-      this.m_layouter.layoutUpdate(200, VoxMath_1.VoxMath.createVec3(0, 0, 0));
-    });
-  }
-
-  createEntity(model, transform = null, index = 1.0, url = "") {
-    let material = VoxRScene_1.VoxRScene.createDefaultMaterial(true);
-    material.setRGB3f(0.85, 0.85, 0.85);
-    material.setTextureList([this.createTexByUrl(this.m_modelTexUrl)]);
-    material.initializeByCodeBuf(true);
-    let mesh = VoxRScene_1.VoxRScene.createDataMeshFromModel(model, material);
-    let entity = VoxRScene_1.VoxRScene.createMouseEventEntity();
-
-    if (url != "") {
-      entity.uuid = url;
-    }
-
-    entity.setMaterial(material);
-    entity.setMesh(mesh); // entity.setPosition(cv);
-    // entity.setRenderState(rst.NONE_CULLFACE_NORMAL_STATE);
-
-    entity.update();
-
-    if (this.m_entityContainer == null) {
-      this.m_rscene.addEntity(entity);
-    } else {
-      this.m_entityContainer.addEntity(entity);
-    }
-
-    entity.addEventListener(VoxRScene_1.MouseEvent.MOUSE_OVER, this, this.mouseOverTargetListener);
-    entity.addEventListener(VoxRScene_1.MouseEvent.MOUSE_OUT, this, this.mouseOutTargetListener);
-    entity.addEventListener(VoxRScene_1.MouseEvent.MOUSE_DOWN, this, this.mouseDownTargetListener);
-    entity.addEventListener(VoxRScene_1.MouseEvent.MOUSE_UP, this, this.mouseUpTargetListener);
-    this.m_entities.push(entity);
-    this.m_layouter.layoutAppendItem(entity, VoxRScene_1.VoxRScene.createMat4(transform));
-    return entity;
-  }
-
-  mouseOverTargetListener(evt) {// console.log("mouseOverTargetListener()..., evt.target: ", evt.target);
-  }
-
-  mouseOutTargetListener(evt) {// console.log("mouseOutTargetListener()..., evt.target: ", evt.target);
-  }
-
-  mouseDownTargetListener(evt) {
-    console.log("mouseDownTargetListener()..., evt: ", evt);
-    this.m_posV0.setXYZ(evt.mouseX, evt.mouseY, 0);
-    this.m_posV1.copyFrom(this.m_posV0);
-    this.m_mi.drager.attach();
-  }
-
-  selectEntities(list, hitPV = null) {
-    if (list && list.length > 0) {
-      let transCtr = this.m_transCtr;
-      let pos = VoxMath_1.VoxMath.createVec3();
-
-      for (let i = 0; i < list.length; ++i) {
-        pos.addBy(list[i].getGlobalBounds().center);
-      }
-
-      pos.scaleBy(1.0 / list.length);
-
-      if (list.length > 0) {
-        if (this.m_modelSelectCall) {
-          let urls = [];
-
-          for (let i = 0; i < list.length; i++) {
-            urls.push(list[i].uuid);
-          }
-
-          console.log("modelSelectCall, urls: ", urls);
-          this.m_modelSelectCall(urls);
-        }
-      }
-
-      if (transCtr && list.length > 0) {
-        // 暂时注释掉，后续功能完善了再启用
-        // transCtr.select(list as ITransformEntity[], pos);
-        this.m_outline.select(list);
-      }
-    }
-  }
-
-  setMouseUpListener(mouseUpCall) {
-    this.m_mouseUpCall = mouseUpCall;
-  }
-
-  setModelSelectListener(modelSelectCall) {
-    this.m_modelSelectCall = modelSelectCall;
-  }
-
-  mouseUpTargetListener(evt) {
-    this.m_posV1.setXYZ(evt.mouseX, evt.mouseY, 0);
-    this.m_posV0.subtractBy(this.m_posV1);
-
-    if (this.m_posV0.getLength() < 0.5) {
-      let entity = evt.target;
-      this.selectEntities([entity], evt.wpos);
-    } // console.log("mouseUpTargetListener() mouse up...");
-
-
-    if (this.m_mouseUpCall) {
-      this.m_mouseUpCall(evt);
-    }
-  }
-
-  mouseUpListener(evt) {
-    if (this.m_transCtr) {
-      this.m_transCtr.decontrol();
-    }
-  }
-
-  mouseBGClickListener(evt) {
-    if (this.m_transCtr) {
-      this.m_transCtr.disable();
-    }
-
-    this.m_outline.deselect();
-
-    if (this.m_mouseUpCall) {
-      this.m_mouseUpCall(evt);
-    }
-
-    if (this.m_modelSelectCall) {
-      this.m_modelSelectCall([]);
-    }
-  }
-
-  run() {
-    if (this.m_graph) {
-      if (this.m_transCtr) {
-        this.m_transCtr.run();
-      }
-
-      this.m_graph.run();
-    }
-  }
-
-}
-
-exports.DsrdViewerBase = DsrdViewerBase;
-
-/***/ }),
-
-/***/ "3edd":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-const ModuleLoader_1 = __webpack_require__("75f5");
-
-class T_Lib_VoxUI {
-  constructor() {
-    this.m_init = true;
-  }
-
-  initialize(callback = null, url = "") {
-    console.log("T_Lib_VoxUI::initialize(), ", this.isEnabled());
-
-    if (this.isEnabled()) {
-      Lib_VoxUI.initialize();
-    }
-
-    this.m_init = !this.isEnabled();
-
-    if (this.m_init) {
-      this.m_init = false;
-
-      if (url == "" || url === undefined) {
-        url = "static/cospace/ui/Lib_VoxUI.umd.min.js";
-      }
-
-      if (callback != null) {
-        new ModuleLoader_1.ModuleLoader(1, () => {
-          if (this.isEnabled()) callback([url]);
-        }).load(url);
-      }
-
-      return true;
-    }
-
-    return false;
-  }
-
-  isEnabled() {
-    return typeof Lib_VoxUI !== "undefined";
-  }
-
-  createColorLabel() {
-    return Lib_VoxUI.createColorLabel();
-  }
-
-  createUILayout() {
-    return Lib_VoxUI.createUILayout();
-  }
-
-  createTipInfo() {
-    return Lib_VoxUI.createTipInfo();
-  }
-
-  createRectTextTip() {
-    return Lib_VoxUI.createRectTextTip();
-  }
-
-  createClipLabel() {
-    return Lib_VoxUI.createClipLabel();
-  }
-
-  createClipColorLabel() {
-    return Lib_VoxUI.createClipColorLabel();
-  }
-
-  createColorClipLabel() {
-    return Lib_VoxUI.createColorClipLabel();
-  }
-
-  createTextLabel() {
-    return Lib_VoxUI.createTextLabel();
-  }
-
-  createButton() {
-    return Lib_VoxUI.createButton();
-  }
-
-  createFlagButton() {
-    return Lib_VoxUI.createFlagButton();
-  }
-
-  createSelectButtonGroup() {
-    return Lib_VoxUI.createSelectButtonGroup();
-  }
-
-  createTextButton(width, height, uuid, texAtlas, textParam, colors) {
-    return Lib_VoxUI.createTextButton(width, height, uuid, texAtlas, textParam, colors);
-  }
-  /**
-   * @param uuid button event uuid
-   * @param text button text content
-   * @param width button width, the defaule value is 90
-   * @param height button height, the defaule value is 50
-   * @param textColor button text color, the defaule value is null
-   * @param fontSize button text font size, the defaule value is 30
-   * @param fontName button text font name, the defaule value is ""
-   */
-
-
-  createTextLabelButton(uuid, text, width, height, textColor, fontSize, fontName) {
-    return Lib_VoxUI.createTextLabelButton(uuid, text, width, height, textColor, fontSize, fontName);
-  }
-
-  createUIPanel() {
-    return Lib_VoxUI.createUIPanel();
-  }
-
-  createPromptPanel() {
-    return Lib_VoxUI.createPromptPanel();
-  }
-
-  createParamCtrlPanel() {
-    return Lib_VoxUI.createParamCtrlPanel();
-  }
-  /**
-   * @param graph IRendererSceneGraph instance
-   * @param uiConfig IUIConfig instance, its default value is null
-   * @param atlasSize the default value is 512
-   * @param renderProcessesTotal the default value is 3
-   */
-
-
-  createUIScene(graph, uiConfig, atlasSize, renderProcessesTotal) {
-    return Lib_VoxUI.createUIScene(graph, uiConfig, atlasSize, renderProcessesTotal);
-  }
-
-  createSelectionEntity() {
-    return Lib_VoxUI.createSelectionEntity();
-  }
-
-  createProgressEntity() {
-    return Lib_VoxUI.createProgressEntity();
-  }
-
-}
-
-const VoxUI = new T_Lib_VoxUI();
-exports.VoxUI = VoxUI;
-
-/***/ }),
-
-/***/ "4427":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-/***/ }),
-
-/***/ "4620":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-/***************************************************************************/
-
-/*                                                                         */
-
-/*  Copyright 2018-2023 by                                                 */
-
-/*  Vily(vily313@126.com)                                                  */
-
-/*                                                                         */
-
-/***************************************************************************/
-
-var __importDefault = this && this.__importDefault || function (mod) {
-  return mod && mod.__esModule ? mod : {
-    "default": mod
-  };
-};
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-const URLFilter_1 = __importDefault(__webpack_require__("7aa4"));
-
-class ImgUint {
-  constructor() {
-    this.m_listeners = [];
-    this.url = "";
-    this.img = null;
-    this.loaded = false;
-  }
-
-  addListener(listener) {
-    let ls = this.m_listeners;
-    let i = 0;
-
-    for (; i < ls.length; ++i) {
-      if (ls[i] == listener) {
-        break;
-      }
-    }
-
-    if (i >= ls.length) {
-      ls.push(listener);
-    }
-  }
-
-  removeListener(listener) {
-    let ls = this.m_listeners;
-
-    for (let i = 0; i < ls.length; ++i) {
-      if (ls[i] == listener) {
-        ls.splice(i, 1);
-        break;
-      }
-    }
-  }
-
-  dispatch() {
-    if (this.loaded) {
-      let ls = this.m_listeners;
-      this.m_listeners = [];
-
-      for (let i = 0; i < ls.length; ++i) {
-        ls[i](this.img, this.url);
-      }
-    }
-  }
-
-}
-
-class ImageResLoader {
-  constructor() {
-    this.m_map = new Map();
-  }
-
-  load(url, onload) {
-    if (url != "") {
-      let initUrl = url;
-      let map = this.m_map;
-      url = url != "" ? url : "static/assets/box.jpg";
-      url = URLFilter_1.default.filterUrl(url);
-
-      if (map.has(initUrl)) {
-        let punit = map.get(url);
-
-        if (punit.loaded) {
-          onload(punit.img, punit.url);
-        } else {
-          punit.addListener(onload);
-        }
-      }
-
-      let img = new Image();
-      let unit = new ImgUint();
-      unit.img = img;
-      unit.url = initUrl;
-      unit.addListener(onload);
-      map.set(initUrl, unit);
-      const request = new XMLHttpRequest();
-      request.open("GET", url, true);
-      request.responseType = "blob";
-
-      request.onload = e => {
-        img.onload = evt => {
-          unit.loaded = true;
-          unit.dispatch();
-        };
-
-        let pwin = window;
-        img.src = (pwin.URL || pwin.webkitURL).createObjectURL(request.response);
-      };
-
-      request.onerror = e => {
-        console.error("load error binary image buffer request.status: ", request.status, "url:", url);
-      };
-
-      request.send(null);
-    }
-  }
-
-}
-
-exports.default = ImageResLoader;
-
-/***/ }),
-
-/***/ "4a3f":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-class VecValueFilter {
-  constructor() {
-    this.m_absorb = false;
-  }
-
-  filterScale(s) {
-    if (Math.abs(s) < 1.0) {
-      if (s < 0) {
-        s = -1;
-      } else if (s > 0) {
-        s = 1;
-      }
-    } else {
-      console.log(s.toFixed(2), "Math.floor(s): ", Math.floor(s));
-      s = Math.floor(s);
-    }
-
-    return s;
-  }
-
-  setAbsorbing(absorb) {
-    this.m_absorb = absorb;
-  }
-
-  ctrlValueFilter(type, pv) {
-    console.log("VecValueFilter, A pv: ", pv);
-
-    if (this.m_absorb) {
-      switch (type) {
-        case 0:
-          pv.x = Math.round(pv.x / 10.0) * 10.0;
-          pv.y = Math.round(pv.y / 10.0) * 10.0;
-          pv.z = Math.round(pv.z / 10.0) * 10.0;
-          break;
-
-        case 1:
-          pv.x = this.filterScale(pv.x);
-          pv.y = this.filterScale(pv.y);
-          pv.z = this.filterScale(pv.z);
-          break;
-
-        case 2:
-          pv.x = Math.round(pv.x / 5.0) * 5.0;
-          pv.y = Math.round(pv.y / 5.0) * 5.0;
-          pv.z = Math.round(pv.z / 5.0) * 5.0;
-          break;
-
-        default:
-          break;
-      }
-    }
-
-    console.log("VecValueFilter, B pv: ", pv);
-  }
-
-}
-
-exports.VecValueFilter = VecValueFilter;
-
-/***/ }),
-
-/***/ "5b39":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-/***************************************************************************/
-
-/*                                                                         */
-
-/*  Copyright 2018-2022 by                                                 */
-
-/*  Vily(vily313@126.com)                                                  */
-
-/*                                                                         */
-
-/***************************************************************************/
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-class HttpFileLoader {
-  constructor() {
-    this.crossOrigin = 'anonymous';
-  }
-
-  setCrossOrigin(crossOrigin) {
-    this.crossOrigin = crossOrigin;
-  }
-
-  async load(url, onLoad,
-  /**
-   * @param progress its value is 0.0 -> 1.0
-   */
-  onProgress = null, onError = null, responseType = "blob", headRange = "") {
-    // console.log("HttpFileLoader::load(), A url: ", url);
-    // console.log("loadBinBuffer, headRange != '': ", headRange != "");
-    if (onLoad == null) {
-      throw Error("onload == null !!!");
-    }
-
-    const reader = new FileReader();
-
-    reader.onload = e => {
-      if (onLoad) onLoad(reader.result, url);
-    };
-
-    const request = new XMLHttpRequest();
-    request.open("GET", url, true);
-
-    if (headRange != "") {
-      request.setRequestHeader("Range", headRange);
-    }
-
-    request.responseType = responseType;
-
-    request.onload = e => {
-      // console.log("loaded binary buffer request.status: ", request.status, e);
-      // console.log("HttpFileLoader::load(), B url: ", url);
-      if (request.status <= 206) {
-        switch (responseType) {
-          case "arraybuffer":
-          case "blob":
-            reader.readAsArrayBuffer(request.response);
-            break;
-
-          case "json":
-            if (onLoad) onLoad(request.response, url);
-            break;
-
-          case "text":
-            if (onLoad) onLoad(request.response, url);
-            break;
-
-          default:
-            if (onLoad) onLoad(request.response, url);
-            break;
-        } // if(responseType == "blob" || responseType == "arraybuffer") {
-        // 	reader.readAsArrayBuffer(request.response);
-        // }else {
-        // 	if(onLoad) onLoad(<string>request.response, url);
-        // }
-
-      } else if (onError) {
-        onError(request.status, url);
-      }
-    };
-
-    if (onProgress != null) {
-      request.onprogress = evt => {
-        // console.log("progress evt: ", evt);
-        // console.log("progress total: ", evt.total, ", loaded: ", evt.loaded);
-        let k = 0.0;
-
-        if (evt.total > 0 || evt.lengthComputable) {
-          k = Math.min(1.0, evt.loaded / evt.total);
-        } else {
-          let content_length = parseInt(request.getResponseHeader("content-length")); // var encoding = req.getResponseHeader("content-encoding");
-          // if (total && encoding && encoding.indexOf("gzip") > -1) {
-
-          if (content_length > 0) {
-            // assuming average gzip compression ratio to be 25%
-            content_length *= 4; // original size / compressed size
-
-            k = Math.min(1.0, evt.loaded / content_length);
-          } else {
-            console.warn("lengthComputable failed");
-          }
-        } //let progressInfo = k + "%";
-        //console.log("progress progressInfo: ", progressInfo);
-
-
-        onProgress(k, url);
-      };
-    }
-
-    if (onError != null) {
-      request.onerror = e => {
-        console.error("load error, request.status: ", request.status, ", url: ", url);
-        onError(request.status, url);
-      };
-    }
-
-    request.send(null);
-  }
-
-}
-
-exports.HttpFileLoader = HttpFileLoader;
-
-/***/ }),
-
-/***/ "5b9f":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-/***/ }),
-
-/***/ "634f":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-const ModuleLoader_1 = __webpack_require__("75f5");
-
-class T_CoUIInteraction {
-  constructor() {
-    this.m_init = true;
-  }
-
-  initialize(callback = null, url = "") {
-    if (this.m_init) {
-      this.m_init = false;
-
-      if (url == "" || url === undefined) {
-        url = "static/cospace/engine/uiInteract/CoUIInteraction.umd.min.js";
-      }
-
-      new ModuleLoader_1.ModuleLoader(1, () => {
-        if (callback != null && this.isEnabled()) callback([url]);
-      }).load(url);
-      return true;
-    }
-
-    return false;
-  }
-
-  createMouseInteraction() {
-    return CoUIInteraction.createMouseInteraction();
-  }
-
-  createKeyboardInteraction() {
-    return CoUIInteraction.createKeyboardInteraction();
-  }
-
-  isEnabled() {
-    return typeof CoUIInteraction !== "undefined";
-  }
-
-}
-
-const VoxUIInteraction = new T_CoUIInteraction();
-exports.VoxUIInteraction = VoxUIInteraction;
-
-/***/ }),
-
-/***/ "75f5":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-const PackedLoader_1 = __webpack_require__("2564");
-
-class ModuleLoader extends PackedLoader_1.PackedLoader {
-  /**
-   * @param times 记录总共需要的加载完成操作的响应次数。这个次数可能是由load直接产生，也可能是由于别的地方驱动。
-   * @param callback 完成所有响应的之后的回调
-   * @param urlChecker url 转换与检查
-   */
-  constructor(times, callback = null, urlChecker = null) {
-    super(times, callback, urlChecker);
-  }
-
-  loadData(url) {
-    let req = new XMLHttpRequest();
-    req.open("GET", url, true);
-
-    req.onerror = function (err) {
-      console.error("load error: ", err);
-    }; // req.onprogress = e => { };
-
-
-    req.onload = evt => {
-      this.loadedData(req.response, url);
-      this.loadedUrl(url);
-    };
-
-    req.send(null);
-  }
-
-  loadedData(data, url) {
-    console.log("ModuleLoader::loadedData(), module js file loaded, url: ", url);
-    let scriptEle = document.createElement("script");
-
-    scriptEle.onerror = evt => {
-      console.error("module script onerror, e: ", evt);
-    };
-
-    scriptEle.type = "text/javascript";
-
-    try {
-      scriptEle.innerHTML = data;
-      document.head.appendChild(scriptEle);
-    } catch (e) {
-      console.error("ModuleLoader::loadedData() apply script ele error.");
-      throw e;
-    }
-  }
-
-}
-
-exports.ModuleLoader = ModuleLoader;
-
-/***/ }),
-
-/***/ "77da":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-class EntityLayouter {
-  constructor() {
-    this.m_scaleV = null;
-    this.m_tempMat = null;
-    this.m_currMat = null;
-    this.m_aabb = null;
-    this.m_sizeScale = 1.0;
-    this.m_entities = [];
-    this.m_transforms = [];
-    this.locationEnabled = true;
-    this.rotationEnabled = false;
-  }
-
-  initialize() {
-    if (this.m_scaleV == null) {
-      this.m_scaleV = CoMath.createVec3();
-      this.m_tempMat = CoMath.createMat4();
-      this.m_currMat = CoMath.createMat4();
-      this.m_aabb = CoMath.createAABB();
-    }
-  }
-
-  getAABB() {
-    return this.m_aabb;
-  }
-
-  layoutReset() {
-    this.m_sizeScale = 1.0;
-    this.m_scaleV = null;
-    this.initialize();
-    this.m_entities = [];
-    this.m_transforms = [];
-  }
-
-  getEntities() {
-    return this.m_entities;
-  }
-
-  layoutAppendItem(entity, transform) {
-    this.m_entities.push(entity);
-    this.m_transforms.push(transform); // console.log("layoutAppendItem(), entity: ", entity);
-  }
-
-  layoutUpdate(fixSize = 300.0, pivot = null, rotationEnabled = false) {
-    this.rotationEnabled = rotationEnabled;
-
-    for (let k = 0; k < this.m_entities.length; ++k) {
-      let et = this.m_entities[k];
-      et.setXYZ(0.0, 0.0, 0.0);
-      et.setScaleXYZ(1.0, 1.0, 1.0);
-      et.setRotationXYZ(0.0, 0.0, 0.0);
-    }
-
-    if (pivot == null) pivot = CoMath.createVec3();
-    this.fixToPosition(this.m_entities, this.m_transforms, pivot, fixSize);
-  }
-
-  calcAABB(entities, transforms) {
-    this.initialize();
-    let aabb = this.m_aabb;
-
-    for (let k = 0; k < entities.length; ++k) {
-      entities[k].update();
-      if (k > 0) aabb.union(entities[k].getGlobalBounds());else aabb.copyFrom(entities[k].getGlobalBounds());
-    }
-
-    aabb.update();
-    return aabb;
-  }
-
-  fixToPosition(entities, transforms, fixV3, baseSize = 300.0) {
-    this.initialize();
-    let mat = this.m_tempMat;
-    let transform;
-    let currMat = this.m_currMat;
-    let aabb = this.m_aabb;
-
-    for (let k = 0; k < entities.length; ++k) {
-      transform = transforms[k];
-      mat.identity();
-
-      if (this.rotationEnabled) {
-        mat.setRotationEulerAngle(0.5 * Math.PI, 0.0, 0.0);
-      }
-
-      if (transform != null) {
-        currMat.copyFrom(transform);
-        currMat.append(mat);
-        entities[k].getTransform().setParentMatrix(currMat);
-      } else {
-        currMat.copyFrom(mat);
-        entities[k].getTransform().setParentMatrix(currMat);
-      }
-
-      entities[k].update();
-      if (k > 0) aabb.union(entities[k].getGlobalBounds());else aabb.copyFrom(entities[k].getGlobalBounds());
-    }
-
-    aabb.update();
-    let sx = baseSize / aabb.getWidth();
-    let sy = baseSize / aabb.getHeight();
-    let sz = baseSize / aabb.getLong();
-    sx = Math.min(sx, sy, sz);
-    this.m_sizeScale = sx;
-    this.m_scaleV.setXYZ(sx, sx, sx);
-    aabb.reset();
-
-    for (let k = 0; k < entities.length; ++k) {
-      transform = transforms[k];
-      mat.identity();
-      mat.setScale(this.m_scaleV);
-
-      if (this.rotationEnabled) {
-        mat.setRotationEulerAngle(0.5 * Math.PI, 0.0, 0.0);
-      }
-
-      if (transform != null) {
-        currMat.copyFrom(transform);
-        currMat.append(mat);
-      } else {
-        currMat.copyFrom(mat);
-      }
-
-      let params = currMat.decompose(CoMath.OrientationType.EULER_ANGLES);
-      entities[k].setScale3(params[2]);
-      entities[k].setRotation3(params[1]);
-      entities[k].setPosition(params[0]);
-      entities[k].getTransform().setParentMatrix(null);
-      entities[k].update();
-      if (k > 0) aabb.union(entities[k].getGlobalBounds());else aabb.copyFrom(entities[k].getGlobalBounds());
-    }
-
-    aabb.update();
-
-    if (this.locationEnabled) {
-      let pdv = CoMath.createVec3();
-      pdv.subVecsTo(fixV3, aabb.center);
-      aabb.reset();
-
-      for (let k = 0; k < entities.length; ++k) {
-        let pv = entities[k].getPosition();
-        pv.addBy(pdv);
-        entities[k].setPosition(pv);
-        entities[k].update();
-        if (k > 0) aabb.union(entities[k].getGlobalBounds());else aabb.copyFrom(entities[k].getGlobalBounds());
-      }
-
-      aabb.update();
-    }
-  }
-
-  getSizeScale() {
-    return this.m_sizeScale;
-  }
-
-}
-
-exports.EntityLayouter = EntityLayouter;
-
-/***/ }),
-
-/***/ "79da":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-var __importDefault = this && this.__importDefault || function (mod) {
-  return mod && mod.__esModule ? mod : {
-    "default": mod
-  };
-};
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-const VoxRScene_1 = __webpack_require__("d1de");
-
-const VoxEntity_1 = __webpack_require__("9b53");
-
-const ImageResLoader_1 = __importDefault(__webpack_require__("4620"));
-
-const VoxMaterial_1 = __webpack_require__("0efa"); // declare var CoMath: ICoMath;
-
-/**
- * cospace renderer
- */
+const VoxMaterial_1 = __webpack_require__("8f2d"); // declare var CoMath: ICoMath;
 
 
 class DsrdImageViewer {
@@ -2344,7 +299,7 @@ exports.DsrdImageViewer = DsrdImageViewer;
 
 /***/ }),
 
-/***/ "7aa4":
+/***/ "0b88":
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2354,328 +309,155 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
-class URLFilter {
-  static getDomain(url) {
-    var urlReg = /http:\/\/([^\/]+)/i;
-    let domain = url.match(urlReg);
-    return domain != null && domain.length > 0 ? domain[0] : "";
-  }
+const CoSpaceAppData_1 = __webpack_require__("4e9d");
 
-  static getHostUrl(port, end = "/") {
-    let host = location.href;
-    let domain = URLFilter.getDomain(host);
-    let nsList = domain.split(":");
-    host = nsList[0] + ":" + nsList[1];
-    return port ? host + ":" + port + "/" : domain + end;
-  }
+exports.CoGeomDataType = CoSpaceAppData_1.CoGeomDataType;
+exports.CoDataFormat = CoSpaceAppData_1.CoDataFormat;
 
-  static isEnabled() {
-    let hostUrl = window.location.href;
-    return hostUrl.indexOf(".artvily.com") > 0;
-  }
+const CoDataModule_1 = __webpack_require__("b096");
 
-  static filterUrl(url) {
-    if (url.indexOf("blob:") < 0) {
-      let hostUrl = window.location.href;
-
-      if (hostUrl.indexOf(".artvily.") > 0) {
-        hostUrl = "http://www.artvily.com:9090/";
-        url = hostUrl + url;
-      }
-    }
-
-    return url;
-  }
-
-  static getFileName(url, lowerCase = false, force = false) {
-    if (url.indexOf("blob:") < 0 || force) {
-      let i = url.lastIndexOf("/");
-
-      if (i < 0) {
-        return "";
-      }
-
-      let j = url.lastIndexOf(".", url.length);
-
-      if (j < 0) {
-        return "";
-      }
-
-      if (i + 2 < j) {
-        let str = url.slice(i + 1, j);
-
-        if (lowerCase) {
-          return str.toLocaleLowerCase();
-        }
-
-        return str;
-      }
-    }
-
-    return "";
-  }
-
-  static getFileNameAndSuffixName(url, lowerCase = false, force = false) {
-    if (url.indexOf("blob:") < 0 || force) {
-      let i = url.lastIndexOf("/");
-      let j = url.lastIndexOf(".", url.length);
-
-      if (j < 0) {
-        return "";
-      }
-
-      let str = url.slice(i + 1);
-
-      if (lowerCase) {
-        return str.toLocaleLowerCase();
-      }
-
-      return str;
-    }
-
-    return "";
-  }
-
-  static getFileSuffixName(url, lowerCase = false, force = false) {
-    if (url.indexOf("blob:") < 0 || force) {
-      let j = url.lastIndexOf(".", url.length);
-
-      if (j < 0) {
-        return "";
-      }
-
-      let str = url.slice(j + 1);
-
-      if (lowerCase) {
-        return str.toLocaleLowerCase();
-      }
-
-      return str;
-    }
-
-    return "";
-  }
-
-}
-
-exports.default = URLFilter;
-
-/***/ }),
-
-/***/ "7c62":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-const CoSpaceAppData_1 = __webpack_require__("3347");
-
-const CoModuleLoader_1 = __webpack_require__("2a2b");
-
-class CoDataModule {
+class CoGeomModelLoader {
   constructor() {
-    this.m_init = true;
-    this.m_sysIniting = true;
-    this.m_initInsFlag = true;
+    this.m_loadedCall = null;
+    this.m_loadedAllCall = null;
+    this.m_loadTotal = 0;
+    this.m_loadedTotal = 0;
     this.verTool = null;
-    this.m_initCalls = [];
   }
-  /**
-   * 初始化
-   * @param sysInitCallback the default value is null
-   * @param urlChecker the default value is null
-   * @param deferredInit the default value is false
-   */
 
+  setListener(loadedCallback, loadedAllCallback) {
+    this.m_loadedCall = loadedCallback;
+    this.m_loadedAllCall = loadedAllCallback;
+  }
 
-  initialize(sysInitCallback = null, deferredInit = false) {
-    if (this.m_init) {
-      this.m_init = false;
-      this.m_sysInitCallback = sysInitCallback;
-      this.m_deferredInit = deferredInit; // let dracoModuleParam = new TaskCodeModuleParam("static/cospace/modules/draco/ModuleDracoGeomParser.umd.js", ModuleNS.dracoParser, ModuleFileType.JS);
-      // dracoModuleParam.params = ["static/cospace/modules/dracoLib/"];
+  load(urls, typeNS = "") {
+    CoGeomModelLoader.s_coapp.verTool = this.verTool;
 
-      let modules = [{
-        url: "static/cospace/core/coapp/CoSpaceApp.umd.js",
-        name: CoSpaceAppData_1.CoModuleNS.coSpaceApp,
-        type: CoSpaceAppData_1.CoModuleFileType.JS
-      }, {
-        url: "static/cospace/core/code/ThreadCore.umd.js",
-        name: CoSpaceAppData_1.CoModuleNS.threadCore,
-        type: CoSpaceAppData_1.CoModuleFileType.JS
-      }, {
-        url: "static/cospace/modules/ctm/ModuleCTMGeomParser.umd.js",
-        name: CoSpaceAppData_1.CoModuleNS.ctmParser,
-        type: CoSpaceAppData_1.CoModuleFileType.JS
-      }, {
-        url: "static/cospace/modules/obj/ModuleOBJGeomParser.umd.js",
-        name: CoSpaceAppData_1.CoModuleNS.objParser,
-        type: CoSpaceAppData_1.CoModuleFileType.JS
-      }, {
-        url: "static/cospace/modules/png/ModulePNGParser.umd.js",
-        name: CoSpaceAppData_1.CoModuleNS.pngParser,
-        type: CoSpaceAppData_1.CoModuleFileType.JS
-      }, {
-        url: "static/cospace/modules/fbxFast/ModuleFBXGeomFastParser.umd.js",
-        name: CoSpaceAppData_1.CoModuleNS.fbxFastParser,
-        type: CoSpaceAppData_1.CoModuleFileType.JS
-      }, {
-        url: "static/cospace/modules/draco/ModuleDracoGeomParser.umd.js",
-        name: CoSpaceAppData_1.CoModuleNS.dracoParser,
-        type: CoSpaceAppData_1.CoModuleFileType.JS,
-        params: ["static/cospace/modules/dracoLib/"]
-      }];
-      this.m_modules = modules; // 初始化数据协同中心
-
-      let dependencyGraphObj = {
-        nodes: [{
-          uniqueName: "dracoGeomParser",
-          path: "static/cospace/modules/draco/ModuleDracoGeomParser.umd.js"
-        }, {
-          uniqueName: "dracoWasmWrapper",
-          path: "static/cospace/modules/dracoLib/w2.js"
-        }, {
-          uniqueName: "ctmGeomParser",
-          path: "static/cospace/modules/ctm/ModuleCTMGeomParser.umd.js"
-        }],
-        maps: [{
-          uniqueName: "dracoGeomParser",
-          includes: [1]
-        } // 这里[1]表示 dracoGeomParser 依赖数组中的第一个元素也就是 dracoWasmWrapper 这个代码模块
-        ]
-      };
-      this.m_dependencyGraphObj = dependencyGraphObj;
-      let loader = new CoModuleLoader_1.CoModuleLoader(1, null, this.verTool);
-
-      if (this.verTool) {
-        loader.forceFiltering = this.verTool.forceFiltering;
-        console.log("this.verTool.forceFiltering: ", this.verTool.forceFiltering);
-      }
-
-      let urlChecker = loader.getUrlChecker();
-
-      if (urlChecker) {
-        for (let i = 0; i < modules.length; ++i) {
-          modules[i].url = urlChecker(modules[i].url);
+    if (urls != null && urls.length > 0) {
+      CoGeomModelLoader.s_coapp.initialize(null, true);
+      let purls = urls.slice(0);
+      CoGeomModelLoader.s_coapp.deferredInit(() => {
+        for (let i = 0; i < purls.length; ++i) {
+          this.loadModel(purls[i], typeNS);
         }
+      });
+    }
+  }
 
-        let nodes = dependencyGraphObj.nodes;
+  loadWithType(urls, types) {
+    CoGeomModelLoader.s_coapp.verTool = this.verTool;
 
-        for (let i = 0; i < nodes.length; ++i) {
-          nodes[i].path = urlChecker(nodes[i].path);
+    if (urls != null && urls.length > 0) {
+      CoGeomModelLoader.s_coapp.initialize(null, true);
+      let purls = urls.slice(0);
+      CoGeomModelLoader.s_coapp.deferredInit(() => {
+        for (let i = 0; i < purls.length; ++i) {
+          this.loadModel(purls[i], types[i]);
         }
-      } // if (this.verTool) {
-      // 	for (let i = 0; i < modules.length; ++i) {
-      // 		modules[i].url = this.verTool.filterUrl(modules[i].url);
-      // 		console.log("VVVVVVV PP0 VVVVVV modules[i].url: ", modules[i].url);
-      // 	}
-      // 	console.log(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
-      // 	let nodes = (dependencyGraphObj as any).nodes;
-      // 	for (let i = 0; i < nodes.length; ++i) {
-      // 		nodes[i].path = this.verTool.filterUrl(nodes[i].path);
-      // 		console.log("VVVVVVV PP1 VVVVVV nodes[i].path: ", nodes[i].path);
-      // 	}
-      // }
-
-
-      if (!deferredInit) {
-        this.loadSys();
-      }
+      });
     }
   }
 
-  loadSys() {
-    if (this.m_sysIniting) {
-      new CoModuleLoader_1.CoModuleLoader(1, () => {
-        this.initCoSpaceSys();
-      }).load(this.m_modules[0].url);
-      this.m_sysIniting = false;
+  reset() {
+    this.m_loadedTotal = 0;
+    this.m_loadTotal = 0;
+  }
+
+  loadModel(url, typeNS = "") {
+    console.log("CoGeomModelLoader::loadModel(), url: ", url);
+    let ns = typeNS;
+
+    if (typeNS == "") {
+      let k0 = url.lastIndexOf(".") + 1;
+      let k1 = url.lastIndexOf("?");
+      ns = k1 < 0 ? url.slice(k0) : url.slice(k0, k1);
+    }
+
+    ns = ns.toLocaleLowerCase();
+    let type = CoSpaceAppData_1.CoDataFormat.Undefined;
+
+    switch (ns) {
+      case "obj":
+        type = CoSpaceAppData_1.CoDataFormat.OBJ;
+        break;
+
+      case "fbx":
+        type = CoSpaceAppData_1.CoDataFormat.FBX;
+        break;
+
+      case "drc":
+        type = CoSpaceAppData_1.CoDataFormat.Draco;
+        break;
+
+      case "ctm":
+        type = CoSpaceAppData_1.CoDataFormat.CTM;
+        break;
+
+      default:
+        break;
+    }
+
+    if (type != CoSpaceAppData_1.CoDataFormat.Undefined) {
+      this.loadGeomModel(url, type);
+    } else {
+      console.error("Can't support this model data format, url: ", url);
     }
   }
-  /**
-   * 注意: 不建议过多使用这个函数,因为回调函数不安全如果是lambda表达式则由性能问题。
-   * 立即获得CPU侧的数据单元实例, 但是数据单元中的数据可能是空的, 因为数据获取的操作实际是异步的。
-   * 需要通过 isCpuPhase() 或者 isGpuPhase() 等函数来判定具体数据情况
-   * @param url 数据资源url
-   * @param dataFormat 数据资源类型
-   * @param callback 数据资源接收回调函数, 其值建议为lambda函数表达式
-   * @param immediate 是否立即返回数据, 默认是false
-   * @returns 数据单元实例，用户只能访问不能更改这个实例内部的数据状态，如果必要则可以申请复制一份
-   */
 
+  loadGeomModel(url, format) {
+    let ins = CoGeomModelLoader.s_coapp;
 
-  getCPUDataByUrlAndCallback(url, dataFormat, callback, immediate) {
-    if (this.coappIns != null) {
-      let unit = this.coappIns.getCPUDataByUrlAndCallback(url, dataFormat, callback, immediate);
-
-      if (this.m_deferredInit) {
-        if (this.m_initInsFlag) {
-          this.m_initInsFlag = false;
-          let modules = this.m_modules;
-          this.coappIns.initialize(3, modules[1].url, true);
+    if (ins != null) {
+      let unit = ins.getCPUDataByUrlAndCallback(url, format, (unit, status) => {
+        if (format != CoSpaceAppData_1.CoDataFormat.FBX) {
+          this.loadedModels(unit.data.models, unit.data.transforms, format, unit.url);
+          this.m_loadTotal++;
+          this.loadedModelFromUnit(unit, status);
         }
+      }, true);
+
+      if (format == CoSpaceAppData_1.CoDataFormat.FBX) {
+        unit.data.modelReceiver = (models, transforms, index, total) => {
+          // console.log("Loaded a fbx model XXX: ", index, ",", total);
+          if (index == 0) {
+            this.m_loadTotal++;
+          }
+
+          this.loadedModels(models, transforms, format, unit.url);
+          this.loadedModelFromUnit(unit, 0, index + 1 == total);
+        };
       }
-
-      return unit;
     }
-
-    return null;
   }
 
-  deferredInit(callback) {
-    if (this.coappIns == null) {
-      this.m_initCalls.push(callback);
-      this.loadSys();
-    } else if (callback != null) {
-      callback();
+  loadedModels(models, transforms, format, url) {
+    if (this.m_loadedCall != null) {
+      this.m_loadedCall(models, transforms, format, url);
     }
   }
 
-  initCoSpaceSys() {
-    if (this.coappIns == null && typeof CoSpaceApp !== "undefined") {
-      let coappIns = CoSpaceApp.createInstance();
-      let modules = this.m_modules;
-      let jsonStr = JSON.stringify(this.m_dependencyGraphObj);
-      coappIns.setThreadDependencyGraphJsonString(jsonStr);
-      coappIns.setTaskModuleParams(modules);
+  loadedModelFromUnit(unit, status = 0, flag = true) {
+    if (flag) this.m_loadedTotal++;
 
-      if (!this.m_deferredInit) {
-        coappIns.initialize(3, modules[1].url, true);
-      }
-
-      let t = this;
-      t.coappIns = coappIns;
-
-      for (let i = 0; i < this.m_initCalls.length; ++i) {
-        if (this.m_initCalls[i] != null) {
-          this.m_initCalls[i]();
-        }
-      }
-
-      this.m_initCalls = [];
+    if (this.m_loadedTotal >= this.m_loadTotal) {
+      let total = this.m_loadedTotal;
+      this.reset();
+      this.m_loadedAllCall(total, unit.url);
     }
-
-    if (this.m_sysInitCallback != null) {
-      this.m_sysInitCallback();
-    }
-
-    this.m_sysInitCallback = null;
   }
 
-  destroy() {}
+  destroy() {
+    this.m_loadedCall = null;
+  }
 
 }
 
-exports.CoDataModule = CoDataModule;
-exports.default = CoDataModule;
+CoGeomModelLoader.s_coapp = new CoDataModule_1.CoDataModule();
+exports.CoGeomModelLoader = CoGeomModelLoader;
 
 /***/ }),
 
-/***/ "7d28":
+/***/ "12c7":
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2685,122 +467,7 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
-class UserEditEvent {}
-
-UserEditEvent.EDIT_BEGIN = 20001;
-UserEditEvent.EDIT_END = 20002;
-exports.UserEditEvent = UserEditEvent;
-
-/***/ }),
-
-/***/ "8875":
-/***/ (function(module, exports, __webpack_require__) {
-
-var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_DEFINE_RESULT__;// addapted from the document.currentScript polyfill by Adam Miller
-// MIT license
-// source: https://github.com/amiller-gh/currentScript-polyfill
-
-// added support for Firefox https://bugzilla.mozilla.org/show_bug.cgi?id=1620505
-
-(function (root, factory) {
-  if (true) {
-    !(__WEBPACK_AMD_DEFINE_ARRAY__ = [], __WEBPACK_AMD_DEFINE_FACTORY__ = (factory),
-				__WEBPACK_AMD_DEFINE_RESULT__ = (typeof __WEBPACK_AMD_DEFINE_FACTORY__ === 'function' ?
-				(__WEBPACK_AMD_DEFINE_FACTORY__.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__)) : __WEBPACK_AMD_DEFINE_FACTORY__),
-				__WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
-  } else {}
-}(typeof self !== 'undefined' ? self : this, function () {
-  function getCurrentScript () {
-    var descriptor = Object.getOwnPropertyDescriptor(document, 'currentScript')
-    // for chrome
-    if (!descriptor && 'currentScript' in document && document.currentScript) {
-      return document.currentScript
-    }
-
-    // for other browsers with native support for currentScript
-    if (descriptor && descriptor.get !== getCurrentScript && document.currentScript) {
-      return document.currentScript
-    }
-  
-    // IE 8-10 support script readyState
-    // IE 11+ & Firefox support stack trace
-    try {
-      throw new Error();
-    }
-    catch (err) {
-      // Find the second match for the "at" string to get file src url from stack.
-      var ieStackRegExp = /.*at [^(]*\((.*):(.+):(.+)\)$/ig,
-        ffStackRegExp = /@([^@]*):(\d+):(\d+)\s*$/ig,
-        stackDetails = ieStackRegExp.exec(err.stack) || ffStackRegExp.exec(err.stack),
-        scriptLocation = (stackDetails && stackDetails[1]) || false,
-        line = (stackDetails && stackDetails[2]) || false,
-        currentLocation = document.location.href.replace(document.location.hash, ''),
-        pageSource,
-        inlineScriptSourceRegExp,
-        inlineScriptSource,
-        scripts = document.getElementsByTagName('script'); // Live NodeList collection
-  
-      if (scriptLocation === currentLocation) {
-        pageSource = document.documentElement.outerHTML;
-        inlineScriptSourceRegExp = new RegExp('(?:[^\\n]+?\\n){0,' + (line - 2) + '}[^<]*<script>([\\d\\D]*?)<\\/script>[\\d\\D]*', 'i');
-        inlineScriptSource = pageSource.replace(inlineScriptSourceRegExp, '$1').trim();
-      }
-  
-      for (var i = 0; i < scripts.length; i++) {
-        // If ready state is interactive, return the script tag
-        if (scripts[i].readyState === 'interactive') {
-          return scripts[i];
-        }
-  
-        // If src matches, return the script tag
-        if (scripts[i].src === scriptLocation) {
-          return scripts[i];
-        }
-  
-        // If inline source matches, return the script tag
-        if (
-          scriptLocation === currentLocation &&
-          scripts[i].innerHTML &&
-          scripts[i].innerHTML.trim() === inlineScriptSource
-        ) {
-          return scripts[i];
-        }
-      }
-  
-      // If no match, return null
-      return null;
-    }
-  };
-
-  return getCurrentScript
-}));
-
-
-/***/ }),
-
-/***/ "8ccd":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-/***/ }),
-
-/***/ "9b53":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-const ModuleLoader_1 = __webpack_require__("75f5");
+const ModuleLoader_1 = __webpack_require__("4d3f");
 
 class T_CoEntity {
   constructor() {
@@ -3013,7 +680,7 @@ exports.VoxEntity = VoxEntity;
 
 /***/ }),
 
-/***/ "c333":
+/***/ "15e2":
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -3022,10 +689,258 @@ exports.VoxEntity = VoxEntity;
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
+
+class MaterialJsonNode {
+  constructor() {
+    this.modelName = "";
+    this.color = 0xffffff;
+    this.metallic = 1.0;
+    this.roughness = 0.1;
+    this.uvScales = [1, 1];
+    this.normalStrength = 1.0;
+    this.specular = 0.5;
+    this.act = "update";
+  }
+
+  copyFromJsonObj(src) {
+    if (src) {
+      let dst = this;
+
+      for (var key in src) {
+        dst[key] = src[key];
+      }
+
+      if (src["uvScales"]) {
+        this.uvScales = src["uvScales"].slice();
+      }
+    }
+  }
+
+  clone() {
+    let node = new MaterialJsonNode();
+    let dst = node;
+    let src = this;
+
+    for (var key in src) {
+      dst[key] = src[key];
+    }
+
+    node.uvScales = this.uvScales.slice(); // node.modelName = this.modelName;
+    // node.color = this.color;
+    // node.metallic = this.metallic;
+    // node.roughness = this.roughness;
+    // node.uvScales = this.uvScales.slice();
+    // node.normalStrength = this.normalStrength;
+    // node.specular = this.specular;
+
+    return node;
+  }
+
+}
+
+exports.MaterialJsonNode = MaterialJsonNode;
 
 /***/ }),
 
-/***/ "c75a":
+/***/ "1c7d":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var __importDefault = this && this.__importDefault || function (mod) {
+  return mod && mod.__esModule ? mod : {
+    "default": mod
+  };
+};
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const URLFilter_1 = __importDefault(__webpack_require__("d33d"));
+
+const ModuleLoader_1 = __webpack_require__("4d3f");
+
+class CoModuleVersion {
+  constructor(infoObj) {
+    this.m_infoObj = null;
+    this.m_verMap = new Map();
+    this.forceFiltering = false;
+
+    if (infoObj != null) {
+      this.m_infoObj = infoObj;
+      const versionInfo = this.m_infoObj;
+      const versionInfoMap = this.m_verMap;
+      let items = versionInfo.items;
+
+      for (let i = 0; i < items.length; ++i) {
+        const ia = items[i];
+        versionInfoMap.set(ia.name, ia);
+
+        if (ia.type) {
+          if (ia.type == "dir") {
+            let ls = ia.items;
+
+            for (let i = 0; i < ls.length; ++i) {
+              const ib = ls[i];
+              versionInfoMap.set(ib.name, ib);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  filterUrl(url) {
+    let isDL = url.indexOf("/dracoLib/") > 0;
+
+    if (isDL) {
+      let name = URLFilter_1.default.getFileNameAndSuffixName(url, true);
+
+      if (this.m_verMap.has(name)) {
+        let item = this.m_verMap.get(name);
+        url += "?ver=" + item.ver;
+      }
+    } else {
+      let name = URLFilter_1.default.getFileName(url, true);
+
+      if (this.m_verMap.has(name)) {
+        let item = this.m_verMap.get(name);
+        url += "?ver=" + item.ver;
+      }
+    }
+
+    return url;
+  }
+
+}
+
+exports.CoModuleVersion = CoModuleVersion;
+
+function toReleaseUrl(url, host) {
+  let i = url.lastIndexOf("/");
+  let j = url.indexOf(".", i);
+  let fileName = url.slice(i, j);
+
+  if (url.indexOf(".umd.") > 0) {
+    fileName = fileName.toLocaleLowerCase();
+    url = host + url.slice(0, i) + fileName + ".js";
+  } else {
+    url = host + url;
+  }
+
+  if (fileName == "") {
+    console.error("err: ", url);
+    console.error("i, j: ", i, j);
+  }
+
+  console.log("toReleaseUrl(), fileName:-" + fileName + "-");
+  console.log("toReleaseUrl(), new url: ", url);
+  return url;
+}
+
+class CoModuleLoader extends ModuleLoader_1.ModuleLoader {
+  /**
+   * @param times 记录总共需要的加载完成操作的响应次数。这个次数可能是由load直接产生，也可能是由于别的地方驱动。
+   * @param callback 完成所有响应的之后的回调
+   */
+  constructor(times, callback = null, versionFilter = null) {
+    super(times, callback, null);
+    this.forceFiltering = false;
+
+    let urlChecker = url => {
+      console.log("XX MMMM XXXX init url: ", url);
+
+      if (url.indexOf(".artvily.") > 0) {
+        return url;
+      }
+
+      let hostUrl = window.location.href;
+      url = url.trim();
+
+      if (hostUrl.indexOf(".artvily.") > 0 || this.forceFiltering) {
+        console.log(">>>>> NNNN 1 >>>>>>>>>>>>>>>>"); // hostUrl = "http://localhost:9000/test/";
+
+        if (CoModuleLoader.urlHostFilterEnabled) {
+          if (!this.forceFiltering) {
+            hostUrl = "http://www.artvily.com:9090/";
+          } else {
+            hostUrl = URLFilter_1.default.getHostUrl("9090");
+          }
+        } // let i = url.lastIndexOf("/");
+        // let j = url.indexOf(".", i);
+        // let fileName = url.slice(i, j);
+        // if (url.indexOf(".umd.") > 0) {
+        // 	fileName = fileName.toLocaleLowerCase();
+        // 	url = hostUrl + url.slice(0, i) + fileName + ".js";
+        // } else {
+        // 	url = hostUrl + url;
+        // }
+
+
+        url = toReleaseUrl(url, hostUrl);
+
+        if (versionFilter) {
+          url = versionFilter.filterUrl(url);
+        }
+
+        return url;
+      } else {
+        if (CoModuleLoader.forceReleaseEnabled) {
+          url = toReleaseUrl(url, "");
+        }
+      }
+
+      if (versionFilter) {
+        url = versionFilter.filterUrl(url);
+      }
+
+      return url;
+    };
+
+    this.setUrlChecker(urlChecker);
+  }
+
+}
+
+CoModuleLoader.urlHostFilterEnabled = true;
+CoModuleLoader.forceReleaseEnabled = false;
+exports.CoModuleLoader = CoModuleLoader;
+
+/***/ }),
+
+/***/ "1eb2":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+// This file is imported into lib/wc client bundles.
+
+if (typeof window !== 'undefined') {
+  var currentScript = window.document.currentScript
+  if (true) {
+    var getCurrentScript = __webpack_require__("8875")
+    currentScript = getCurrentScript()
+
+    // for backward compatibility, because previously we directly included the polyfill
+    if (!('currentScript' in document)) {
+      Object.defineProperty(document, 'currentScript', { get: getCurrentScript })
+    }
+  }
+
+  var src = currentScript && currentScript.src.match(/(.+\/)[^/]+\.js(\?.*)?$/)
+  if (src) {
+    __webpack_require__.p = src[1] // eslint-disable-line
+  }
+}
+
+// Indicate to webpack that this file can be concatenated
+/* unused harmony default export */ var _unused_webpack_default_export = (null);
+
+
+/***/ }),
+
+/***/ "2513":
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -3035,57 +950,328 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
-const CoModuleLoader_1 = __webpack_require__("2a2b");
+const VoxMath_1 = __webpack_require__("7c47");
 
-class PostOutline {
-  constructor(rscene, verTool = null) {
-    this.m_rscene = rscene;
-    let url = "static/cospace/renderEffect/occPostOutline/OccPostOutlineModule.umd.js";
-    new CoModuleLoader_1.CoModuleLoader(1, null, verTool).setCallback(() => {
-      this.m_postOutline = OccPostOutlineModule.create();
-      this.initOutline();
-      this.m_rscene.appendRenderNode(this);
-    }).load(url);
+class CameraView {
+  constructor() {
+    this.m_rscene = null;
+    this.m_camera = null;
   }
 
-  initOutline() {
-    this.m_postOutline.initialize(this.m_rscene, 0, [0]);
-    this.m_postOutline.setFBOSizeScaleRatio(0.5);
-    this.m_postOutline.setRGB3f(0.0, 1.0, 0.0);
-    this.m_postOutline.setOutlineDensity(2.0);
-    this.m_postOutline.setOcclusionDensity(0.2);
+  initialize(rscene) {
+    if (this.m_rscene == null && rscene != null) {
+      this.m_rscene = rscene;
+      this.m_camera = rscene.getCamera();
+    }
   }
+  /**
+   * @param fov_angle_degree the default value is 45.0
+   * @param near the default value is 10.0
+   * @param far the default value is 5000.0
+   */
 
-  select(targets) {
-    if (this.m_postOutline != null) {
-      this.m_postOutline.setTargetList(targets);
+
+  setCamProjectParam(fov_angle_degree, near, far) {
+    if (this.m_rscene) {
+      let cam = this.m_rscene.getCamera();
+      cam.perspectiveRH(Math.PI * fov_angle_degree / 180.0, cam.getAspect(), near, far);
     }
   }
 
-  deselect() {
-    if (this.m_postOutline != null) {
-      this.m_postOutline.setTargetList(null);
+  updateCamera() {
+    if (this.m_rscene) {
+      this.m_rscene.updateCamera();
     }
-
-    console.log("post outline deselect() ...");
   }
 
-  render() {
-    if (this.m_postOutline != null) {
-      // console.log("post outline getTargetList(): ",this.m_postOutline.getTargetList());
-      this.m_postOutline.drawBegin();
-      this.m_postOutline.draw();
-      this.m_postOutline.drawEnd();
+  updateCameraWithF32Arr16(fs32Arr16, updateCamera = true) {
+    if (fs32Arr16.length == 16) {
+      this.applyCamvs(fs32Arr16, updateCamera);
+    }
+  }
+
+  getCameraData(posScale = 0.01, transpose = false) {
+    if (this.m_rscene) {
+      let cam = this.m_rscene.getCamera();
+      let mat = cam.getViewMatrix().clone();
+      mat.invert();
+
+      if (transpose) {
+        mat.transpose();
+      }
+
+      let vs = mat.getLocalFS32().slice(0);
+      vs[3] *= posScale;
+      vs[7] *= posScale;
+      vs[11] *= posScale;
+      return vs;
+    }
+
+    return null;
+  }
+
+  applyCamvs(cdvs, updateCamera) {
+    if (cdvs == null) {
+      cdvs = [0.7071067690849304, -0.40824827551841736, 0.5773502588272095, 2.390000104904175, 0.7071067690849304, 0.40824827551841736, -0.5773502588272095, -2.390000104904175, 0.0, 0.8164965510368347, 0.5773502588272095, 2.390000104904175, 0, 0, 0, 1];
+    }
+
+    let mat4 = VoxMath_1.VoxMath.createMat4(new Float32Array(cdvs));
+    mat4.transpose();
+    let camvs = mat4.getLocalFS32();
+    let i = 0; // let vx = new Vector3D(camvs[i], camvs[i+1], camvs[i+2], camvs[i+3]);
+
+    i = 4;
+    let vy = VoxMath_1.VoxMath.createVec3(camvs[i], camvs[i + 1], camvs[i + 2], camvs[i + 3]); // i = 8;
+    // let vz = new Vector3D(camvs[i], camvs[i+1], camvs[i+2], camvs[i+3]);
+
+    i = 12;
+    let pos = VoxMath_1.VoxMath.createVec3(camvs[i], camvs[i + 1], camvs[i + 2]); // console.log("		  vy: ", vy);
+
+    let cam = this.m_rscene.getCamera(); // console.log("cam.getUV(): ", cam.getUV());
+    // console.log("");
+    // console.log("cam.getNV(): ", cam.getNV());
+    // vz.negate();
+    // console.log("		  vz: ", vz);
+    // console.log("		 pos: ", pos);
+
+    if (pos.getLength() > 0.001) {
+      let camPos = pos.clone().scaleBy(100.0);
+      cam.lookAtRH(camPos, VoxMath_1.VoxMath.createVec3(), vy);
+
+      if (updateCamera) {
+        cam.update();
+      }
     }
   }
 
 }
 
-exports.PostOutline = PostOutline;
+exports.CameraView = CameraView;
 
 /***/ }),
 
-/***/ "d07b":
+/***/ "2c06":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+/***************************************************************************/
+
+/*                                                                         */
+
+/*  Copyright 2018-2023 by                                                 */
+
+/*  Vily(vily313@126.com)                                                  */
+
+/*                                                                         */
+
+/***************************************************************************/
+
+var __importDefault = this && this.__importDefault || function (mod) {
+  return mod && mod.__esModule ? mod : {
+    "default": mod
+  };
+};
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const URLFilter_1 = __importDefault(__webpack_require__("d33d"));
+
+class ImgUint {
+  constructor() {
+    this.m_listeners = [];
+    this.url = "";
+    this.img = null;
+    this.loaded = false;
+  }
+
+  addListener(listener) {
+    let ls = this.m_listeners;
+    let i = 0;
+
+    for (; i < ls.length; ++i) {
+      if (ls[i] == listener) {
+        break;
+      }
+    }
+
+    if (i >= ls.length) {
+      ls.push(listener);
+    }
+  }
+
+  removeListener(listener) {
+    let ls = this.m_listeners;
+
+    for (let i = 0; i < ls.length; ++i) {
+      if (ls[i] == listener) {
+        ls.splice(i, 1);
+        break;
+      }
+    }
+  }
+
+  dispatch() {
+    if (this.loaded) {
+      let ls = this.m_listeners;
+      this.m_listeners = [];
+
+      for (let i = 0; i < ls.length; ++i) {
+        ls[i](this.img, this.url);
+      }
+    }
+  }
+
+}
+
+class ImageResLoader {
+  constructor() {
+    this.m_map = new Map();
+  }
+
+  load(url, onload) {
+    if (url != "") {
+      let initUrl = url;
+      let map = this.m_map;
+      url = url != "" ? url : "static/assets/box.jpg";
+      url = URLFilter_1.default.filterUrl(url);
+
+      if (map.has(initUrl)) {
+        let punit = map.get(url);
+
+        if (punit.loaded) {
+          onload(punit.img, punit.url);
+        } else {
+          punit.addListener(onload);
+        }
+      }
+
+      let img = new Image();
+      let unit = new ImgUint();
+      unit.img = img;
+      unit.url = initUrl;
+      unit.addListener(onload);
+      map.set(initUrl, unit);
+      const request = new XMLHttpRequest();
+      request.open("GET", url, true);
+      request.responseType = "blob";
+
+      request.onload = e => {
+        img.onload = evt => {
+          unit.loaded = true;
+          unit.dispatch();
+        };
+
+        let pwin = window;
+        img.src = (pwin.URL || pwin.webkitURL).createObjectURL(request.response);
+      };
+
+      request.onerror = e => {
+        console.error("load error binary image buffer request.status: ", request.status, "url:", url);
+      };
+
+      request.send(null);
+    }
+  }
+
+}
+
+exports.default = ImageResLoader;
+
+/***/ }),
+
+/***/ "2dfe":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+class VecValueFilter {
+  constructor() {
+    this.m_absorb = false;
+  }
+
+  filterScale(s) {
+    if (Math.abs(s) < 1.0) {
+      if (s < 0) {
+        s = -1;
+      } else if (s > 0) {
+        s = 1;
+      }
+    } else {
+      console.log(s.toFixed(2), "Math.floor(s): ", Math.floor(s));
+      s = Math.floor(s);
+    }
+
+    return s;
+  }
+
+  setAbsorbing(absorb) {
+    this.m_absorb = absorb;
+  }
+
+  ctrlValueFilter(type, pv) {
+    console.log("VecValueFilter, A pv: ", pv);
+
+    if (this.m_absorb) {
+      switch (type) {
+        case 0:
+          pv.x = Math.round(pv.x / 10.0) * 10.0;
+          pv.y = Math.round(pv.y / 10.0) * 10.0;
+          pv.z = Math.round(pv.z / 10.0) * 10.0;
+          break;
+
+        case 1:
+          pv.x = this.filterScale(pv.x);
+          pv.y = this.filterScale(pv.y);
+          pv.z = this.filterScale(pv.z);
+          break;
+
+        case 2:
+          pv.x = Math.round(pv.x / 5.0) * 5.0;
+          pv.y = Math.round(pv.y / 5.0) * 5.0;
+          pv.z = Math.round(pv.z / 5.0) * 5.0;
+          break;
+
+        default:
+          break;
+      }
+    }
+
+    console.log("VecValueFilter, B pv: ", pv);
+  }
+
+}
+
+exports.VecValueFilter = VecValueFilter;
+
+/***/ }),
+
+/***/ "3444":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+class UserEditEvent {}
+
+UserEditEvent.EDIT_BEGIN = 20001;
+UserEditEvent.EDIT_END = 20002;
+exports.UserEditEvent = UserEditEvent;
+
+/***/ }),
+
+/***/ "3612":
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -3097,7 +1283,7 @@ Object.defineProperty(exports, "__esModule", {
 
 /***/ }),
 
-/***/ "d1de":
+/***/ "3b42":
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -3107,9 +1293,653 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
-const ModuleLoader_1 = __webpack_require__("75f5");
+/***/ }),
 
-const VoxRenderer_1 = __webpack_require__("dab7");
+/***/ "4312":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+class CoEntityLayouter2 {
+  constructor() {
+    this.m_scaleV = null;
+    this.m_tempMat = null;
+    this.m_currMat = null;
+    this.m_aabb = null;
+    this.m_sizeScale = 1.0;
+    this.m_entities = [];
+    this.m_transforms = [];
+    this.locationEnabled = true;
+    this.rotationEnabled = false;
+  }
+
+  initialize() {
+    if (this.m_scaleV == null) {
+      this.m_scaleV = CoMath.createVec3();
+      this.m_tempMat = CoMath.createMat4();
+      this.m_currMat = CoMath.createMat4();
+      this.m_aabb = CoMath.createAABB();
+    }
+  }
+
+  getAABB() {
+    return this.m_aabb;
+  }
+
+  layoutReset() {
+    this.m_sizeScale = 1.0;
+    this.m_scaleV = null;
+    this.initialize();
+    this.m_entities = [];
+    this.m_transforms = [];
+  }
+
+  getEntities() {
+    return this.m_entities;
+  }
+
+  layoutAppendItem(entity, transform) {
+    this.m_entities.push(entity);
+    this.m_transforms.push(transform); // console.log("layoutAppendItem(), entity: ", entity);
+  }
+
+  layoutUpdate(fixSize = 300.0, pivot = null, rotationEnabled = false) {
+    this.rotationEnabled = rotationEnabled;
+
+    for (let k = 0; k < this.m_entities.length; ++k) {
+      let et = this.m_entities[k];
+      et.setXYZ(0.0, 0.0, 0.0);
+      et.setScaleXYZ(1.0, 1.0, 1.0);
+      et.setRotationXYZ(0.0, 0.0, 0.0);
+    }
+
+    if (pivot == null) pivot = CoMath.createVec3();
+    this.fixToPosition(this.m_entities, this.m_transforms, pivot, fixSize);
+  }
+
+  calcAABB(entities, transforms) {
+    this.initialize();
+    let aabb = this.m_aabb;
+
+    for (let k = 0; k < entities.length; ++k) {
+      entities[k].update();
+      if (k > 0) aabb.union(entities[k].getGlobalBounds());else aabb.copyFrom(entities[k].getGlobalBounds());
+    }
+
+    aabb.update();
+    return aabb;
+  }
+
+  fixToPosition(entities, transforms, fixV3, baseSize = 300.0) {
+    this.initialize();
+    let mat = this.m_tempMat;
+    let transform;
+    let currMat = this.m_currMat;
+    let aabb = this.m_aabb;
+
+    for (let k = 0; k < entities.length; ++k) {
+      transform = transforms[k];
+      mat.identity();
+
+      if (this.rotationEnabled) {
+        mat.setRotationEulerAngle(0.5 * Math.PI, 0.0, 0.0);
+      }
+
+      if (transform != null) {
+        currMat.copyFrom(transform);
+        currMat.append(mat);
+        entities[k].getTransform().setParentMatrix(currMat);
+      } else {
+        currMat.copyFrom(mat);
+        entities[k].getTransform().setParentMatrix(currMat);
+      }
+
+      entities[k].update();
+      if (k > 0) aabb.union(entities[k].getGlobalBounds());else aabb.copyFrom(entities[k].getGlobalBounds());
+    }
+
+    aabb.update();
+    let sx = baseSize / aabb.getWidth();
+    let sy = baseSize / aabb.getHeight();
+    let sz = baseSize / aabb.getLong();
+    sx = Math.min(sx, sy, sz);
+    this.m_sizeScale = sx;
+    this.m_scaleV.setXYZ(sx, sx, sx);
+    aabb.reset();
+
+    for (let k = 0; k < entities.length; ++k) {
+      transform = transforms[k];
+      mat.identity();
+      mat.setScale(this.m_scaleV);
+
+      if (this.rotationEnabled) {
+        mat.setRotationEulerAngle(0.5 * Math.PI, 0.0, 0.0);
+      }
+
+      if (transform != null) {
+        currMat.copyFrom(transform);
+        currMat.append(mat);
+      } else {
+        currMat.copyFrom(mat);
+      }
+
+      let params = currMat.decompose(CoMath.OrientationType.EULER_ANGLES);
+      entities[k].setScale3(params[2]);
+      entities[k].setRotation3(params[1]);
+      entities[k].setPosition(params[0]);
+      entities[k].getTransform().setParentMatrix(null);
+      entities[k].update();
+      if (k > 0) aabb.union(entities[k].getGlobalBounds());else aabb.copyFrom(entities[k].getGlobalBounds());
+    }
+
+    aabb.update();
+
+    if (this.locationEnabled) {
+      let pdv = CoMath.createVec3();
+      pdv.subVecsTo(fixV3, aabb.center);
+      aabb.reset();
+
+      for (let k = 0; k < entities.length; ++k) {
+        let pv = entities[k].getPosition();
+        pv.addBy(pdv);
+        entities[k].setPosition(pv);
+        entities[k].update();
+        if (k > 0) aabb.union(entities[k].getGlobalBounds());else aabb.copyFrom(entities[k].getGlobalBounds());
+      }
+
+      aabb.update();
+    }
+  }
+
+  getSizeScale() {
+    return this.m_sizeScale;
+  }
+
+}
+
+exports.CoEntityLayouter2 = CoEntityLayouter2;
+
+/***/ }),
+
+/***/ "4604":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+/**
+ * 将加载逻辑打包的loader
+ */
+
+class PackedLoader {
+  /**
+   * @param times 记录总共需要的完成操作的响应次数。这个次数可能是由load直接产生，也可能是由于别的地方驱动。
+   * @param callback 完成所有响应的之后的回调
+   */
+  constructor(times, callback = null, urlChecker = null) {
+    this.m_uid = PackedLoader.s_uid++;
+    this.m_urlChecker = null;
+    this.m_oneTimes = true;
+    this.m_loaderMap = null;
+    this.m_callback = callback;
+    this.m_times = times;
+    this.m_urlChecker = urlChecker;
+  }
+
+  setUrlChecker(urlChecker = null) {
+    this.m_urlChecker = urlChecker;
+    return this;
+  }
+
+  getUrlChecker() {
+    return this.m_urlChecker;
+  }
+
+  getUid() {
+    return this.m_uid;
+  }
+
+  setCallback(callback) {
+    this.m_callback = callback;
+    return this;
+  }
+
+  addLoader(m) {
+    if (m != null && m != this) {
+      if (this.isFinished()) {
+        m.use();
+      } else {
+        if (this.m_loaderMap == null) {
+          this.m_loaderMap = new Map();
+        }
+
+        let map = this.m_loaderMap;
+
+        if (!map.has(m.getUid())) {
+          map.set(m.getUid(), m);
+        }
+      }
+    }
+
+    return this;
+  }
+
+  isFinished() {
+    return this.m_times == 0;
+  }
+
+  useOnce() {
+    if (this.m_oneTimes) {
+      this.m_oneTimes = false;
+      this.use();
+    }
+  }
+
+  use() {
+    if (this.m_times > 0) {
+      this.m_times--;
+
+      if (this.isFinished()) {
+        if (this.m_callback != null) {
+          this.m_callback();
+          this.m_callback = null;
+
+          if (this.m_loaderMap != null) {
+            for (let [key, value] of this.m_loaderMap) {
+              value.use();
+            }
+
+            this.m_loaderMap = null;
+          }
+        }
+      }
+    }
+  }
+
+  hasModuleByUrl(url) {
+    return PackedLoader.loadedMap.has(url);
+  }
+
+  load(url) {
+    if (url == "") {
+      return this;
+    }
+
+    if (this.m_urlChecker != null) {
+      url = this.m_urlChecker(url);
+    }
+
+    let loadedMap = PackedLoader.loadedMap;
+
+    if (loadedMap.has(url)) {
+      this.use();
+      return;
+    }
+
+    let loadingMap = PackedLoader.loadingMap;
+
+    if (loadingMap.has(url)) {
+      let list = loadingMap.get(url);
+
+      for (let i = 0; i < list.length; ++i) {
+        if (list[i] == this) {
+          return;
+        }
+      }
+
+      list.push(this);
+      return;
+    }
+
+    loadingMap.set(url, [this]);
+    this.loadData(url);
+    return this;
+  }
+  /**
+   * subclass need override this function
+   * @param url data url
+   */
+
+
+  loadData(url) {
+    let codeLoader = new XMLHttpRequest();
+    codeLoader.open("GET", url, true);
+
+    codeLoader.onerror = function (err) {
+      console.error("load error: ", err);
+    }; // codeLoader.onprogress = e => { };
+
+
+    codeLoader.onload = evt => {
+      // this.loadedData(codeLoader.response, url);
+      this.loadedUrl(url);
+    };
+
+    codeLoader.send(null);
+  }
+  /**
+   * subclass need override this function
+   * @param data loaded data
+   * @param url data url
+   */
+
+
+  loadedData(data, url) {
+    console.log("module js file loaded, url: ", url); // let scriptEle: HTMLScriptElement = document.createElement("script");
+    // scriptEle.onerror = evt => {
+    // 	console.error("module script onerror, e: ", evt);
+    // };
+    // scriptEle.type = "text/javascript";
+    // scriptEle.innerHTML = data;
+    // document.head.appendChild(scriptEle);
+  }
+  /**
+   * does not override this function
+   * @param url http req url
+   */
+
+
+  loadedUrl(url) {
+    let loadedMap = PackedLoader.loadedMap;
+    let loadingMap = PackedLoader.loadingMap;
+    loadedMap.set(url, 1);
+    let list = loadingMap.get(url);
+
+    for (let i = 0; i < list.length; ++i) {
+      list[i].use();
+    }
+
+    loadingMap.delete(url);
+  }
+
+  getDataByUrl(url) {
+    return null;
+  }
+
+  clearAllData() {}
+
+  destroy() {
+    this.m_urlChecker = null;
+  }
+
+}
+
+PackedLoader.s_uid = 0;
+PackedLoader.loadedMap = new Map();
+PackedLoader.loadingMap = new Map();
+exports.PackedLoader = PackedLoader;
+
+/***/ }),
+
+/***/ "4d3f":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const PackedLoader_1 = __webpack_require__("4604");
+
+class ModuleLoader extends PackedLoader_1.PackedLoader {
+  /**
+   * @param times 记录总共需要的加载完成操作的响应次数。这个次数可能是由load直接产生，也可能是由于别的地方驱动。
+   * @param callback 完成所有响应的之后的回调
+   * @param urlChecker url 转换与检查
+   */
+  constructor(times, callback = null, urlChecker = null) {
+    super(times, callback, urlChecker);
+  }
+
+  loadData(url) {
+    let req = new XMLHttpRequest();
+    req.open("GET", url, true);
+
+    req.onerror = function (err) {
+      console.error("load error: ", err);
+    }; // req.onprogress = e => { };
+
+
+    req.onload = evt => {
+      this.loadedData(req.response, url);
+      this.loadedUrl(url);
+    };
+
+    req.send(null);
+  }
+
+  loadedData(data, url) {
+    console.log("ModuleLoader::loadedData(), module js file loaded, url: ", url);
+    let scriptEle = document.createElement("script");
+
+    scriptEle.onerror = evt => {
+      console.error("module script onerror, e: ", evt);
+    };
+
+    scriptEle.type = "text/javascript";
+
+    try {
+      scriptEle.innerHTML = data;
+      document.head.appendChild(scriptEle);
+    } catch (e) {
+      console.error("ModuleLoader::loadedData() apply script ele error.");
+      throw e;
+    }
+  }
+
+}
+
+exports.ModuleLoader = ModuleLoader;
+
+/***/ }),
+
+/***/ "4e9d":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+var CoModuleNS;
+
+(function (CoModuleNS) {
+  CoModuleNS["ctmParser"] = "ctmGeomParser";
+  CoModuleNS["objParser"] = "objGeomParser";
+  CoModuleNS["dracoParser"] = "dracoGeomParser";
+  CoModuleNS["pngParser"] = "pngParser";
+  CoModuleNS["fbxFastParser"] = "fbxFastParser";
+  CoModuleNS["threadCore"] = "threadCore";
+  CoModuleNS["coSpaceApp"] = "coSpaceApp";
+})(CoModuleNS || (CoModuleNS = {}));
+
+exports.CoModuleNS = CoModuleNS;
+/**
+ * 数据文件类型，例如 ctm, draco
+ */
+
+var CoDataFormat;
+
+(function (CoDataFormat) {
+  CoDataFormat["Undefined"] = "undefined-format";
+  CoDataFormat["CTM"] = "ctm";
+  CoDataFormat["Draco"] = "draco";
+  CoDataFormat["OBJ"] = "obj";
+  CoDataFormat["FBX"] = "fbx";
+  CoDataFormat["GLB"] = "glb";
+  CoDataFormat["Jpg"] = "jpg";
+  CoDataFormat["Png"] = "png";
+  CoDataFormat["Gif"] = "gif";
+})(CoDataFormat || (CoDataFormat = {}));
+
+exports.CoDataFormat = CoDataFormat;
+var CoModuleFileType;
+
+(function (CoModuleFileType) {
+  CoModuleFileType["JS"] = "js-text";
+  CoModuleFileType["Binasy"] = "binary";
+})(CoModuleFileType || (CoModuleFileType = {}));
+
+exports.CoModuleFileType = CoModuleFileType;
+
+/***/ }),
+
+/***/ "521d":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+/***************************************************************************/
+
+/*                                                                         */
+
+/*  Copyright 2018-2022 by                                                 */
+
+/*  Vily(vily313@126.com)                                                  */
+
+/*                                                                         */
+
+/***************************************************************************/
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+class HttpFileLoader {
+  constructor() {
+    this.crossOrigin = 'anonymous';
+  }
+
+  setCrossOrigin(crossOrigin) {
+    this.crossOrigin = crossOrigin;
+  }
+
+  async load(url, onLoad,
+  /**
+   * @param progress its value is 0.0 -> 1.0
+   */
+  onProgress = null, onError = null, responseType = "blob", headRange = "") {
+    // console.log("HttpFileLoader::load(), A url: ", url);
+    // console.log("loadBinBuffer, headRange != '': ", headRange != "");
+    if (onLoad == null) {
+      throw Error("onload == null !!!");
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = e => {
+      if (onLoad) onLoad(reader.result, url);
+    };
+
+    const request = new XMLHttpRequest();
+    request.open("GET", url, true);
+
+    if (headRange != "") {
+      request.setRequestHeader("Range", headRange);
+    }
+
+    request.responseType = responseType;
+
+    request.onload = e => {
+      // console.log("loaded binary buffer request.status: ", request.status, e);
+      // console.log("HttpFileLoader::load(), B url: ", url);
+      if (request.status <= 206) {
+        switch (responseType) {
+          case "arraybuffer":
+          case "blob":
+            reader.readAsArrayBuffer(request.response);
+            break;
+
+          case "json":
+            if (onLoad) onLoad(request.response, url);
+            break;
+
+          case "text":
+            if (onLoad) onLoad(request.response, url);
+            break;
+
+          default:
+            if (onLoad) onLoad(request.response, url);
+            break;
+        } // if(responseType == "blob" || responseType == "arraybuffer") {
+        // 	reader.readAsArrayBuffer(request.response);
+        // }else {
+        // 	if(onLoad) onLoad(<string>request.response, url);
+        // }
+
+      } else if (onError) {
+        onError(request.status, url);
+      }
+    };
+
+    if (onProgress != null) {
+      request.onprogress = evt => {
+        // console.log("progress evt: ", evt);
+        // console.log("progress total: ", evt.total, ", loaded: ", evt.loaded);
+        let k = 0.0;
+
+        if (evt.total > 0 || evt.lengthComputable) {
+          k = Math.min(1.0, evt.loaded / evt.total);
+        } else {
+          let content_length = parseInt(request.getResponseHeader("content-length")); // var encoding = req.getResponseHeader("content-encoding");
+          // if (total && encoding && encoding.indexOf("gzip") > -1) {
+
+          if (content_length > 0) {
+            // assuming average gzip compression ratio to be 25%
+            content_length *= 4; // original size / compressed size
+
+            k = Math.min(1.0, evt.loaded / content_length);
+          } else {
+            console.warn("lengthComputable failed");
+          }
+        } //let progressInfo = k + "%";
+        //console.log("progress progressInfo: ", progressInfo);
+
+
+        onProgress(k, url);
+      };
+    }
+
+    if (onError != null) {
+      request.onerror = e => {
+        console.error("load error, request.status: ", request.status, ", url: ", url);
+        onError(request.status, url);
+      };
+    }
+
+    request.send(null);
+  }
+
+}
+
+exports.HttpFileLoader = HttpFileLoader;
+
+/***/ }),
+
+/***/ "622b":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const ModuleLoader_1 = __webpack_require__("4d3f");
+
+const VoxRenderer_1 = __webpack_require__("c77c");
 
 var RendererDevice = null;
 exports.RendererDevice = RendererDevice;
@@ -3551,7 +2381,269 @@ exports.VoxRScene = VoxRScene;
 
 /***/ }),
 
-/***/ "d82c":
+/***/ "6ee3":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var __importDefault = this && this.__importDefault || function (mod) {
+  return mod && mod.__esModule ? mod : {
+    "default": mod
+  };
+};
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const PostOutline_1 = __webpack_require__("7596");
+
+const VoxRScene_1 = __webpack_require__("622b");
+
+const VoxMath_1 = __webpack_require__("7c47");
+
+const VoxEntity_1 = __webpack_require__("12c7");
+
+const CoModelTeamLoader_1 = __webpack_require__("a811");
+
+const URLFilter_1 = __importDefault(__webpack_require__("d33d"));
+
+const SceneAccessor_1 = __webpack_require__("a0ee");
+
+const DsrdViewerBase_1 = __webpack_require__("7750");
+
+const DsrdImageViewer_1 = __webpack_require__("033e");
+
+const CoModuleLoader_1 = __webpack_require__("1c7d");
+
+const CameraView_1 = __webpack_require__("2513");
+
+class DsrdViewer extends DsrdViewerBase_1.DsrdViewerBase {
+  constructor() {
+    super();
+    this.m_viewDiv = null;
+    this.m_initCallback = null;
+    this.m_zAxisUp = false;
+    this.m_debugDev = false;
+    this.imgViewer = new DsrdImageViewer_1.DsrdImageViewer();
+    this.camView = new CameraView_1.CameraView();
+    this.m_loadingCallback = null;
+    this.m_modelDataUrl = "";
+    this.m_baseSize = 200.0;
+    this.m_forceRot90 = false;
+  }
+
+  initialize(div = null, initCallback = null, zAxisUp = false, debugDev = false, forceReleaseEnabled = false) {
+    document.oncontextmenu = function (e) {
+      e.preventDefault();
+    };
+
+    console.log("DsrdViewer::initialize(), forceReleaseEnabled: ", forceReleaseEnabled);
+    CoModuleLoader_1.CoModuleLoader.forceReleaseEnabled = forceReleaseEnabled;
+    this.m_viewDiv = div;
+    this.m_initCallback = initCallback;
+    this.m_zAxisUp = zAxisUp;
+    this.m_debugDev = debugDev;
+    this.loadInfo();
+  }
+
+  keyDownDoes(evt) {
+    console.log("DsrdViewer::keyDown() ..., evt: ", evt); // switch (evt.key) {
+    // 	case "t":
+    // 		// let node = this.modelScene.getModelNode("export_1");
+    // 		// console.log("node: ", node);
+    // 		// let entity = node.entity;
+    // 		// if (entity) {
+    // 		// 	let material = entity.getMaterial();
+    // 		// 	console.log("material: ", material);
+    // 		// }
+    // 		let pbrParam: PBRMaterialParam = {};
+    // 		pbrParam.roughness = 0.5;
+    // 		pbrParam.pipeline = true;
+    // 		pbrParam.scatterEnabled = false;
+    // 		pbrParam.toneMapingExposure = 3.0;
+    // 		pbrParam.fogEnabled = false;
+    // 		pbrParam.albedoColor = [0.1, 1.0, 0.1];
+    // 		this.modelScene.setMaterialParamToNode("export_0", pbrParam);
+    // 		break;
+    // 	default:
+    // 		break;
+    // }
+
+    return true;
+  }
+
+  initRenderer() {
+    let RD = VoxRScene_1.RendererDevice;
+    /**
+     * 开启打印输出shader构建的相关信息
+     */
+
+    RD.SHADERCODE_TRACE_ENABLED = false;
+    RD.VERT_SHADER_PRECISION_GLOBAL_HIGHP_ENABLED = true;
+    let graph = this.m_graph = VoxRScene_1.VoxRScene.createRendererSceneGraph();
+    let sizeW = 512;
+    let sizeH = 512;
+    let zAxisUp = this.m_zAxisUp; // let debugDev: boolean = this.m_debugDev;
+
+    let div = this.m_viewDiv;
+    let dpr = window.devicePixelRatio;
+    let rparam = graph.createRendererSceneParam(div ? div : this.createDiv(0, 0, sizeW / dpr, sizeH / dpr));
+    rparam.autoSyncRenderBufferAndWindowSize = false;
+    rparam.syncBgColor = false;
+    rparam.setCamProject(45, 10.0, 2000.0);
+    rparam.setCamPosition(239.0, -239.0, 239.0);
+
+    if (zAxisUp || div == null) {
+      rparam.setCamUpDirect(0.0, 0.0, 1.0);
+    } else {
+      rparam.setCamUpDirect(0.0, 1.0, 0.0);
+    }
+
+    rparam.setAttriAntialias(true);
+    this.m_rscene = graph.createScene(rparam);
+    this.m_rscene.enableMouseEvent(true);
+    VoxRScene_1.VoxRScene.setRendererScene(this.m_rscene);
+    let subScene = this.m_rscene.createSubScene(rparam, 3, false);
+    subScene.enableMouseEvent(true);
+    subScene.setAccessor(new SceneAccessor_1.SceneAccessor());
+    this.m_edit3DUIRScene = subScene;
+    graph.addScene(this.m_edit3DUIRScene);
+    this.m_outline = new PostOutline_1.PostOutline(this.m_rscene, this.m_verTool); // this.imgViewer = new DsrdImageViewer();
+
+    this.imgViewer.initialize(this.m_rscene);
+    this.camView.initialize(this.m_rscene);
+    this.init3DScene();
+
+    if (this.m_initCallback) {
+      this.m_initCallback();
+    }
+  }
+
+  init3DScene() {
+    this.m_modelTexUrl = "static/assets/white.jpg";
+
+    if (this.m_entityContainer == null) {
+      this.m_entityContainer = VoxEntity_1.VoxEntity.createDisplayEntityContainer();
+      this.m_rscene.addEntity(this.m_entityContainer);
+    }
+
+    let debugDev = this.m_debugDev;
+    let div = this.m_viewDiv;
+    this.m_layouter.locationEnabled = false;
+    this.m_debugDev = debugDev;
+
+    if (div && !debugDev) {} else {
+      this.m_debugDev = true;
+      this.m_teamLoader = new CoModelTeamLoader_1.CoModelTeamLoader();
+      this.initModels();
+      let imgUrls = ["static/assets/modules/apple_01/mini.jpg", "static/assets/box.jpg"]; // this.imgViewer.setViewImageUrls(imgUrls);
+
+      this.imgViewer.setViewImageUrl(imgUrls[0], true); // this.imgViewer.setViewImageAlpha(0.1);
+    }
+  }
+
+  initModels() {
+    this.m_forceRot90 = true;
+    let urls = [];
+    let types = [];
+
+    for (let i = 0; i < 2; ++i) {
+      let purl = "static/assets/modules/apple_01/export_" + i + ".drc";
+      urls.push(purl);
+      types.push("drc");
+    }
+
+    this.initSceneByUrls(urls, types, prog => {
+      console.log("models loaded ...");
+    }, 200);
+  }
+
+  initSceneByUrls(urls, types, loadingCallback, size = 200) {
+    this.m_baseSize = size;
+    this.m_loadingCallback = loadingCallback;
+    let loader = this.m_teamLoader;
+    loader.loadWithTypes(urls, types, (models, transforms) => {
+      // this.m_layouter.layoutReset();
+      // for (let i = 0; i < models.length; ++i) {
+      // 	console.log("VVVVVV models[",i,"].url: ", models[i].url);
+      // 	this.createEntity(models[i], transforms != null ? transforms[i] : null, models[i].url);
+      // }
+      this.m_modelDataUrl = urls[0] + "." + types[0];
+      console.log("XXX -^- XXX initSceneByUrls() this.m_modelDataUrl: ", this.m_modelDataUrl); // this.fitEntitiesSize();
+      // if (this.m_loadingCallback) {
+      // 	this.m_loadingCallback(1.0);
+      // }
+
+      for (let i = 0; i < models.length; ++i) {
+        let md = new DsrdViewerBase_1.ModelData();
+        md.url = models[i].url;
+        md.models = models;
+        md.transforms = transforms;
+        this.m_models.push(md);
+      }
+
+      this.initModelScene();
+    });
+  }
+
+  initModelScene() {
+    if (this.m_models.length > 0 && this.m_materialEanbled) {
+      this.m_layouter.layoutReset();
+
+      for (let i = 0; i < this.m_models.length; ++i) {
+        let model = this.m_models[i];
+        let models = model.models;
+        let transforms = model.transforms; // this.createEntity(models[i], transforms != null ? transforms[i] : null, 1.0);
+
+        this.createEntity(models[i], transforms != null ? transforms[i] : null, model.url);
+      } // this.m_layouter.layoutUpdate(200);
+
+
+      this.fitEntitiesSize();
+
+      if (this.m_loadingCallback) {
+        this.m_loadingCallback(1.0);
+      }
+    }
+  }
+
+  setForceRotate90(force) {
+    this.m_forceRot90 = force;
+  }
+
+  fitEntitiesSize(forceRot90 = false) {
+    forceRot90 = forceRot90 || this.m_forceRot90;
+    this.m_layouter.layoutUpdate(this.m_baseSize, VoxMath_1.VoxMath.createVec3());
+    let container = this.m_entityContainer;
+    let format = URLFilter_1.default.getFileSuffixName(this.m_modelDataUrl, true, true);
+    console.log("XXXXXX fitEntitiesSize() this.m_modelDataUrl: ", this.m_modelDataUrl);
+    console.log("format: ", format);
+
+    switch (format) {
+      case "obj":
+        container.setRotationXYZ(90, 0, 0);
+        break;
+
+      default:
+        if (forceRot90) {
+          container.setRotationXYZ(90, 0, 0);
+        }
+
+        break;
+    }
+
+    container.update();
+  }
+
+}
+
+exports.DsrdViewer = DsrdViewer;
+
+/***/ }),
+
+/***/ "702c":
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -3561,155 +2653,941 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
-const CoSpaceAppData_1 = __webpack_require__("3347");
+const ShaderCodeUUID_1 = __webpack_require__("ea2a");
 
-exports.CoGeomDataType = CoSpaceAppData_1.CoGeomDataType;
-exports.CoDataFormat = CoSpaceAppData_1.CoDataFormat;
+const HttpFileLoader_1 = __webpack_require__("521d");
 
-const CoDataModule_1 = __webpack_require__("7c62");
-
-class CoGeomModelLoader {
+class PBRModule {
   constructor() {
-    this.m_loadedCall = null;
-    this.m_loadedAllCall = null;
-    this.m_loadTotal = 0;
-    this.m_loadedTotal = 0;
-    this.verTool = null;
+    this.m_effect = null;
+    this.m_preLoadMaps = true;
+    this.m_loadSpecularData = true;
+    this.m_specEnvMapBuf = null;
+    this.m_specEnvMap = null;
+    this.m_loadSpecCallback = null;
+    this.m_hdrBrnEnabled = true;
+    this.preloadMaps = true;
+    this.envMapUrl = "";
+    this.hdrBrnEnabled = true;
   }
 
-  setListener(loadedCallback, loadedAllCallback) {
-    this.m_loadedCall = loadedCallback;
-    this.m_loadedAllCall = loadedAllCallback;
+  initialize(materialData) {
+    this.m_materialData = materialData;
+
+    if (materialData && materialData.pbr) {
+      this.m_texData = materialData.pbr.map;
+    }
   }
 
-  load(urls, typeNS = "") {
-    CoGeomModelLoader.s_coapp.verTool = this.verTool;
+  preload(callback) {
+    if (this.m_loadSpecCallback == null && callback != null) {
+      this.loadSpecularData(this.hdrBrnEnabled);
+      this.m_loadSpecCallback = callback;
+    }
+  }
 
-    if (urls != null && urls.length > 0) {
-      CoGeomModelLoader.s_coapp.initialize(null, true);
-      let purls = urls.slice(0);
-      CoGeomModelLoader.s_coapp.deferredInit(() => {
-        for (let i = 0; i < purls.length; ++i) {
-          this.loadModel(purls[i], typeNS);
+  active(rscene, materialCtx, shadowEnabled) {
+    this.m_materialCtx = materialCtx;
+
+    if (this.m_effect == null) {
+      this.m_rscene = rscene;
+      this.m_effect = PBREffect.create();
+      this.m_effect.initialize(this.m_rscene);
+    }
+
+    this.preloadMap();
+  }
+
+  loadSpecularData(hdrBrnEnabled) {
+    if (this.m_loadSpecularData) {
+      this.m_hdrBrnEnabled = hdrBrnEnabled;
+      let url = this.envMapUrl;
+
+      if (this.m_texData) {
+        url = this.m_texData.envBrnMap;
+
+        if (hdrBrnEnabled) {
+          url = this.m_texData.envBrnMap;
+        }
+      }
+
+      console.log("start load spec map data, url: ", url);
+      new HttpFileLoader_1.HttpFileLoader().load(url, (buf, url) => {
+        this.m_specEnvMapBuf = buf;
+
+        if (this.m_effect != null) {
+          this.m_specEnvMap = this.m_effect.createSpecularTex(this.m_specEnvMapBuf, true, this.m_specEnvMap);
+        }
+
+        if (this.m_loadSpecCallback != null) {
+          this.m_loadSpecCallback();
+          this.m_loadSpecCallback = null;
         }
       });
+      this.m_loadSpecularData = false;
     }
   }
 
-  loadWithType(urls, types) {
-    CoGeomModelLoader.s_coapp.verTool = this.verTool;
+  preloadMap() {
+    if (this.m_preLoadMaps) {
+      let texData = this.m_texData;
 
-    if (urls != null && urls.length > 0) {
-      CoGeomModelLoader.s_coapp.initialize(null, true);
-      let purls = urls.slice(0);
-      CoGeomModelLoader.s_coapp.deferredInit(() => {
-        for (let i = 0; i < purls.length; ++i) {
-          this.loadModel(purls[i], types[i]);
-        }
-      });
+      if (this.preloadMaps && texData) {
+        if (texData.diffuseMap !== undefined) this.m_materialCtx.getTextureByUrl(texData.diffuseMap);
+        if (texData.normalMap !== undefined) this.m_materialCtx.getTextureByUrl(texData.normalMap);
+        if (texData.armMap !== undefined) this.m_materialCtx.getTextureByUrl(texData.armMap);
+        if (texData.displacementMap !== undefined) this.m_materialCtx.getTextureByUrl(texData.displacementMap);
+      }
+
+      this.m_preLoadMaps = false;
     }
   }
 
-  reset() {
-    this.m_loadedTotal = 0;
-    this.m_loadTotal = 0;
+  getUUID() {
+    return ShaderCodeUUID_1.ShaderCodeUUID.PBR;
   }
 
-  loadModel(url, typeNS = "") {
-    console.log("CoGeomModelLoader::loadModel(), url: ", url);
-    let ns = typeNS;
+  isEnabled() {
+    const mctx = this.m_materialCtx;
+    let boo = mctx != null && mctx.hasShaderCodeObjectWithUUID(this.getUUID());
+    return boo;
+  }
 
-    if (typeNS == "") {
-      let k0 = url.lastIndexOf(".") + 1;
-      let k1 = url.lastIndexOf("?");
-      ns = k1 < 0 ? url.slice(k0) : url.slice(k0, k1);
+  createMaterial(shadowReceiveEnabled, materialParam = null, texData = null) {
+    // console.log("### pbr createMaterial().");
+    if (this.m_specEnvMap == null) {
+      if (this.m_specEnvMapBuf == null) {
+        throw Error("this.m_specEnvMapBuf is null !!!");
+      }
+
+      this.m_specEnvMap = this.m_effect.createSpecularTex(this.m_specEnvMapBuf, true, this.m_specEnvMap);
+
+      this.m_specEnvMap.__$attachThis();
     }
 
-    ns = ns.toLocaleLowerCase();
-    let type = CoSpaceAppData_1.CoDataFormat.Undefined;
+    let param;
 
-    switch (ns) {
-      case "obj":
-        type = CoSpaceAppData_1.CoDataFormat.OBJ;
+    if (materialParam) {
+      param = materialParam;
+    } else {
+      if (this.m_materialData.pbr) {
+        param = this.m_materialData.pbr.defaultParam;
+      }
+    }
+
+    const mctx = this.m_materialCtx;
+    texData = texData == null ? this.m_texData : texData;
+    let mapData = {
+      envMap: param.specEnvMap !== undefined ? param.specEnvMap : this.m_specEnvMap,
+      diffuseMap: texData && texData.diffuseMap !== undefined ? mctx.getTextureByUrl(texData.diffuseMap) : null,
+      normalMap: texData && texData.normalMap !== undefined ? mctx.getTextureByUrl(texData.normalMap) : null,
+      armMap: texData && texData.armMap !== undefined ? mctx.getTextureByUrl(texData.armMap) : null,
+      displacementMap: texData && texData.displacementMap !== undefined ? mctx.getTextureByUrl(texData.displacementMap) : null,
+      parallaxMap: texData && texData.parallaxMap !== undefined ? mctx.getTextureByUrl(texData.parallaxMap) : null,
+      aoMap: null
+    };
+    let m = this.m_effect.createMaterial();
+    let decor = m.getDecorator();
+    let vertUniform = decor.vertUniform;
+
+    if (param.pipeline) {
+      m.setMaterialPipeline(mctx.pipeline);
+    }
+
+    if (param.scatterEnabled !== undefined) decor.scatterEnabled = param.scatterEnabled;
+    if (param.woolEnabled !== undefined) decor.woolEnabled = param.woolEnabled;
+    if (param.absorbEnabled !== undefined) decor.absorbEnabled = param.absorbEnabled;
+    if (param.normalNoiseEnabled !== undefined) decor.normalNoiseEnabled = param.normalNoiseEnabled;
+    decor.hdrBrnEnabled = this.m_hdrBrnEnabled;
+    if (param.metallic !== undefined) decor.setMetallic(param.metallic);
+    if (param.roughness !== undefined) decor.setRoughness(param.roughness);
+    if (param.ao !== undefined) decor.setAO(param.ao);
+
+    if (param.shadowReceiveEnabled !== undefined) {
+      decor.shadowReceiveEnabled = param.shadowReceiveEnabled && shadowReceiveEnabled && mctx.vsmModule != null;
+    }
+
+    if (param.pipeline !== undefined && param.pipeline) {
+      decor.fogEnabled = mctx.envLightModule && param.fogEnabled;
+    } // for test
+    // decor.scatterEnabled = false;
+    // decor.woolEnabled = false;
+    // decor.absorbEnabled = false;
+    // decor.normalNoiseEnabled = false;
+    // param.scatterIntensity = 1.0;
+    // param.sideIntensity = 1.0;
+    // decor.setMetallic(0.1);
+    // decor.setRoughness(0.5);
+    // decor.setAO(1.0);
+    // decor.shadowReceiveEnabled = false;
+    // decor.fogEnabled = false;
+    // init maps
+
+
+    decor.specularEnvMap = mapData.envMap;
+    decor.armMap = mapData.armMap;
+    decor.diffuseMap = mapData.diffuseMap;
+    decor.normalMap = mapData.normalMap;
+    decor.aoMap = mapData.aoMap;
+    decor.parallaxMap = mapData.parallaxMap;
+    vertUniform.displacementMap = mapData.displacementMap;
+    decor.initialize();
+    vertUniform.initialize();
+    let vs = param.displacementParams;
+
+    if (vs !== undefined) {
+      vertUniform.setDisplacementParams(vs[0], vs[1]);
+    }
+
+    vs = param.uvScales;
+
+    if (vs !== undefined) {
+      vertUniform.setUVScale(vs[0], vs[1]);
+    }
+
+    vs = param.albedoColor;
+
+    if (vs !== undefined) {
+      decor.setAlbedoColor(vs[0], vs[1], vs[2]);
+    }
+
+    vs = param.parallaxParams;
+
+    if (vs !== undefined) {
+      decor.setParallaxParams(vs[0], vs[1], vs[2], vs[3]);
+    }
+
+    if (param.sideIntensity !== undefined) decor.setSideIntensity(param.sideIntensity);
+    if (param.toneMapingExposure !== undefined) decor.setToneMapingExposure(param.toneMapingExposure);
+    if (param.scatterIntensity !== undefined) decor.setScatterIntensity(param.scatterIntensity); // decor.scatterEnabled = false;
+    // decor.setToneMapingExposure(3.0);
+    // decor.setAlbedoColor(1.0, 1.0, 1.0);
+    // decor.setScatterIntensity(1.0);
+    // decor.setParallaxParams(1, 10, 5.0, 0.02);
+    // decor.setSideIntensity(1.0);
+    // decor.setRoughness(0.5);
+    // decor.setMetallic(0.1);
+    // decor.setAO(1.0);
+
+    return m;
+  }
+
+  destroy() {
+    this.m_rscene = null;
+
+    if (this.m_effect != null) {
+      this.m_effect.destroy();
+      this.m_effect = null;
+    }
+
+    this.m_materialCtx = null;
+    this.m_materialData = null;
+    this.m_texData = null;
+
+    if (this.m_specEnvMap != null) {
+      this.m_specEnvMap.__$detachThis();
+
+      this.m_specEnvMap = null;
+    }
+  }
+
+}
+
+exports.PBRModule = PBRModule;
+
+/***/ }),
+
+/***/ "7596":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const CoModuleLoader_1 = __webpack_require__("1c7d");
+
+class PostOutline {
+  constructor(rscene, verTool = null) {
+    this.m_rscene = rscene;
+    let url = "static/cospace/renderEffect/occPostOutline/OccPostOutlineModule.umd.js";
+    new CoModuleLoader_1.CoModuleLoader(1, null, verTool).setCallback(() => {
+      this.m_postOutline = OccPostOutlineModule.create();
+      this.initOutline();
+      this.m_rscene.appendRenderNode(this);
+    }).load(url);
+  }
+
+  initOutline() {
+    this.m_postOutline.initialize(this.m_rscene, 0, [0]);
+    this.m_postOutline.setFBOSizeScaleRatio(0.5);
+    this.m_postOutline.setRGB3f(0.0, 1.0, 0.0);
+    this.m_postOutline.setOutlineDensity(2.0);
+    this.m_postOutline.setOcclusionDensity(0.2);
+  }
+
+  select(targets) {
+    if (this.m_postOutline != null) {
+      this.m_postOutline.setTargetList(targets);
+    }
+  }
+
+  deselect() {
+    if (this.m_postOutline != null) {
+      this.m_postOutline.setTargetList(null);
+    }
+
+    console.log("post outline deselect() ...");
+  }
+
+  render() {
+    if (this.m_postOutline != null) {
+      // console.log("post outline getTargetList(): ",this.m_postOutline.getTargetList());
+      this.m_postOutline.drawBegin();
+      this.m_postOutline.draw();
+      this.m_postOutline.drawEnd();
+    }
+  }
+
+}
+
+exports.PostOutline = PostOutline;
+
+/***/ }),
+
+/***/ "7750":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var __importDefault = this && this.__importDefault || function (mod) {
+  return mod && mod.__esModule ? mod : {
+    "default": mod
+  };
+};
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const CoModuleLoader_1 = __webpack_require__("1c7d");
+
+const UserEditEvent_1 = __webpack_require__("3444");
+
+const VoxRScene_1 = __webpack_require__("622b");
+
+const VoxUIInteraction_1 = __webpack_require__("e096");
+
+const VoxUI_1 = __webpack_require__("f189");
+
+const VoxMaterial_1 = __webpack_require__("8f2d");
+
+const VoxMath_1 = __webpack_require__("7c47");
+
+const VoxModelEdit_1 = __webpack_require__("9a9d");
+
+const CoModelTeamLoader_1 = __webpack_require__("a811");
+
+const URLFilter_1 = __importDefault(__webpack_require__("d33d"));
+
+const HttpFileLoader_1 = __webpack_require__("521d");
+
+const VecValueFilter_1 = __webpack_require__("2dfe");
+
+const CoEntityLayouter2_1 = __webpack_require__("4312");
+
+const ModelScene_1 = __webpack_require__("cc0e");
+
+const PBRMaterialCtx_1 = __webpack_require__("e175");
+
+const TextPackedLoader_1 = __webpack_require__("a0f6");
+
+class ModelData {
+  constructor() {}
+
+}
+
+exports.ModelData = ModelData;
+/**
+ * cospace renderer
+ */
+
+class DsrdViewerBase {
+  constructor() {
+    this.m_verTool = null;
+    this.m_teamLoader = new CoModelTeamLoader_1.CoModelTeamLoader();
+    this.m_edit3DUIRScene = null;
+    this.m_materialEanbled = false;
+    this.m_scData = null;
+    this.m_models = [];
+    this.modelScene = new ModelScene_1.ModelScene();
+    this.pbrCtx = new PBRMaterialCtx_1.PBRMaterialCtx();
+    this.m_graph = null;
+    this.m_rscene = null;
+    this.m_uiScene = null;
+    this.m_mi = null;
+    this.m_posV0 = null;
+    this.m_posV1 = null;
+    this.m_transCtr = null;
+    this.m_selectFrame = null;
+    this.m_valueFilter = new VecValueFilter_1.VecValueFilter();
+    this.m_map = new Map();
+    this.m_layouter = new CoEntityLayouter2_1.CoEntityLayouter2();
+    this.m_entityQuery = null;
+    this.m_entities = [];
+    this.m_modelTexUrl = "";
+  }
+
+  loadInfo() {
+    let url = "static/cospace/info.json";
+    url = URLFilter_1.default.filterUrl(url);
+    let httpLoader = new HttpFileLoader_1.HttpFileLoader();
+    httpLoader.load(url, (data, url) => {
+      console.log("loadInfo loaded data: ", data);
+      this.m_verTool = new CoModuleLoader_1.CoModuleVersion(data);
+      this.initEngineModule();
+    }, null, null, "json");
+  }
+
+  initEngineModule() {
+    let url = "static/cospace/engine/uiInteract/CoUIInteraction.umd.js";
+    let uiInteractML = new CoModuleLoader_1.CoModuleLoader(2, () => {}, this.m_verTool);
+    let url0 = "static/cospace/engine/renderer/CoRenderer.umd.js";
+    let url1 = "static/cospace/engine/rscene/CoRScene.umd.js";
+    let url2 = "static/cospace/math/CoMath.umd.js";
+    let url3 = "static/cospace/ageom/CoAGeom.umd.js";
+    let url5 = "static/cospace/comesh/CoMesh.umd.js";
+    let url6 = "static/cospace/coentity/CoEntity.umd.js";
+    let url7 = "static/cospace/particle/CoParticle.umd.js";
+    let url8 = "static/cospace/coMaterial/CoMaterial.umd.js";
+    let url9 = " static/cospace/cotexture/CoTexture.umd.js";
+    let url10 = "static/cospace/ui/Lib_VoxUI.umd.js";
+    let url11 = "static/cospace/modelEdit/Lib_VoxModelEdit.umd.js";
+    new CoModuleLoader_1.CoModuleLoader(2, () => {
+      if (VoxRScene_1.VoxRScene.isEnabled()) {
+        new CoModuleLoader_1.CoModuleLoader(3, () => {
+          new CoModuleLoader_1.CoModuleLoader(6, () => {
+            console.log("modules loaded ...");
+            VoxRScene_1.VoxRScene.initialize();
+            VoxMath_1.VoxMath.initialize();
+            VoxModelEdit_1.VoxModelEdit.initialize();
+            this.initRenderer();
+
+            this.modelScene.__$init();
+
+            this.initMouseInteract();
+            this.createEditEntity();
+            this.initUIScene();
+            let scDataJsonUrl = "static/assets/scene/dsrdCfg02.json";
+            let textLoader = new TextPackedLoader_1.TextPackedLoader(1, () => {
+              this.m_scData = JSON.parse(textLoader.getDataByUrl(scDataJsonUrl));
+              this.pbrCtx.pbrModule.envMapUrl = "static/bytes/spb.bin";
+              this.pbrCtx.pbrModule.preloadMaps = false;
+              this.pbrCtx.initialize(this.m_rscene, this.m_scData.material, () => {
+                console.log("pbrCtx.initialize() ...");
+                this.m_materialEanbled = true;
+                this.initModelScene();
+              });
+            }).load(scDataJsonUrl);
+          }, this.m_verTool).load(url3).load(url6).load(url7).load(url9).load(url10).load(url11);
+        }, this.m_verTool).load(url2).load(url5).load(url8);
+      }
+    }, this.m_verTool).addLoader(uiInteractML).load(url0).load(url1);
+    uiInteractML.load(url);
+  }
+
+  initModelScene() {
+    if (this.m_models.length > 0 && this.m_materialEanbled) {
+      this.m_layouter.layoutReset();
+
+      for (let i = 0; i < this.m_models.length; ++i) {
+        let model = this.m_models[i];
+        let models = model.models;
+        let transforms = model.transforms; // this.createEntity(models[i], transforms != null ? transforms[i] : null, 1.0);
+
+        this.createEntity(models[i], transforms != null ? transforms[i] : null, model.url);
+      }
+
+      this.m_layouter.layoutUpdate(200);
+    }
+  }
+
+  initMouseInteract() {
+    const mi = VoxUIInteraction_1.VoxUIInteraction.createMouseInteraction();
+    mi.initialize(this.m_rscene, 0).setAutoRunning(true, 1);
+    this.m_mi = mi;
+    this.m_posV0 = VoxMath_1.VoxMath.createVec3();
+    this.m_posV1 = VoxMath_1.VoxMath.createVec3();
+  }
+
+  createDiv(px, py, pw, ph) {
+    let div = document.createElement("div");
+    div.style.width = pw + "px";
+    div.style.height = ph + "px";
+    document.body.appendChild(div);
+    div.style.display = "bolck";
+    div.style.left = px + "px";
+    div.style.top = py + "px";
+    div.style.position = "absolute";
+    div.style.display = "bolck";
+    div.style.position = "absolute";
+    return div;
+  }
+
+  initRenderer() {}
+
+  initUIScene() {
+    let uisc = this.m_uiScene = VoxUI_1.VoxUI.createUIScene(this.m_graph);
+    uisc.texAtlasNearestFilter = true;
+    uisc.rscene.addEventListener(VoxRScene_1.MouseEvent.MOUSE_BG_DOWN, this, this.uiMouseDownListener);
+    uisc.rscene.addEventListener(VoxRScene_1.MouseEvent.MOUSE_UP, this, this.uiMouseUpListener);
+    uisc.rscene.addEventListener(VoxRScene_1.MouseEvent.MOUSE_MOVE, this, this.uiMouseMoveListener);
+    this.initUIEntities();
+    this.m_entityQuery = VoxModelEdit_1.VoxModelEdit.createRectFrameQuery();
+    this.m_entityQuery.initialize(this.m_rscene);
+
+    if (this.m_selectFrame == null) {
+      this.m_selectFrame = VoxModelEdit_1.VoxModelEdit.createUIRectLine();
+      this.m_selectFrame.initialize(uisc.rscene);
+      this.m_selectFrame.enable();
+    }
+
+    let rscene = this.m_rscene; // rscene.addEventListener(CoRScene.MouseEvent.MOUSE_BG_DOWN, this, this.mouseBgDownListener);
+
+    rscene.addEventListener(VoxRScene_1.KeyboardEvent.KEY_DOWN, this, this.keyDown);
+    rscene.addEventListener(VoxRScene_1.MouseEvent.MOUSE_BG_CLICK, this, this.mouseBGClickListener);
+    rscene.addEventListener(VoxRScene_1.MouseEvent.MOUSE_UP, this, this.mouseUpListener, true, true);
+  }
+
+  createBtn(uuid, text, px, py, group) {
+    let textColor = VoxMaterial_1.VoxMaterial.createColor4(1, 1, 1, 1);
+    let btn = VoxUI_1.VoxUI.createTextLabelButton(uuid, text, 100, 50, textColor);
+    btn.setXY(px, py);
+    this.m_uiScene.addEntity(btn);
+    btn.addEventListener(VoxRScene_1.MouseEvent.MOUSE_UP, this, this.btnMouseUpListener);
+    group.addButton(btn);
+    return btn;
+  }
+
+  createSelectBtn(px, py, ns, uuid, selectNS, deselectNS, flag) {
+    let selectBar = VoxUI_1.VoxUI.createSelectionEntity();
+    selectBar.uuid = uuid;
+    let colors = [0xff5dbea3, 0xff33b249, 0xff5adbb5, 0xff33b249];
+    selectBar.setBGColorsWithARGBUint32(colors);
+    selectBar.initialize(this.m_uiScene, ns, selectNS, deselectNS, 30);
+    selectBar.addEventListener(VoxRScene_1.SelectionEvent.SELECT, this, this.selectChange);
+
+    if (flag) {
+      selectBar.select(false);
+    } else {
+      selectBar.deselect(false);
+    }
+
+    selectBar.setXY(px, py);
+    this.m_uiScene.addEntity(selectBar);
+    return selectBar;
+  }
+
+  selectChange(evt) {
+    console.log("selectChange(), evt.flag: ", evt.flag);
+    this.m_valueFilter.setAbsorbing(evt.flag);
+  }
+
+  initUIEntities() {
+    this.m_btnGroup0 = VoxUI_1.VoxUI.createSelectButtonGroup();
+    this.m_btnGroup1 = VoxUI_1.VoxUI.createSelectButtonGroup();
+    this.m_btnGroup2 = VoxUI_1.VoxUI.createSelectButtonGroup();
+    let tx = 10;
+    let ty = 10; // let absorbBtn = this.createSelectBtn(tx, ty + 30 + 520, "吸附", "absorb", "ON", "OFF", false);
+    // let localBtn = this.createBtn("local", "局部坐标", tx, ty + 30 + 450, this.m_btnGroup0);
+    // let globalBtn = this.createBtn("global", "全局坐标", tx, ty + 30 + 380, this.m_btnGroup0);
+    // ty += 50;
+    // let moveBtn = this.createBtn("move", "移动", tx, ty + 120, this.m_btnGroup1);
+    // let rotateBtn = this.createBtn("rotate", "旋转", tx, ty + 60, this.m_btnGroup1);
+    // let scaleBtn = this.createBtn("scale", "缩放", tx, ty, this.m_btnGroup1);
+    // ty -= 50;
+    // // let redoBtn = this.createBtn("redo", "重做", tx, ty + 30, this.m_btnGroup2);
+    // // let undoBtn = this.createBtn("undo", "撤销", tx, ty - 40, this.m_btnGroup2);
+    // // this.m_btnGroup0.selectButton(globalBtn);
+    // this.m_btnGroup1.selectButton(moveBtn);
+    // // this.m_btnGroup2.selectButton(moveBtn);
+  }
+
+  createEditEntity() {
+    let edit3dsc = this.m_edit3DUIRScene;
+    this.m_transCtr = VoxModelEdit_1.VoxModelEdit.createTransformController();
+    const tc = this.m_transCtr;
+    tc.initialize(edit3dsc);
+    tc.addEventListener(UserEditEvent_1.UserEditEvent.EDIT_BEGIN, this, this.trans3DEditBegin);
+    tc.addEventListener(UserEditEvent_1.UserEditEvent.EDIT_END, this, this.trans3DEditEnd);
+    this.m_transCtr.setCtrlValueFilter(this.m_valueFilter);
+    this.m_prevPos = VoxMath_1.VoxMath.createVec3();
+    this.m_currPos = VoxMath_1.VoxMath.createVec3();
+    this.m_keyInterac = VoxUIInteraction_1.VoxUIInteraction.createKeyboardInteraction();
+    const ki = this.m_keyInterac;
+    ki.initialize(this.m_rscene);
+    let Key = VoxRScene_1.Keyboard;
+    let type = ki.createKeysEventType([Key.CTRL, Key.Y]);
+    ki.addKeysDownListener(type, this, this.keyCtrlYDown);
+    type = ki.createKeysEventType([Key.CTRL, Key.Z]);
+    ki.addKeysDownListener(type, this, this.keyCtrlZDown);
+    this.m_recoder = VoxModelEdit_1.VoxModelEdit.createTransformRecorder();
+  }
+
+  keyCtrlZDown(evt) {
+    this.m_recoder.undo();
+    let list = this.m_recoder.getCurrList();
+    this.selectEntities(list);
+  }
+
+  keyCtrlYDown(evt) {
+    this.m_recoder.redo();
+    let list = this.m_recoder.getCurrList();
+    this.selectEntities(list);
+  }
+
+  trans3DEditBegin(evt) {
+    console.log("XXXXXXXX Edit begin...");
+    let list = evt.currentTarget.getTargetEntities();
+    let st = this.m_rscene.getStage3D();
+    this.m_prevPos.setXYZ(st.mouseX, st.mouseY, 0);
+    this.m_recoder.saveBegin(list);
+    this.m_selectFrame.disable();
+  }
+
+  trans3DEditEnd(evt) {
+    console.log("XXXXXXXX Edit end...", this.m_prevPos, this.m_currPos);
+    let st = this.m_rscene.getStage3D();
+    this.m_currPos.setXYZ(st.mouseX, st.mouseY, 0);
+
+    if (VoxMath_1.Vector3D.Distance(this.m_prevPos, this.m_currPos) > 0.5) {
+      console.log("XXXXXXXX Edit transforming success ...");
+      let list = evt.currentTarget.getTargetEntities();
+      console.log("XXXXXXXX Edit transforming entity list: ", list);
+      this.m_recoder.saveEnd(list);
+    } else {
+      this.m_recoder.saveEnd(null);
+    }
+
+    this.m_selectFrame.enable();
+  }
+
+  uiMouseDownListener(evt) {
+    console.log("DsrdViewer::uiMouseDownListener(), evt: ", evt); // this.m_selectFrame.begin(evt.mouseX, evt.mouseY);
+  }
+
+  uiMouseUpListener(evt) {
+    console.log("DsrdViewer::uiMouseUpListener(), evt: ", evt); // if (this.m_selectFrame.isSelectEnabled()) {
+    // 	let b = this.m_selectFrame.bounds;
+    // 	console.log("DsrdViewer::uiMouseUpListener(), b: ", b);
+    // 	let list = this.m_entityQuery.getEntities(b.min, b.max);
+    // 	console.log("list: ", list);
+    // 	this.selectEntities(list);
+    // }
+    // this.m_selectFrame.end(evt.mouseX, evt.mouseY);
+  }
+
+  uiMouseMoveListener(evt) {
+    // console.log("DsrdViewer::uiMouseMoveListener(), evt: ", evt);
+    // console.log("ui move (x, y): ", evt.mouseX, evt.mouseY);
+    this.m_selectFrame.move(evt.mouseX, evt.mouseY);
+  }
+
+  btnMouseUpListener(evt) {
+    console.log("btnMouseUpListener(), evt.uuid: ", evt.uuid);
+    let uuid = evt.uuid;
+
+    switch (uuid) {
+      case "local":
+        this.m_transCtr.toLocal();
         break;
 
-      case "fbx":
-        type = CoSpaceAppData_1.CoDataFormat.FBX;
+      case "global":
+        this.m_transCtr.toGlobal();
         break;
 
-      case "drc":
-        type = CoSpaceAppData_1.CoDataFormat.Draco;
+      case "move":
+        this.m_transCtr.toTranslation();
         break;
 
-      case "ctm":
-        type = CoSpaceAppData_1.CoDataFormat.CTM;
+      case "scale":
+        this.m_transCtr.toScale();
+        break;
+
+      case "rotate":
+        this.m_transCtr.toRotation();
+        this;
+        break;
+
+      case "redo":
+        this.keyCtrlYDown(null);
+        break;
+
+      case "undo":
+        this.keyCtrlZDown(null);
         break;
 
       default:
         break;
     }
+  }
 
-    if (type != CoSpaceAppData_1.CoDataFormat.Undefined) {
-      this.loadGeomModel(url, type);
-    } else {
-      console.error("Can't support this model data format, url: ", url);
+  createTexByUrl(url = "", saving = true) {
+    let map = this.m_map;
+    url = url != "" ? url : "static/assets/box.jpg";
+    url = URLFilter_1.default.filterUrl(url);
+
+    if (map.has(url)) {
+      return map.get(url);
+    }
+
+    let tex = this.m_rscene.textureBlock.createImageTex2D();
+
+    if (saving) {
+      map.set(url, tex);
+    }
+
+    const request = new XMLHttpRequest();
+    request.open("GET", url, true);
+    request.responseType = "blob";
+
+    request.onload = e => {
+      let img = new Image();
+
+      img.onload = evt => {
+        tex.setDataFromImage(img, 0, 0, 0, false);
+      };
+
+      let pwin = window;
+      var imageUrl = (pwin.URL || pwin.webkitURL).createObjectURL(request.response);
+      img.src = imageUrl;
+    };
+
+    request.onerror = e => {
+      console.error("load error binary image buffer request.status: ", request.status, "url:", url);
+    };
+
+    request.send(null);
+    return tex;
+  }
+
+  keyDownDoes(evt) {
+    console.log("DsrdViewer::keyDown() ..., evt.keyCode: ", evt.keyCode);
+    return true;
+  }
+
+  keyDown(evt) {
+    console.log("DsrdViewer::keyDown() ..., evt.keyCode: ", evt.keyCode);
+
+    if (this.keyDownDoes(evt)) {
+      let KEY = VoxRScene_1.Keyboard;
+
+      switch (evt.keyCode) {
+        case KEY.W:
+          this.m_transCtr.toTranslation();
+          break;
+
+        case KEY.E:
+          this.m_transCtr.toScale();
+          break;
+
+        case KEY.R:
+          this.m_transCtr.toRotation();
+          break;
+
+        default:
+          break;
+      }
     }
   }
 
-  loadGeomModel(url, format) {
-    let ins = CoGeomModelLoader.s_coapp;
+  loadModels() {
+    let baseUrl = "static/private/";
+    let url = baseUrl + "obj/base.obj";
+    url = baseUrl + "fbx/base4.fbx";
+    url = "static/assets/fbx/base4.fbx";
+    console.log("loadModels() init...");
+    url = URLFilter_1.default.filterUrl(url);
+    let loader = this.m_teamLoader;
+    loader.verTool = this.m_verTool;
+    loader.load([url], (models, transforms) => {
+      this.m_layouter.layoutReset();
 
-    if (ins != null) {
-      let unit = ins.getCPUDataByUrlAndCallback(url, format, (unit, status) => {
-        if (format != CoSpaceAppData_1.CoDataFormat.FBX) {
-          this.loadedModels(unit.data.models, unit.data.transforms, format, unit.url);
-          this.m_loadTotal++;
-          this.loadedModelFromUnit(unit, status);
-        }
-      }, true);
+      for (let i = 0; i < models.length; ++i) {
+        this.createEntity(models[i], transforms != null ? transforms[i] : null);
+      }
 
-      if (format == CoSpaceAppData_1.CoDataFormat.FBX) {
-        unit.data.modelReceiver = (models, transforms, index, total) => {
-          // console.log("Loaded a fbx model XXX: ", index, ",", total);
-          if (index == 0) {
-            this.m_loadTotal++;
+      this.m_layouter.layoutUpdate(200, VoxMath_1.VoxMath.createVec3(0, 0, 0));
+    });
+  }
+
+  createEntity(model, transform = null, url = "") {
+    // let material = VoxRScene.createDefaultMaterial(true);
+    // material.setRGB3f(0.85, 0.85, 0.85);
+    // material.setTextureList([this.createTexByUrl(this.m_modelTexUrl)]);
+    // material.initializeByCodeBuf(true);
+    let material = null;
+    let flag = false;
+    flag = this.pbrCtx.isMCTXEnabled(); // flag = false;
+
+    if (flag) {
+      // material = this.pbrCtx.pbrModule.createMaterial(true);
+      let pbrParam = {};
+      pbrParam.roughness = 0.5;
+      pbrParam.pipeline = true;
+      pbrParam.scatterEnabled = false;
+      pbrParam.toneMapingExposure = 3.0;
+      pbrParam.fogEnabled = false;
+      pbrParam.albedoColor = [1.0, 1.0, 1.0];
+      let pbrMapUrl = {}; // pbrMapUrl.diffuseMap = "static/assets/white.jpg";
+
+      pbrMapUrl.diffuseMap = "";
+      material = this.pbrCtx.pbrModule.createMaterial(true, pbrParam, pbrMapUrl);
+    } else {
+      let m = VoxRScene_1.VoxRScene.createDefaultMaterial(true);
+      m.setRGB3f(0.85, 0.85, 0.85);
+      m.setTextureList([this.createTexByUrl(this.m_modelTexUrl)]);
+      m.initializeByCodeBuf(true);
+      material = m;
+    }
+
+    let mesh = VoxRScene_1.VoxRScene.createDataMeshFromModel(model, material);
+    let entity = VoxRScene_1.VoxRScene.createMouseEventEntity();
+    entity.uuid = url;
+    entity.setMaterial(material);
+    entity.setMesh(mesh); // entity.setPosition(cv);
+    // entity.setRenderState(rst.NONE_CULLFACE_NORMAL_STATE);
+
+    entity.update();
+
+    if (this.m_entityContainer == null) {
+      this.m_rscene.addEntity(entity);
+    } else {
+      this.m_entityContainer.addEntity(entity);
+    }
+
+    entity.addEventListener(VoxRScene_1.MouseEvent.MOUSE_OVER, this, this.mouseOverTargetListener);
+    entity.addEventListener(VoxRScene_1.MouseEvent.MOUSE_OUT, this, this.mouseOutTargetListener);
+    entity.addEventListener(VoxRScene_1.MouseEvent.MOUSE_DOWN, this, this.mouseDownTargetListener);
+    entity.addEventListener(VoxRScene_1.MouseEvent.MOUSE_UP, this, this.mouseUpTargetListener);
+    this.m_entities.push(entity);
+    this.m_layouter.layoutAppendItem(entity, VoxRScene_1.VoxRScene.createMat4(transform));
+    this.modelScene.addModelNode(URLFilter_1.default.getFileName(url), entity);
+    return entity;
+  }
+
+  mouseOverTargetListener(evt) {// console.log("mouseOverTargetListener()..., evt.target: ", evt.target);
+  }
+
+  mouseOutTargetListener(evt) {// console.log("mouseOutTargetListener()..., evt.target: ", evt.target);
+  }
+
+  mouseDownTargetListener(evt) {
+    console.log("mouseDownTargetListener()..., evt: ", evt);
+    this.m_posV0.setXYZ(evt.mouseX, evt.mouseY, 0);
+    this.m_posV1.copyFrom(this.m_posV0);
+    this.m_mi.drager.attach();
+  }
+
+  selectEntities(list, hitPV = null) {
+    if (list && list.length > 0) {
+      let transCtr = this.m_transCtr;
+      let pos = VoxMath_1.VoxMath.createVec3();
+
+      for (let i = 0; i < list.length; ++i) {
+        pos.addBy(list[i].getGlobalBounds().center);
+      }
+
+      pos.scaleBy(1.0 / list.length);
+
+      if (list.length > 0) {
+        if (this.m_modelSelectCall) {
+          let urls = [];
+
+          for (let i = 0; i < list.length; i++) {
+            urls.push(list[i].uuid);
           }
 
-          this.loadedModels(models, transforms, format, unit.url);
-          this.loadedModelFromUnit(unit, 0, index + 1 == total);
-        };
+          console.log("modelSelectCall, urls: ", urls);
+          this.m_modelSelectCall(urls);
+        }
+      }
+
+      if (transCtr && list.length > 0) {
+        // 暂时注释掉，后续功能完善了再启用
+        // transCtr.select(list as ITransformEntity[], pos);
+        this.m_outline.select(list);
       }
     }
   }
 
-  loadedModels(models, transforms, format, url) {
-    if (this.m_loadedCall != null) {
-      this.m_loadedCall(models, transforms, format, url);
+  setMouseUpListener(mouseUpCall) {
+    this.m_mouseUpCall = mouseUpCall;
+  }
+
+  setModelSelectListener(modelSelectCall) {
+    this.m_modelSelectCall = modelSelectCall;
+  }
+
+  setMaterialParamWithUUID(uuid, param) {}
+
+  mouseUpTargetListener(evt) {
+    this.m_posV1.setXYZ(evt.mouseX, evt.mouseY, 0);
+    this.m_posV0.subtractBy(this.m_posV1);
+
+    if (this.m_posV0.getLength() < 0.5) {
+      let entity = evt.target;
+      this.selectEntities([entity], evt.wpos);
+    } // console.log("mouseUpTargetListener() mouse up...");
+
+
+    if (this.m_mouseUpCall) {
+      this.m_mouseUpCall(evt);
     }
   }
 
-  loadedModelFromUnit(unit, status = 0, flag = true) {
-    if (flag) this.m_loadedTotal++;
-
-    if (this.m_loadedTotal >= this.m_loadTotal) {
-      let total = this.m_loadedTotal;
-      this.reset();
-      this.m_loadedAllCall(total, unit.url);
+  mouseUpListener(evt) {
+    if (this.m_transCtr) {
+      this.m_transCtr.decontrol();
     }
   }
 
-  destroy() {
-    this.m_loadedCall = null;
+  mouseBGClickListener(evt) {
+    if (this.m_transCtr) {
+      this.m_transCtr.disable();
+    }
+
+    this.m_outline.deselect();
+
+    if (this.m_mouseUpCall) {
+      this.m_mouseUpCall(evt);
+    }
+
+    if (this.m_modelSelectCall) {
+      this.m_modelSelectCall([]);
+    }
+  }
+
+  run() {
+    if (this.m_graph) {
+      if (this.m_transCtr) {
+        this.m_transCtr.run();
+      }
+
+      this.m_graph.run();
+    }
   }
 
 }
 
-CoGeomModelLoader.s_coapp = new CoDataModule_1.CoDataModule();
-exports.CoGeomModelLoader = CoGeomModelLoader;
+exports.DsrdViewerBase = DsrdViewerBase;
 
 /***/ }),
 
-/***/ "dab7":
+/***/ "7c47":
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -3719,130 +3597,7 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
-const ModuleLoader_1 = __webpack_require__("75f5");
-
-var RenderDrawMode;
-exports.RenderDrawMode = RenderDrawMode;
-var CullFaceMode;
-exports.CullFaceMode = CullFaceMode;
-var DepthTestMode;
-exports.DepthTestMode = DepthTestMode;
-var RenderBlendMode;
-exports.RenderBlendMode = RenderBlendMode;
-var GLStencilFunc;
-exports.GLStencilFunc = GLStencilFunc;
-var GLStencilOp;
-exports.GLStencilOp = GLStencilOp;
-var GLBlendMode;
-exports.GLBlendMode = GLBlendMode;
-var GLBlendEquation;
-exports.GLBlendEquation = GLBlendEquation;
-
-class T_CoRenderer {
-  constructor() {
-    this.m_init = true;
-  }
-
-  init() {
-    if (typeof CoRenderer !== "undefined") {
-      exports.RenderDrawMode = RenderDrawMode = CoRenderer.RenderDrawMode;
-      exports.CullFaceMode = CullFaceMode = CoRenderer.CullFaceMode;
-      exports.DepthTestMode = DepthTestMode = CoRenderer.DepthTestMode;
-      exports.RenderBlendMode = RenderBlendMode = CoRenderer.RenderBlendMode;
-      exports.GLStencilFunc = GLStencilFunc = CoRenderer.GLStencilFunc;
-      exports.GLStencilOp = GLStencilOp = CoRenderer.GLStencilOp;
-      exports.GLBlendMode = GLBlendMode = CoRenderer.GLBlendMode;
-      exports.GLBlendEquation = GLBlendEquation = CoRenderer.GLBlendEquation;
-    }
-  }
-
-  initialize(callback = null, url = "") {
-    this.init();
-    this.m_init = !this.isEnabled();
-
-    if (this.m_init) {
-      this.m_init = false;
-
-      if (url == "" || url === undefined) {
-        url = "static/cospace/engine/renderer/CoRenderer.umd.min.js";
-      }
-
-      new ModuleLoader_1.ModuleLoader(1, () => {
-        this.init();
-        if (callback != null && this.isEnabled()) callback([url]);
-      }).load(url);
-      return true;
-    }
-
-    return false;
-  }
-
-  get RenderDrawMode() {
-    return CoRenderer.RenderDrawMode;
-  }
-
-  get CullFaceMode() {
-    return CoRenderer.CullFaceMode;
-  }
-
-  get DepthTestMode() {
-    return CoRenderer.DepthTestMode;
-  }
-
-  get RenderBlendMode() {
-    return CoRenderer.RenderBlendMode;
-  }
-
-  get GLStencilFunc() {
-    return CoRenderer.GLStencilFunc;
-  }
-
-  get GLStencilOp() {
-    return CoRenderer.GLStencilOp;
-  }
-
-  get GLBlendMode() {
-    return CoRenderer.GLBlendMode;
-  }
-
-  get GLBlendEquation() {
-    return CoRenderer.GLBlendEquation;
-  }
-
-  get RendererDevice() {
-    return CoRenderer.RendererDevice;
-  }
-
-  get RendererState() {
-    return CoRenderer.RendererState;
-  }
-
-  createRendererInstance() {
-    return CoRenderer.createRendererInstance();
-  }
-
-  isEnabled() {
-    return typeof CoRenderer !== "undefined";
-  }
-
-}
-
-const VoxRenderer = new T_CoRenderer();
-exports.VoxRenderer = VoxRenderer;
-
-/***/ }),
-
-/***/ "f042":
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-const ModuleLoader_1 = __webpack_require__("75f5");
+const ModuleLoader_1 = __webpack_require__("4d3f");
 
 var OrientationType;
 exports.OrientationType = OrientationType;
@@ -4015,312 +3770,206 @@ exports.VoxMath = VoxMath;
 
 /***/ }),
 
-/***/ "f046":
+/***/ "7ce5":
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-var __importDefault = this && this.__importDefault || function (mod) {
-  return mod && mod.__esModule ? mod : {
-    "default": mod
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+/***/ }),
+
+/***/ "8875":
+/***/ (function(module, exports, __webpack_require__) {
+
+var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_DEFINE_RESULT__;// addapted from the document.currentScript polyfill by Adam Miller
+// MIT license
+// source: https://github.com/amiller-gh/currentScript-polyfill
+
+// added support for Firefox https://bugzilla.mozilla.org/show_bug.cgi?id=1620505
+
+(function (root, factory) {
+  if (true) {
+    !(__WEBPACK_AMD_DEFINE_ARRAY__ = [], __WEBPACK_AMD_DEFINE_FACTORY__ = (factory),
+				__WEBPACK_AMD_DEFINE_RESULT__ = (typeof __WEBPACK_AMD_DEFINE_FACTORY__ === 'function' ?
+				(__WEBPACK_AMD_DEFINE_FACTORY__.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__)) : __WEBPACK_AMD_DEFINE_FACTORY__),
+				__WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
+  } else {}
+}(typeof self !== 'undefined' ? self : this, function () {
+  function getCurrentScript () {
+    var descriptor = Object.getOwnPropertyDescriptor(document, 'currentScript')
+    // for chrome
+    if (!descriptor && 'currentScript' in document && document.currentScript) {
+      return document.currentScript
+    }
+
+    // for other browsers with native support for currentScript
+    if (descriptor && descriptor.get !== getCurrentScript && document.currentScript) {
+      return document.currentScript
+    }
+  
+    // IE 8-10 support script readyState
+    // IE 11+ & Firefox support stack trace
+    try {
+      throw new Error();
+    }
+    catch (err) {
+      // Find the second match for the "at" string to get file src url from stack.
+      var ieStackRegExp = /.*at [^(]*\((.*):(.+):(.+)\)$/ig,
+        ffStackRegExp = /@([^@]*):(\d+):(\d+)\s*$/ig,
+        stackDetails = ieStackRegExp.exec(err.stack) || ffStackRegExp.exec(err.stack),
+        scriptLocation = (stackDetails && stackDetails[1]) || false,
+        line = (stackDetails && stackDetails[2]) || false,
+        currentLocation = document.location.href.replace(document.location.hash, ''),
+        pageSource,
+        inlineScriptSourceRegExp,
+        inlineScriptSource,
+        scripts = document.getElementsByTagName('script'); // Live NodeList collection
+  
+      if (scriptLocation === currentLocation) {
+        pageSource = document.documentElement.outerHTML;
+        inlineScriptSourceRegExp = new RegExp('(?:[^\\n]+?\\n){0,' + (line - 2) + '}[^<]*<script>([\\d\\D]*?)<\\/script>[\\d\\D]*', 'i');
+        inlineScriptSource = pageSource.replace(inlineScriptSourceRegExp, '$1').trim();
+      }
+  
+      for (var i = 0; i < scripts.length; i++) {
+        // If ready state is interactive, return the script tag
+        if (scripts[i].readyState === 'interactive') {
+          return scripts[i];
+        }
+  
+        // If src matches, return the script tag
+        if (scripts[i].src === scriptLocation) {
+          return scripts[i];
+        }
+  
+        // If inline source matches, return the script tag
+        if (
+          scriptLocation === currentLocation &&
+          scripts[i].innerHTML &&
+          scripts[i].innerHTML.trim() === inlineScriptSource
+        ) {
+          return scripts[i];
+        }
+      }
+  
+      // If no match, return null
+      return null;
+    }
   };
-};
+
+  return getCurrentScript
+}));
+
+
+/***/ }),
+
+/***/ "8f2d":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
 
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
-const PostOutline_1 = __webpack_require__("c75a");
+const ModuleLoader_1 = __webpack_require__("4d3f");
 
-const VoxRScene_1 = __webpack_require__("d1de");
-
-const VoxMath_1 = __webpack_require__("f042");
-
-const VoxEntity_1 = __webpack_require__("9b53");
-
-const CoModelTeamLoader_1 = __webpack_require__("fd42");
-
-const URLFilter_1 = __importDefault(__webpack_require__("7aa4"));
-
-const SceneAccessor_1 = __webpack_require__("36c5");
-
-const DsrdViewerBase_1 = __webpack_require__("39ed");
-
-const DsrdImageViewer_1 = __webpack_require__("79da");
-
-const CoModuleLoader_1 = __webpack_require__("2a2b"); // declare var CoMath: ICoMath;
-
-/**
- * cospace renderer
- */
-
-
-class DsrdViewer extends DsrdViewerBase_1.DsrdViewerBase {
+class T_CoMaterial {
   constructor() {
-    super();
-    this.m_viewDiv = null;
-    this.m_initCallback = null;
-    this.m_zAxisUp = false;
-    this.m_debugDev = false;
-    this.m_loadingCallback = null;
-    this.m_modelDataUrl = "";
-    this.m_baseSize = 200.0;
-    this.m_forceRot90 = false;
+    this.m_init = true;
   }
 
-  initialize(div = null, initCallback = null, zAxisUp = false, debugDev = false, forceReleaseEnabled = false) {
-    document.oncontextmenu = function (e) {
-      e.preventDefault();
-    };
+  initialize(callback = null, url = "") {
+    this.m_init = !this.isEnabled();
 
-    console.log("DsrdViewer::initialize(), forceReleaseEnabled: ", forceReleaseEnabled);
-    CoModuleLoader_1.CoModuleLoader.forceReleaseEnabled = forceReleaseEnabled;
-    this.m_viewDiv = div;
-    this.m_initCallback = initCallback;
-    this.m_zAxisUp = zAxisUp;
-    this.m_debugDev = debugDev;
-    this.loadInfo();
+    if (this.m_init) {
+      this.m_init = false;
+
+      if (url == "" || url === undefined) {
+        url = "static/cospace/coMaterial/CoMaterial.umd.min.js";
+      }
+
+      new ModuleLoader_1.ModuleLoader(1, () => {
+        if (callback != null && this.isEnabled()) callback([url]);
+      }).load(url);
+      return true;
+    }
+
+    return false;
+  }
+
+  isEnabled() {
+    return typeof CoMaterial !== "undefined";
   }
   /**
-   * @param fov_angle_degree the default value is 45.0
-   * @param near the default value is 10.0
-   * @param far the default value is 5000.0
+   * create a Color4 instance
+   * @param pr the default vaue is 1.0
+   * @param pg the default vaue is 1.0
+   * @param pb the default vaue is 1.0
+   * @param pa the default vaue is 1.0
    */
 
 
-  setCamProjectParam(fov_angle_degree, near, far) {
-    if (this.m_rscene) {
-      let cam = this.m_rscene.getCamera();
-      cam.perspectiveRH(Math.PI * fov_angle_degree / 180.0, cam.getAspect(), near, far);
-    }
+  createColor4(pr, pg, pb, pa) {
+    return CoMaterial.createColor4(pr, pg, pb, pa);
+  }
+  /**
+   * build default 3d entity rendering material
+   * @param normalEnabled the default value is false
+   */
+
+
+  createDefaultMaterial(normalEnabled) {
+    return CoMaterial.createDefaultMaterial(normalEnabled);
+  }
+  /**
+   * build 3d line entity rendering material
+   * @param dynColorEnabled the default value is true
+   */
+
+
+  createLineMaterial(dynColorEnabled) {
+    return CoMaterial.createLineMaterial(dynColorEnabled);
+  }
+  /**
+   * build 3d quad line entity rendering material
+   * @param dynColorEnabled the default value is false
+   */
+
+
+  createQuadLineMaterial(dynColorEnabled) {
+    return CoMaterial.createQuadLineMaterial(dynColorEnabled);
   }
 
-  updateCamera() {
-    if (this.m_rscene) {
-      this.m_rscene.updateCamera();
-    }
+  createShaderMaterial(shd_uniqueName) {
+    return CoMaterial.createShaderMaterial(shd_uniqueName);
   }
 
-  updateCameraWithF32Arr16(fs32Arr16, updateCamera = true) {
-    if (fs32Arr16.length == 16) {
-      this.applyCamvs(fs32Arr16, updateCamera);
-    }
+  createMaterial(dcr) {
+    return CoMaterial.createMaterial(dcr);
   }
 
-  getCameraData(posScale, transpose = false) {
-    if (this.m_rscene) {
-      let cam = this.m_rscene.getCamera();
-      let mat = cam.getViewMatrix().clone();
-      mat.invert();
-
-      if (transpose) {
-        mat.transpose();
-      }
-
-      let vs = mat.getLocalFS32().slice(0);
-      vs[3] *= posScale;
-      vs[7] *= posScale;
-      vs[11] *= posScale;
-      return vs;
-    }
-
-    return null;
+  creatMaterialContextParam() {
+    return CoMaterial.creatMaterialContextParam();
   }
 
-  initRenderer() {
-    // document.body.style.overflow = "hidden";
-    let RD = VoxRScene_1.RendererDevice;
-    /**
-     * 开启打印输出shader构建的相关信息
-     */
-
-    RD.SHADERCODE_TRACE_ENABLED = false;
-    RD.VERT_SHADER_PRECISION_GLOBAL_HIGHP_ENABLED = true;
-    let graph = this.m_graph = VoxRScene_1.VoxRScene.createRendererSceneGraph();
-    let sizeW = 512;
-    let sizeH = 512;
-    let zAxisUp = this.m_zAxisUp; // let debugDev: boolean = this.m_debugDev;
-
-    let div = this.m_viewDiv;
-    let dpr = window.devicePixelRatio;
-    let rparam = graph.createRendererSceneParam(div ? div : this.createDiv(0, 0, sizeW / dpr, sizeH / dpr));
-    rparam.autoSyncRenderBufferAndWindowSize = false;
-    rparam.syncBgColor = false;
-    rparam.setCamProject(45, 10.0, 2000.0);
-    rparam.setCamPosition(239.0, -239.0, 239.0);
-
-    if (zAxisUp || div == null) {
-      rparam.setCamUpDirect(0.0, 0.0, 1.0);
-    } else {
-      rparam.setCamUpDirect(0.0, 1.0, 0.0);
-    }
-
-    rparam.setAttriAntialias(true);
-    this.m_rscene = graph.createScene(rparam);
-    this.m_rscene.enableMouseEvent(true);
-    VoxRScene_1.VoxRScene.setRendererScene(this.m_rscene);
-    let subScene = this.m_rscene.createSubScene(rparam, 3, false);
-    subScene.enableMouseEvent(true);
-    subScene.setAccessor(new SceneAccessor_1.SceneAccessor());
-    this.m_edit3DUIRScene = subScene;
-    graph.addScene(this.m_edit3DUIRScene);
-    this.m_outline = new PostOutline_1.PostOutline(this.m_rscene, this.m_verTool);
-    this.imgViewer = new DsrdImageViewer_1.DsrdImageViewer();
-    this.imgViewer.initialize(this.m_rscene);
-    this.init3DScene();
-
-    if (this.m_initCallback) {
-      this.m_initCallback();
-    }
-  }
-
-  init3DScene() {
-    this.m_modelTexUrl = "static/assets/white.jpg";
-
-    if (this.m_entityContainer == null) {
-      this.m_entityContainer = VoxEntity_1.VoxEntity.createDisplayEntityContainer();
-      this.m_rscene.addEntity(this.m_entityContainer);
-    }
-
-    let debugDev = this.m_debugDev;
-    let div = this.m_viewDiv;
-    this.m_layouter.locationEnabled = false;
-    this.m_debugDev = debugDev;
-
-    if (div && !debugDev) {} else {
-      this.m_debugDev = true;
-      this.m_teamLoader = new CoModelTeamLoader_1.CoModelTeamLoader();
-      this.initModels();
-      let imgUrls = ["static/assets/modules/apple_01/mini.jpg", "static/assets/box.jpg"]; // this.imgViewer.setViewImageUrls(imgUrls);
-
-      this.imgViewer.setViewImageUrl(imgUrls[0], true); // this.imgViewer.setViewImageAlpha(0.1);
-    } // this.loadModels();
-
-  }
-
-  initModels() {
-    this.m_forceRot90 = true;
-    let urls = [];
-    let types = [];
-
-    for (let i = 0; i < 2; ++i) {
-      let purl = "static/assets/modules/apple_01/export_" + i + ".drc";
-      urls.push(purl);
-      types.push("drc");
-    }
-
-    this.initSceneByUrls(urls, types, prog => {
-      console.log("models loaded ...");
-    }, 200);
-  }
-
-  initSceneByUrls(urls, types, loadingCallback, size = 200) {
-    this.m_baseSize = size;
-    this.m_loadingCallback = loadingCallback;
-    let loader = this.m_teamLoader;
-    loader.loadWithTypes(urls, types, (models, transforms) => {
-      this.m_layouter.layoutReset();
-
-      for (let i = 0; i < models.length; ++i) {
-        console.log("VVVVVV models[", i, "].url: ", models[i].url);
-        this.createEntity(models[i], transforms != null ? transforms[i] : null, 2.0, models[i].url);
-      }
-
-      this.m_modelDataUrl = urls[0] + "." + types[0];
-      console.log("XXXXXX initSceneByUrls() this.m_modelDataUrl: ", this.m_modelDataUrl);
-      this.fitEntitiesSize();
-
-      if (this.m_loadingCallback) {
-        this.m_loadingCallback(1.0);
-      }
-    });
-  }
-
-  setForceRotate90(force) {
-    this.m_forceRot90 = force;
-  }
-
-  fitEntitiesSize(forceRot90 = false) {
-    forceRot90 = forceRot90 || this.m_forceRot90;
-    this.m_layouter.layoutUpdate(this.m_baseSize, VoxMath_1.VoxMath.createVec3());
-    let container = this.m_entityContainer;
-    let format = URLFilter_1.default.getFileSuffixName(this.m_modelDataUrl, true, true);
-    console.log("XXXXXX fitEntitiesSize() this.m_modelDataUrl: ", this.m_modelDataUrl);
-    console.log("format: ", format);
-
-    switch (format) {
-      case "obj":
-        container.setRotationXYZ(90, 0, 0);
-        break;
-
-      default:
-        if (forceRot90) {
-          container.setRotationXYZ(90, 0, 0);
-        }
-
-        break;
-    }
-
-    container.update();
-  }
-
-  applyCamvs(cdvs, updateCamera) {
-    if (cdvs == null) {
-      cdvs = [0.7071067690849304, -0.40824827551841736, 0.5773502588272095, 2.390000104904175, 0.7071067690849304, 0.40824827551841736, -0.5773502588272095, -2.390000104904175, 0.0, 0.8164965510368347, 0.5773502588272095, 2.390000104904175, 0, 0, 0, 1];
-    }
-
-    let mat4 = VoxMath_1.VoxMath.createMat4(new Float32Array(cdvs));
-    mat4.transpose();
-    let camvs = mat4.getLocalFS32();
-    let i = 0; // let vx = new Vector3D(camvs[i], camvs[i+1], camvs[i+2], camvs[i+3]);
-
-    i = 4;
-    let vy = VoxMath_1.VoxMath.createVec3(camvs[i], camvs[i + 1], camvs[i + 2], camvs[i + 3]); // i = 8;
-    // let vz = new Vector3D(camvs[i], camvs[i+1], camvs[i+2], camvs[i+3]);
-
-    i = 12;
-    let pos = VoxMath_1.VoxMath.createVec3(camvs[i], camvs[i + 1], camvs[i + 2]); // console.log("		  vy: ", vy);
-
-    let cam = this.m_rscene.getCamera(); // console.log("cam.getUV(): ", cam.getUV());
-    // console.log("");
-    // console.log("cam.getNV(): ", cam.getNV());
-    // vz.negate();
-    // console.log("		  vz: ", vz);
-    // console.log("		 pos: ", pos);
-
-    if (pos.getLength() > 0.001) {
-      let camPos = pos.clone().scaleBy(100.0);
-      cam.lookAtRH(camPos, VoxMath_1.VoxMath.createVec3(), vy);
-
-      if (updateCamera) {
-        cam.update();
-      }
-    }
+  createMaterialContext() {
+    return CoMaterial.createMaterialContext();
   }
 
 }
 
-exports.DsrdViewer = DsrdViewer;
+const VoxMaterial = new T_CoMaterial();
+exports.VoxMaterial = VoxMaterial;
 
 /***/ }),
 
-/***/ "fae3":
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _setPublicPath__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__("1eb2");
-/* harmony import */ var _entry__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__("f046");
-/* harmony import */ var _entry__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(_entry__WEBPACK_IMPORTED_MODULE_1__);
-/* harmony reexport (unknown) */ for(var __WEBPACK_IMPORT_KEY__ in _entry__WEBPACK_IMPORTED_MODULE_1__) if(["default"].indexOf(__WEBPACK_IMPORT_KEY__) < 0) (function(key) { __webpack_require__.d(__webpack_exports__, key, function() { return _entry__WEBPACK_IMPORTED_MODULE_1__[key]; }) }(__WEBPACK_IMPORT_KEY__));
-
-
-
-
-/***/ }),
-
-/***/ "fd42":
+/***/ "9a9d":
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4330,11 +3979,210 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
-const CoModuleLoader_1 = __webpack_require__("2a2b");
+const ICoTransformRecorder_1 = __webpack_require__("3b42");
+
+exports.ICoTransformRecorder = ICoTransformRecorder_1.ICoTransformRecorder;
+
+const ITransformController_1 = __webpack_require__("3612");
+
+exports.ITransformController = ITransformController_1.ITransformController;
+
+const IFloorLineGrid_1 = __webpack_require__("7ce5");
+
+exports.IFloorLineGrid = IFloorLineGrid_1.IFloorLineGrid;
+
+const IUIRectLine_1 = __webpack_require__("9ce7");
+
+exports.IUIRectLine = IUIRectLine_1.IUIRectLine;
+
+const IRectFrameQuery_1 = __webpack_require__("d518");
+
+exports.IRectFrameQuery = IRectFrameQuery_1.IRectFrameQuery;
+
+const ModuleLoader_1 = __webpack_require__("4d3f");
+
+var UserEditEvent = null;
+exports.UserEditEvent = UserEditEvent;
+
+class T_Lib_VoxModelEdit {
+  constructor() {
+    this.m_init = true;
+  }
+
+  initialize(callback = null, url = "") {
+    console.log("T_Lib_VoxModelEdit::initialize(), ", this.isEnabled());
+
+    if (this.isEnabled()) {
+      exports.UserEditEvent = UserEditEvent = Lib_VoxModelEdit.UserEditEvent;
+    }
+
+    this.m_init = !this.isEnabled();
+
+    if (this.m_init) {
+      this.m_init = false;
+
+      if (url == "" || url === undefined) {
+        url = "static/cospace/modelEdit/Lib_VoxModelEdit.umd.min.js";
+      }
+
+      if (callback) {
+        new ModuleLoader_1.ModuleLoader(1, () => {
+          if (this.isEnabled()) callback([url]);
+        }).load(url);
+      }
+
+      return true;
+    }
+
+    return false;
+  }
+
+  isEnabled() {
+    return typeof Lib_VoxModelEdit !== "undefined";
+  }
+
+  get UserEditEvent() {
+    return Lib_VoxModelEdit.UserEditEvent;
+  }
+
+  createTransformRecorder() {
+    return Lib_VoxModelEdit.createTransformRecorder();
+  }
+
+  createTransformController() {
+    return Lib_VoxModelEdit.createTransformController();
+  }
+
+  createFloorLineGrid() {
+    return Lib_VoxModelEdit.createFloorLineGrid();
+  }
+
+  createUIRectLine() {
+    return Lib_VoxModelEdit.createUIRectLine();
+  }
+
+  createRectFrameQuery() {
+    return Lib_VoxModelEdit.createRectFrameQuery();
+  }
+
+}
+
+const VoxModelEdit = new T_Lib_VoxModelEdit();
+exports.VoxModelEdit = VoxModelEdit;
+
+/***/ }),
+
+/***/ "9ce7":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+/***/ }),
+
+/***/ "a0ee":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+class SceneAccessor {
+  constructor() {}
+
+  renderBegin(rendererScene) {
+    let p = rendererScene.getRenderProxy();
+    p.clearDepth(1.0);
+  }
+
+  renderEnd(rendererScene) {}
+
+}
+
+exports.SceneAccessor = SceneAccessor;
+
+/***/ }),
+
+/***/ "a0f6":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const PackedLoader_1 = __webpack_require__("4604");
+
+class TextPackedLoader extends PackedLoader_1.PackedLoader {
+  constructor() {
+    super(...arguments);
+    this.m_dataMap = new Map();
+  } // /**
+  //  * @param times 记录总共需要的加载完成操作的响应次数。这个次数可能是由load直接产生，也可能是由于别的地方驱动。
+  //  * @param callback 完成所有响应的之后的回调
+  //  * @param urlChecker url 转换与检查
+  //  */
+  // constructor(times: number, callback: (m?: PackedLoader) => void = null, urlChecker: (url: string) => string = null) {
+  // 	super(times, callback, urlChecker);
+  // }
+
+
+  loadData(url) {
+    let req = new XMLHttpRequest();
+    req.open("GET", url, true);
+
+    req.onerror = function (err) {
+      console.error("load error: ", err);
+    }; // req.onprogress = e => { };
+
+
+    req.onload = evt => {
+      // this.loadedData(req.response, url);
+      this.m_dataMap.set(url, req.response);
+      this.loadedUrl(url);
+    };
+
+    req.send(null);
+  }
+
+  getDataByUrl(url) {
+    return this.m_dataMap.get(url);
+  }
+
+  clearAllData() {
+    this.m_dataMap.clear();
+  }
+
+}
+
+exports.TextPackedLoader = TextPackedLoader;
+
+/***/ }),
+
+/***/ "a811":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const CoModuleLoader_1 = __webpack_require__("1c7d");
 
 exports.CoModuleVersion = CoModuleLoader_1.CoModuleVersion;
 
-const CoGeomModelLoader_1 = __webpack_require__("d82c");
+const CoGeomModelLoader_1 = __webpack_require__("0b88");
 
 exports.CoGeomDataType = CoGeomModelLoader_1.CoGeomDataType;
 
@@ -4454,6 +4302,1203 @@ class CoModelTeamLoader {
 }
 
 exports.CoModelTeamLoader = CoModelTeamLoader;
+
+/***/ }),
+
+/***/ "b096":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const CoSpaceAppData_1 = __webpack_require__("4e9d");
+
+const CoModuleLoader_1 = __webpack_require__("1c7d");
+
+class CoDataModule {
+  constructor() {
+    this.m_init = true;
+    this.m_sysIniting = true;
+    this.m_initInsFlag = true;
+    this.verTool = null;
+    this.m_initCalls = [];
+  }
+  /**
+   * 初始化
+   * @param sysInitCallback the default value is null
+   * @param urlChecker the default value is null
+   * @param deferredInit the default value is false
+   */
+
+
+  initialize(sysInitCallback = null, deferredInit = false) {
+    if (this.m_init) {
+      this.m_init = false;
+      this.m_sysInitCallback = sysInitCallback;
+      this.m_deferredInit = deferredInit; // let dracoModuleParam = new TaskCodeModuleParam("static/cospace/modules/draco/ModuleDracoGeomParser.umd.js", ModuleNS.dracoParser, ModuleFileType.JS);
+      // dracoModuleParam.params = ["static/cospace/modules/dracoLib/"];
+
+      let modules = [{
+        url: "static/cospace/core/coapp/CoSpaceApp.umd.js",
+        name: CoSpaceAppData_1.CoModuleNS.coSpaceApp,
+        type: CoSpaceAppData_1.CoModuleFileType.JS
+      }, {
+        url: "static/cospace/core/code/ThreadCore.umd.js",
+        name: CoSpaceAppData_1.CoModuleNS.threadCore,
+        type: CoSpaceAppData_1.CoModuleFileType.JS
+      }, {
+        url: "static/cospace/modules/ctm/ModuleCTMGeomParser.umd.js",
+        name: CoSpaceAppData_1.CoModuleNS.ctmParser,
+        type: CoSpaceAppData_1.CoModuleFileType.JS
+      }, {
+        url: "static/cospace/modules/obj/ModuleOBJGeomParser.umd.js",
+        name: CoSpaceAppData_1.CoModuleNS.objParser,
+        type: CoSpaceAppData_1.CoModuleFileType.JS
+      }, {
+        url: "static/cospace/modules/png/ModulePNGParser.umd.js",
+        name: CoSpaceAppData_1.CoModuleNS.pngParser,
+        type: CoSpaceAppData_1.CoModuleFileType.JS
+      }, {
+        url: "static/cospace/modules/fbxFast/ModuleFBXGeomFastParser.umd.js",
+        name: CoSpaceAppData_1.CoModuleNS.fbxFastParser,
+        type: CoSpaceAppData_1.CoModuleFileType.JS
+      }, {
+        url: "static/cospace/modules/draco/ModuleDracoGeomParser.umd.js",
+        name: CoSpaceAppData_1.CoModuleNS.dracoParser,
+        type: CoSpaceAppData_1.CoModuleFileType.JS,
+        params: ["static/cospace/modules/dracoLib/"]
+      }];
+      this.m_modules = modules; // 初始化数据协同中心
+
+      let dependencyGraphObj = {
+        nodes: [{
+          uniqueName: "dracoGeomParser",
+          path: "static/cospace/modules/draco/ModuleDracoGeomParser.umd.js"
+        }, {
+          uniqueName: "dracoWasmWrapper",
+          path: "static/cospace/modules/dracoLib/w2.js"
+        }, {
+          uniqueName: "ctmGeomParser",
+          path: "static/cospace/modules/ctm/ModuleCTMGeomParser.umd.js"
+        }],
+        maps: [{
+          uniqueName: "dracoGeomParser",
+          includes: [1]
+        } // 这里[1]表示 dracoGeomParser 依赖数组中的第一个元素也就是 dracoWasmWrapper 这个代码模块
+        ]
+      };
+      this.m_dependencyGraphObj = dependencyGraphObj;
+      let loader = new CoModuleLoader_1.CoModuleLoader(1, null, this.verTool);
+
+      if (this.verTool) {
+        loader.forceFiltering = this.verTool.forceFiltering;
+        console.log("this.verTool.forceFiltering: ", this.verTool.forceFiltering);
+      }
+
+      let urlChecker = loader.getUrlChecker();
+
+      if (urlChecker) {
+        for (let i = 0; i < modules.length; ++i) {
+          modules[i].url = urlChecker(modules[i].url);
+        }
+
+        let nodes = dependencyGraphObj.nodes;
+
+        for (let i = 0; i < nodes.length; ++i) {
+          nodes[i].path = urlChecker(nodes[i].path);
+        }
+      } // if (this.verTool) {
+      // 	for (let i = 0; i < modules.length; ++i) {
+      // 		modules[i].url = this.verTool.filterUrl(modules[i].url);
+      // 		console.log("VVVVVVV PP0 VVVVVV modules[i].url: ", modules[i].url);
+      // 	}
+      // 	console.log(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
+      // 	let nodes = (dependencyGraphObj as any).nodes;
+      // 	for (let i = 0; i < nodes.length; ++i) {
+      // 		nodes[i].path = this.verTool.filterUrl(nodes[i].path);
+      // 		console.log("VVVVVVV PP1 VVVVVV nodes[i].path: ", nodes[i].path);
+      // 	}
+      // }
+
+
+      if (!deferredInit) {
+        this.loadSys();
+      }
+    }
+  }
+
+  loadSys() {
+    if (this.m_sysIniting) {
+      new CoModuleLoader_1.CoModuleLoader(1, () => {
+        this.initCoSpaceSys();
+      }).load(this.m_modules[0].url);
+      this.m_sysIniting = false;
+    }
+  }
+  /**
+   * 注意: 不建议过多使用这个函数,因为回调函数不安全如果是lambda表达式则由性能问题。
+   * 立即获得CPU侧的数据单元实例, 但是数据单元中的数据可能是空的, 因为数据获取的操作实际是异步的。
+   * 需要通过 isCpuPhase() 或者 isGpuPhase() 等函数来判定具体数据情况
+   * @param url 数据资源url
+   * @param dataFormat 数据资源类型
+   * @param callback 数据资源接收回调函数, 其值建议为lambda函数表达式
+   * @param immediate 是否立即返回数据, 默认是false
+   * @returns 数据单元实例，用户只能访问不能更改这个实例内部的数据状态，如果必要则可以申请复制一份
+   */
+
+
+  getCPUDataByUrlAndCallback(url, dataFormat, callback, immediate) {
+    if (this.coappIns != null) {
+      let unit = this.coappIns.getCPUDataByUrlAndCallback(url, dataFormat, callback, immediate);
+
+      if (this.m_deferredInit) {
+        if (this.m_initInsFlag) {
+          this.m_initInsFlag = false;
+          let modules = this.m_modules;
+          this.coappIns.initialize(3, modules[1].url, true);
+        }
+      }
+
+      return unit;
+    }
+
+    return null;
+  }
+
+  deferredInit(callback) {
+    if (this.coappIns == null) {
+      this.m_initCalls.push(callback);
+      this.loadSys();
+    } else if (callback != null) {
+      callback();
+    }
+  }
+
+  initCoSpaceSys() {
+    if (this.coappIns == null && typeof CoSpaceApp !== "undefined") {
+      let coappIns = CoSpaceApp.createInstance();
+      let modules = this.m_modules;
+      let jsonStr = JSON.stringify(this.m_dependencyGraphObj);
+      coappIns.setThreadDependencyGraphJsonString(jsonStr);
+      coappIns.setTaskModuleParams(modules);
+
+      if (!this.m_deferredInit) {
+        coappIns.initialize(3, modules[1].url, true);
+      }
+
+      let t = this;
+      t.coappIns = coappIns;
+
+      for (let i = 0; i < this.m_initCalls.length; ++i) {
+        if (this.m_initCalls[i] != null) {
+          this.m_initCalls[i]();
+        }
+      }
+
+      this.m_initCalls = [];
+    }
+
+    if (this.m_sysInitCallback != null) {
+      this.m_sysInitCallback();
+    }
+
+    this.m_sysInitCallback = null;
+  }
+
+  destroy() {}
+
+}
+
+exports.CoDataModule = CoDataModule;
+exports.default = CoDataModule;
+
+/***/ }),
+
+/***/ "c77c":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const ModuleLoader_1 = __webpack_require__("4d3f");
+
+var RenderDrawMode;
+exports.RenderDrawMode = RenderDrawMode;
+var CullFaceMode;
+exports.CullFaceMode = CullFaceMode;
+var DepthTestMode;
+exports.DepthTestMode = DepthTestMode;
+var RenderBlendMode;
+exports.RenderBlendMode = RenderBlendMode;
+var GLStencilFunc;
+exports.GLStencilFunc = GLStencilFunc;
+var GLStencilOp;
+exports.GLStencilOp = GLStencilOp;
+var GLBlendMode;
+exports.GLBlendMode = GLBlendMode;
+var GLBlendEquation;
+exports.GLBlendEquation = GLBlendEquation;
+
+class T_CoRenderer {
+  constructor() {
+    this.m_init = true;
+  }
+
+  init() {
+    if (typeof CoRenderer !== "undefined") {
+      exports.RenderDrawMode = RenderDrawMode = CoRenderer.RenderDrawMode;
+      exports.CullFaceMode = CullFaceMode = CoRenderer.CullFaceMode;
+      exports.DepthTestMode = DepthTestMode = CoRenderer.DepthTestMode;
+      exports.RenderBlendMode = RenderBlendMode = CoRenderer.RenderBlendMode;
+      exports.GLStencilFunc = GLStencilFunc = CoRenderer.GLStencilFunc;
+      exports.GLStencilOp = GLStencilOp = CoRenderer.GLStencilOp;
+      exports.GLBlendMode = GLBlendMode = CoRenderer.GLBlendMode;
+      exports.GLBlendEquation = GLBlendEquation = CoRenderer.GLBlendEquation;
+    }
+  }
+
+  initialize(callback = null, url = "") {
+    this.init();
+    this.m_init = !this.isEnabled();
+
+    if (this.m_init) {
+      this.m_init = false;
+
+      if (url == "" || url === undefined) {
+        url = "static/cospace/engine/renderer/CoRenderer.umd.min.js";
+      }
+
+      new ModuleLoader_1.ModuleLoader(1, () => {
+        this.init();
+        if (callback != null && this.isEnabled()) callback([url]);
+      }).load(url);
+      return true;
+    }
+
+    return false;
+  }
+
+  get RenderDrawMode() {
+    return CoRenderer.RenderDrawMode;
+  }
+
+  get CullFaceMode() {
+    return CoRenderer.CullFaceMode;
+  }
+
+  get DepthTestMode() {
+    return CoRenderer.DepthTestMode;
+  }
+
+  get RenderBlendMode() {
+    return CoRenderer.RenderBlendMode;
+  }
+
+  get GLStencilFunc() {
+    return CoRenderer.GLStencilFunc;
+  }
+
+  get GLStencilOp() {
+    return CoRenderer.GLStencilOp;
+  }
+
+  get GLBlendMode() {
+    return CoRenderer.GLBlendMode;
+  }
+
+  get GLBlendEquation() {
+    return CoRenderer.GLBlendEquation;
+  }
+
+  get RendererDevice() {
+    return CoRenderer.RendererDevice;
+  }
+
+  get RendererState() {
+    return CoRenderer.RendererState;
+  }
+
+  createRendererInstance() {
+    return CoRenderer.createRendererInstance();
+  }
+
+  isEnabled() {
+    return typeof CoRenderer !== "undefined";
+  }
+
+}
+
+const VoxRenderer = new T_CoRenderer();
+exports.VoxRenderer = VoxRenderer;
+
+/***/ }),
+
+/***/ "cc0e":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const VoxMath_1 = __webpack_require__("7c47");
+
+const MaterialJsonNode_1 = __webpack_require__("15e2");
+
+const VoxMaterial_1 = __webpack_require__("8f2d");
+
+class ModelMaterialJsonNode {
+  constructor() {
+    this.modelName = "";
+    this.m_vec3A = null;
+    this.m_colorA = null;
+    this.mdecor = null;
+    this.jsonNode = new MaterialJsonNode_1.MaterialJsonNode();
+    this.changed = true;
+  }
+
+  getJsonObj() {
+    return this.jsonNode.clone();
+  }
+
+  copyFromMDecor() {
+    if (this.m_colorA == null) {
+      this.m_colorA = VoxMaterial_1.VoxMaterial.createColor4();
+      this.m_vec3A = VoxMath_1.VoxMath.createVec3();
+    } // this.changed = true;
+
+
+    const jnode = this.jsonNode;
+    let decor = this.mdecor;
+
+    if (decor) {
+      jnode.metallic = decor.getMetallic();
+      jnode.roughness = decor.getRoughness();
+      let c = this.m_colorA;
+      decor.getAlbedoColor(c);
+      jnode.color = c.getRGBUint24();
+      let vertUniform = decor.vertUniform;
+      let v3 = this.m_vec3A;
+
+      if (vertUniform) {
+        vertUniform.getUVScale(v3);
+        jnode.uvScales[0] = v3.x;
+        jnode.uvScales[1] = v3.y;
+      }
+    }
+  }
+
+  setJsonObj(jsonObj) {
+    if (this.m_colorA == null) {
+      this.m_colorA = VoxMaterial_1.VoxMaterial.createColor4();
+      this.m_vec3A = VoxMath_1.VoxMath.createVec3();
+    }
+
+    this.changed = true;
+    console.log("setJsonObj(), modelName: ", this.modelName, ", changed: ", this.changed);
+    const jnode = this.jsonNode;
+    jnode.copyFromJsonObj(jsonObj);
+    jnode.modelName = this.modelName;
+    let decor = this.mdecor;
+
+    if (decor) {
+      let value = jsonObj["metallic"];
+
+      if (value) {
+        decor.setMetallic(value);
+      }
+
+      value = jsonObj["roughness"];
+
+      if (value) {
+        decor.setRoughness(value);
+      }
+
+      let c = this.m_colorA;
+      value = jsonObj["color"];
+
+      if (value) {
+        c.setRGBUint24(value);
+        decor.setAlbedoColor(c.r, c.g, c.b);
+      }
+
+      let vertUniform = decor.vertUniform;
+      let vs = null;
+
+      if (vertUniform) {
+        vs = jsonObj["uvScales"];
+
+        if (vs) {
+          vertUniform.setUVScale(vs[0], vs[1]);
+        }
+      }
+    }
+  }
+
+}
+
+class ModelNode {
+  constructor() {
+    this.uuid = "";
+    this.entity = null;
+    this.materialNode = new ModelMaterialJsonNode();
+  }
+
+  copyEntityDataToMaterialNode() {
+    this.materialNode.copyFromMDecor();
+  }
+
+}
+
+exports.ModelNode = ModelNode;
+
+class ModelScene {
+  constructor() {
+    this.m_modelMap = new Map();
+  }
+
+  __$init() {}
+
+  initialize(scData) {}
+  /**
+   * @param force the default value is false
+   * @returns IMaterialJsonNode instance list
+   */
+
+
+  getMaterialJsonObjs(force = false) {
+    let list = [];
+    let map = this.m_modelMap;
+
+    for (var [key, value] of map) {
+      console.log(value.materialNode.modelName, ", value.materialNode.changed: ", value.materialNode.changed);
+
+      if (value.materialNode.changed || force) {
+        list.push(value.materialNode.getJsonObj());
+        value.materialNode.changed = false;
+      }
+    }
+
+    return list;
+  }
+
+  getMaterialJsonObjFromNode(uuid) {
+    if (this.m_modelMap.has(uuid)) {
+      let node = this.m_modelMap.get(uuid);
+      return node.materialNode.getJsonObj();
+    }
+
+    return null;
+  }
+
+  setMaterialParamToNodeByJsonObj(uuid, jsonObj) {
+    if (this.m_modelMap.has(uuid)) {
+      let node = this.m_modelMap.get(uuid);
+      node.materialNode.setJsonObj(jsonObj);
+    }
+  }
+
+  setMaterialParamToNode(uuid, param) {
+    if (this.m_modelMap.has(uuid)) {
+      let node = this.m_modelMap.get(uuid);
+
+      if (node.entity != null) {
+        let material = node.entity.getMaterial();
+
+        if (material) {
+          let decor = material.getDecorator();
+
+          if (decor) {
+            if (param.metallic !== undefined) decor.setMetallic(param.metallic);
+            if (param.roughness !== undefined) decor.setRoughness(param.roughness);
+            if (param.ao !== undefined) decor.setAO(param.ao);
+            let vs = param.displacementParams;
+            let vertUniform = decor.vertUniform;
+
+            if (vertUniform) {
+              if (vs !== undefined) {
+                vertUniform.setDisplacementParams(vs[0], vs[1]);
+              }
+
+              vs = param.uvScales;
+
+              if (vs !== undefined) {
+                vertUniform.setUVScale(vs[0], vs[1]);
+              }
+            }
+
+            vs = param.albedoColor;
+
+            if (vs !== undefined) {
+              decor.setAlbedoColor(vs[0], vs[1], vs[2]);
+            }
+
+            vs = param.parallaxParams;
+
+            if (vs !== undefined) {
+              decor.setParallaxParams(vs[0], vs[1], vs[2], vs[3]);
+            }
+
+            if (param.sideIntensity !== undefined) decor.setSideIntensity(param.sideIntensity);
+            if (param.toneMapingExposure !== undefined) decor.setToneMapingExposure(param.toneMapingExposure);
+            if (param.scatterIntensity !== undefined) decor.setScatterIntensity(param.scatterIntensity);
+          }
+        }
+      }
+    }
+  }
+
+  getModelNode(uuid) {
+    if (this.m_modelMap.has(uuid)) {
+      let node = this.m_modelMap.get(uuid);
+      return node;
+    }
+
+    return null;
+  }
+
+  addModelNode(uuid, entity) {
+    if (!this.m_modelMap.has(uuid)) {
+      let node = new ModelNode();
+      node.uuid = uuid;
+      node.entity = entity;
+      let mnode = node.materialNode;
+      mnode.modelName = uuid;
+      mnode.mdecor = null;
+      let material = node.entity.getMaterial();
+
+      if (material) {
+        mnode.mdecor = material.getDecorator();
+      }
+
+      console.log("ModelScene::addModelNode(), uuid: ", uuid, entity);
+      this.m_modelMap.set(uuid, node);
+      node.copyEntityDataToMaterialNode();
+      mnode.changed = false;
+    }
+
+    return null;
+  }
+
+}
+
+exports.ModelScene = ModelScene;
+
+/***/ }),
+
+/***/ "d33d":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+class URLFilter {
+  static getDomain(url) {
+    var urlReg = /http:\/\/([^\/]+)/i;
+    let domain = url.match(urlReg);
+    return domain != null && domain.length > 0 ? domain[0] : "";
+  }
+
+  static getHostUrl(port, end = "/") {
+    let host = location.href;
+    let domain = URLFilter.getDomain(host);
+    let nsList = domain.split(":");
+    host = nsList[0] + ":" + nsList[1];
+    return port ? host + ":" + port + "/" : domain + end;
+  }
+
+  static isEnabled() {
+    let hostUrl = window.location.href;
+    return hostUrl.indexOf(".artvily.com") > 0;
+  }
+
+  static filterUrl(url) {
+    if (url.indexOf("blob:") < 0) {
+      let hostUrl = window.location.href;
+
+      if (hostUrl.indexOf(".artvily.") > 0) {
+        hostUrl = "http://www.artvily.com:9090/";
+        url = hostUrl + url;
+      }
+    }
+
+    return url;
+  }
+
+  static getFileName(url, lowerCase = false, force = false) {
+    if (url.indexOf("blob:") < 0 || force) {
+      let i = url.lastIndexOf("/");
+
+      if (i < 0) {
+        return "";
+      }
+
+      let j = url.lastIndexOf(".", url.length);
+
+      if (j < 0) {
+        return "";
+      }
+
+      if (i + 2 < j) {
+        let str = url.slice(i + 1, j);
+
+        if (lowerCase) {
+          return str.toLocaleLowerCase();
+        }
+
+        return str;
+      }
+    }
+
+    return "";
+  }
+
+  static getFileNameAndSuffixName(url, lowerCase = false, force = false) {
+    if (url.indexOf("blob:") < 0 || force) {
+      let i = url.lastIndexOf("/");
+      let j = url.lastIndexOf(".", url.length);
+
+      if (j < 0) {
+        return "";
+      }
+
+      let str = url.slice(i + 1);
+
+      if (lowerCase) {
+        return str.toLocaleLowerCase();
+      }
+
+      return str;
+    }
+
+    return "";
+  }
+
+  static getFileSuffixName(url, lowerCase = false, force = false) {
+    if (url.indexOf("blob:") < 0 || force) {
+      let j = url.lastIndexOf(".", url.length);
+
+      if (j < 0) {
+        return "";
+      }
+
+      let str = url.slice(j + 1);
+
+      if (lowerCase) {
+        return str.toLocaleLowerCase();
+      }
+
+      return str;
+    }
+
+    return "";
+  }
+
+}
+
+exports.default = URLFilter;
+
+/***/ }),
+
+/***/ "d518":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+/***/ }),
+
+/***/ "e096":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const ModuleLoader_1 = __webpack_require__("4d3f");
+
+class T_CoUIInteraction {
+  constructor() {
+    this.m_init = true;
+  }
+
+  initialize(callback = null, url = "") {
+    if (this.m_init) {
+      this.m_init = false;
+
+      if (url == "" || url === undefined) {
+        url = "static/cospace/engine/uiInteract/CoUIInteraction.umd.min.js";
+      }
+
+      new ModuleLoader_1.ModuleLoader(1, () => {
+        if (callback != null && this.isEnabled()) callback([url]);
+      }).load(url);
+      return true;
+    }
+
+    return false;
+  }
+
+  createMouseInteraction() {
+    return CoUIInteraction.createMouseInteraction();
+  }
+
+  createKeyboardInteraction() {
+    return CoUIInteraction.createKeyboardInteraction();
+  }
+
+  isEnabled() {
+    return typeof CoUIInteraction !== "undefined";
+  }
+
+}
+
+const VoxUIInteraction = new T_CoUIInteraction();
+exports.VoxUIInteraction = VoxUIInteraction;
+
+/***/ }),
+
+/***/ "e175":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const PBRModule_1 = __webpack_require__("702c");
+
+exports.PBRParam = PBRModule_1.PBRParam;
+exports.PBRMapUrl = PBRModule_1.PBRMapUrl;
+exports.PBRModule = PBRModule_1.PBRModule;
+
+const CoModuleLoader_1 = __webpack_require__("1c7d");
+
+class PBRMaterialCtx {
+  constructor() {
+    this.m_mctxFlag = 0;
+    this.m_callback = null;
+    this.pbrModule = new PBRModule_1.PBRModule();
+  }
+
+  getMaterialCtx() {
+    return this.m_mctx;
+  }
+
+  initialize(rscene, materialData, callback) {
+    if (this.m_rscene == null && rscene != null) {
+      this.m_rscene = rscene;
+      this.m_materialData = materialData;
+      this.m_callback = callback;
+      this.pbrModule.initialize(materialData);
+      this.initMaterialModule();
+    }
+  }
+
+  initMaterialModule() {
+    this.pbrModule.preload(() => {
+      console.log("pbrModule.preload()....");
+      this.updateMCTXInit();
+    });
+    let url0 = "static/cospace/renderEffect/pbr/PBREffect.umd.js";
+    let url1 = "static/cospace/renderEffect/lightModule/CoLightModule.umd.js";
+    let url2 = "static/cospace/renderEffect/envLight/CoEnvLightModule.umd.js";
+    let url3 = "static/cospace/renderEffect/vsmShadow/VSMShadowModule.umd.js";
+    new CoModuleLoader_1.CoModuleLoader(4, () => {
+      this.updateMCTXInit();
+    }).load(url0).load(url1).load(url2).load(url3);
+  }
+
+  updateMCTXInit() {
+    this.m_mctxFlag++;
+
+    if (this.isMCTXEnabled()) {
+      this.initMaterialCtx();
+    }
+  }
+
+  isMCTXEnabled() {
+    return this.m_mctxFlag == 2;
+  }
+
+  buildEnvLight(mctx, param, data) {
+    let module = CoEnvLightModule.create(this.m_rscene);
+    module.initialize();
+
+    if (data != undefined && data != null) {
+      module.setFogDensity(data.density);
+      let rgb = data.rgb;
+      module.setFogColorRGB3f(rgb[0], rgb[1], rgb[2]);
+    } else {
+      module.setFogDensity(0.0005);
+      module.setFogColorRGB3f(0.0, 0.8, 0.1);
+    }
+
+    mctx.envLightModule = module;
+  }
+
+  buildLightModule(mctx, param, data) {
+    param.pointLightsTotal = 0;
+    param.spotLightsTotal = 0;
+    param.directionLightsTotal = 0;
+    let lightModule = CoLightModule.createLightModule(this.m_rscene);
+
+    if (data) {
+      if (data.pointLights != undefined && data.pointLights != null) {
+        param.pointLightsTotal = data.pointLights.length;
+      }
+
+      if (data.spotLights != undefined && data.spotLights != null) {
+        param.spotLightsTotal = data.spotLights.length;
+      }
+
+      if (data.directionLights != undefined && data.directionLights != null) {
+        param.directionLightsTotal = data.directionLights.length;
+      }
+
+      for (let i = 0; i < param.pointLightsTotal; ++i) {
+        lightModule.appendPointLight();
+      }
+
+      for (let i = 0; i < param.spotLightsTotal; ++i) {
+        lightModule.appendSpotLight();
+      }
+
+      for (let i = 0; i < param.directionLightsTotal; ++i) {
+        lightModule.appendDirectionLight();
+      }
+    }
+
+    this.initLightModuleData(lightModule, param, data);
+    mctx.lightModule = lightModule;
+  }
+
+  initLightModuleData(lightModule, param, data) {
+    if (data) {
+      for (let i = 0; i < param.pointLightsTotal; ++i) {
+        let lo = data.pointLights[i];
+        let light = lightModule.getPointLightAt(i);
+        light.position.fromArray(lo.position);
+        light.color.fromArray4(lo.rgb);
+        light.attenuationFactor1 = lo.factor1;
+        light.attenuationFactor2 = lo.factor2;
+      }
+
+      for (let i = 0; i < param.spotLightsTotal; ++i) {
+        let lo = data.spotLights[i];
+        let light = lightModule.getSpotLightAt(i);
+        light.position.fromArray(lo.position);
+        light.direction.fromArray(lo.direction);
+        light.color.fromArray4(lo.rgb);
+        light.attenuationFactor1 = lo.factor1;
+        light.attenuationFactor2 = lo.factor2;
+      }
+
+      for (let i = 0; i < param.directionLightsTotal; ++i) {
+        let lo = data.directionLights[i];
+        let light = lightModule.getDirectionLightAt(i);
+        light.direction.fromArray(lo.direction);
+        light.color.fromArray4(lo.rgb);
+        light.attenuationFactor1 = lo.factor1;
+        light.attenuationFactor2 = lo.factor2;
+      }
+    }
+
+    lightModule.update();
+  }
+
+  initMaterialCtx() {
+    console.log("initMaterialCtx() ....");
+    this.m_mctx = CoRScene.createMaterialContext();
+    let mctx = this.m_mctx;
+    let md = this.m_materialData;
+    let mc = md.context;
+    console.log("		md: ", md);
+    console.log("		mc: ", mc);
+    let mcParam = CoRScene.creatMaterialContextParam();
+    mcParam.shaderLibVersion = mc.shaderLibVersion;
+    mcParam.loadAllShaderCode = true;
+    mcParam.shaderCodeBinary = true;
+    mcParam.pbrMaterialEnabled = true;
+    mcParam.lambertMaterialEnabled = false;
+    mcParam.shaderFileNickname = true;
+    mcParam.vsmFboIndex = 0;
+    mcParam.vsmEnabled = true; // mcParam.vsmEnabled = false;
+    // mcParam.buildBinaryFile = true;
+
+    this.buildEnvLight(mctx, mcParam, md.fog);
+    this.buildLightModule(mctx, mcParam, md.light);
+    this.buildShadowModule(mctx, mcParam, md.shadow);
+    mctx.addShaderLibListener(this);
+    mctx.initialize(this.m_rscene, mcParam);
+    this.pbrModule.active(this.m_rscene, mctx, mcParam.vsmEnabled); // console.log("initMaterialCtx() ... 2");
+  }
+
+  shaderLibLoadComplete(loadingTotal, loadedTotal) {
+    console.log("############## shaderLibLoadComplete().................");
+
+    if (this.m_callback != null) {
+      this.m_callback();
+      this.m_callback = null;
+    }
+  }
+
+  buildShadowModule(mctx, param, data) {
+    let v3 = CoRScene.createVec3();
+    v3.fromArray(data.cameraPosition);
+    let vsmModule = VSMShadowModule.create(param.vsmFboIndex);
+    vsmModule.setCameraPosition(v3);
+    vsmModule.setCameraNear(data.cameraNear);
+    vsmModule.setCameraFar(data.cameraFar);
+    let mapSize = data.mapSize;
+    let cameraViewSize = data.cameraViewSize;
+    vsmModule.setMapSize(mapSize[0], mapSize[1]);
+    vsmModule.setCameraViewSize(cameraViewSize[0], cameraViewSize[1]);
+    vsmModule.setShadowRadius(data.radius);
+    vsmModule.setShadowBias(data.bias);
+    vsmModule.initialize(this.m_rscene, [0], 3000);
+    vsmModule.setShadowIntensity(data.shadowIntensity);
+    vsmModule.setColorIntensity(data.colorIntensity);
+    mctx.vsmModule = vsmModule;
+  }
+
+  run() {
+    if (this.m_mctx) {
+      this.m_mctx.run();
+    }
+  }
+
+}
+
+exports.PBRMaterialCtx = PBRMaterialCtx;
+
+/***/ }),
+
+/***/ "ea2a":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+/**
+ * IShaderCodeObject instance uuid
+ */
+
+var ShaderCodeUUID;
+
+(function (ShaderCodeUUID) {
+  /**
+   * nothing shader code object
+   */
+  ShaderCodeUUID["None"] = "";
+  /**
+   * the default value is PBR light shader code object that it comes from the system shader lib.
+   */
+
+  ShaderCodeUUID["Default"] = "pbr";
+  /**
+   * lambert light shader code object that it comes from the system shader lib.
+   */
+
+  ShaderCodeUUID["Lambert"] = "lambert";
+  /**
+   * PBR light shader code object that it comes from the system shader lib.
+   */
+
+  ShaderCodeUUID["PBR"] = "pbr";
+})(ShaderCodeUUID || (ShaderCodeUUID = {}));
+
+exports.ShaderCodeUUID = ShaderCodeUUID;
+
+/***/ }),
+
+/***/ "f189":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+const ModuleLoader_1 = __webpack_require__("4d3f");
+
+class T_Lib_VoxUI {
+  constructor() {
+    this.m_init = true;
+  }
+
+  initialize(callback = null, url = "") {
+    console.log("T_Lib_VoxUI::initialize(), ", this.isEnabled());
+
+    if (this.isEnabled()) {
+      Lib_VoxUI.initialize();
+    }
+
+    this.m_init = !this.isEnabled();
+
+    if (this.m_init) {
+      this.m_init = false;
+
+      if (url == "" || url === undefined) {
+        url = "static/cospace/ui/Lib_VoxUI.umd.min.js";
+      }
+
+      if (callback != null) {
+        new ModuleLoader_1.ModuleLoader(1, () => {
+          if (this.isEnabled()) callback([url]);
+        }).load(url);
+      }
+
+      return true;
+    }
+
+    return false;
+  }
+
+  isEnabled() {
+    return typeof Lib_VoxUI !== "undefined";
+  }
+
+  createColorLabel() {
+    return Lib_VoxUI.createColorLabel();
+  }
+
+  createUILayout() {
+    return Lib_VoxUI.createUILayout();
+  }
+
+  createTipInfo() {
+    return Lib_VoxUI.createTipInfo();
+  }
+
+  createRectTextTip() {
+    return Lib_VoxUI.createRectTextTip();
+  }
+
+  createClipLabel() {
+    return Lib_VoxUI.createClipLabel();
+  }
+
+  createClipColorLabel() {
+    return Lib_VoxUI.createClipColorLabel();
+  }
+
+  createColorClipLabel() {
+    return Lib_VoxUI.createColorClipLabel();
+  }
+
+  createTextLabel() {
+    return Lib_VoxUI.createTextLabel();
+  }
+
+  createButton() {
+    return Lib_VoxUI.createButton();
+  }
+
+  createFlagButton() {
+    return Lib_VoxUI.createFlagButton();
+  }
+
+  createSelectButtonGroup() {
+    return Lib_VoxUI.createSelectButtonGroup();
+  }
+
+  createTextButton(width, height, uuid, texAtlas, textParam, colors) {
+    return Lib_VoxUI.createTextButton(width, height, uuid, texAtlas, textParam, colors);
+  }
+  /**
+   * @param uuid button event uuid
+   * @param text button text content
+   * @param width button width, the defaule value is 90
+   * @param height button height, the defaule value is 50
+   * @param textColor button text color, the defaule value is null
+   * @param fontSize button text font size, the defaule value is 30
+   * @param fontName button text font name, the defaule value is ""
+   */
+
+
+  createTextLabelButton(uuid, text, width, height, textColor, fontSize, fontName) {
+    return Lib_VoxUI.createTextLabelButton(uuid, text, width, height, textColor, fontSize, fontName);
+  }
+
+  createUIPanel() {
+    return Lib_VoxUI.createUIPanel();
+  }
+
+  createPromptPanel() {
+    return Lib_VoxUI.createPromptPanel();
+  }
+
+  createParamCtrlPanel() {
+    return Lib_VoxUI.createParamCtrlPanel();
+  }
+  /**
+   * @param graph IRendererSceneGraph instance
+   * @param uiConfig IUIConfig instance, its default value is null
+   * @param atlasSize the default value is 512
+   * @param renderProcessesTotal the default value is 3
+   */
+
+
+  createUIScene(graph, uiConfig, atlasSize, renderProcessesTotal) {
+    return Lib_VoxUI.createUIScene(graph, uiConfig, atlasSize, renderProcessesTotal);
+  }
+
+  createSelectionEntity() {
+    return Lib_VoxUI.createSelectionEntity();
+  }
+
+  createProgressEntity() {
+    return Lib_VoxUI.createProgressEntity();
+  }
+
+}
+
+const VoxUI = new T_Lib_VoxUI();
+exports.VoxUI = VoxUI;
+
+/***/ }),
+
+/***/ "fae3":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _setPublicPath__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__("1eb2");
+/* harmony import */ var _entry__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__("6ee3");
+/* harmony import */ var _entry__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(_entry__WEBPACK_IMPORTED_MODULE_1__);
+/* harmony reexport (unknown) */ for(var __WEBPACK_IMPORT_KEY__ in _entry__WEBPACK_IMPORTED_MODULE_1__) if(["default"].indexOf(__WEBPACK_IMPORT_KEY__) < 0) (function(key) { __webpack_require__.d(__webpack_exports__, key, function() { return _entry__WEBPACK_IMPORTED_MODULE_1__[key]; }) }(__WEBPACK_IMPORT_KEY__));
+
+
+
 
 /***/ })
 

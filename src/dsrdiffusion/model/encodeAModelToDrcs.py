@@ -152,5 +152,5 @@ if __name__ == "__main__":
     # ###
     print("####### encodeAModelToDrcs end ...")
     # python .\encodeAModelToDrcs.py -- encoder=.\draco_encoder.exe renderer=D:\programs\blender\blender.exe exportPy=.\exportMeshesToDrcObjs.py modelFilePath=private\apple02\apple02.glb
-    # python .\encodeAModelToDrcs.py -- encoder=.\draco_encoder.exe renderer=D:\programs\blender\blender.exe exportPy=.\exportMeshesToDrcObjs.py modelFilePath=D:\dev\webProj\minirsvr\src\renderingsvr\static\sceneres\v1ModelRTask2002\mglb02.glb
+    # python .\encodeAModelToDrcs.py -- encoder=.\draco_encoder.exe renderer=D:\programs\blender\blender.exe exportPy=.\exportMeshesToDrcObjs.py modelFilePath=D:\dev\webProj\minirsvr\src\renderingsvr\static\sceneres\v1ModelRTask2006\planet.obj
     # python .\encodeAModelToDrcs.py -- encoder=D:\dev\webdev\voxblender\modelEncode\draco_encoder.exe renderer=D:\programs\blender\blender.exe exportPy=D:\dev\webdev\voxblender\modelEncode\exportMeshesToDrcObjs.py modelFilePath=private\scene01\scene01.fbx
