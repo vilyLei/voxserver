@@ -4810,6 +4810,15 @@ class ModelScene {
     return null;
   }
 
+  setMaterialParamToNodesByJsonObjs(materials) {
+    if (materials) {
+      for (let i = 0; i < materials.length; ++i) {
+        let mo = materials[i];
+        this.setMaterialParamToNodeByJsonObj(mo.modelName, mo);
+      }
+    }
+  }
+
   setMaterialParamToNodeByJsonObj(uuid, jsonObj) {
     if (this.m_modelMap.has(uuid)) {
       let node = this.m_modelMap.get(uuid);
@@ -4821,7 +4830,7 @@ class ModelScene {
     if (this.m_modelMap.has(uuid)) {
       let node = this.m_modelMap.get(uuid);
 
-      if (node.entity != null) {
+      if (node.entity) {
         let material = node.entity.getMaterial();
 
         if (material) {
