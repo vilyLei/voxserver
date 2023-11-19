@@ -4,8 +4,8 @@
 
 <head>
 	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width,initial-scale=1.0">
 	<title>{{ .title }}</title>
 	<script>
 
@@ -23,22 +23,28 @@
 			info2 += "({{ .viewsTotal }})";
 			stils.push(info1, info2);
 		}
-		function __$$vvf() {this.isEnabled = function(){return true;}}
-		let pwin = window;pwin["VoxVerify"] = new __$$vvf();
+		function __$$vvf() { this.isEnabled = function () { return true; } }
+		let pwin = window; pwin["VoxVerify"] = new __$$vvf();
 		initPageST();
 		function pageOnload() {
 			console.log("page onload() ...");
 		}
+		async function initModule() {
+			console.log("page initModule() ...");
+
+			console.log("bbb navigator: ", navigator);
+			console.log("bbb navigator.gpu: ", navigator.gpu);
+			const adapter = await navigator.gpu.requestAdapter();
+			const device = await adapter.requestDevice();
+		}
 	</script>
 </head>
 
-<body onload="">	
+<body onload="pageOnload()">
 	<!-- <script type="text/javascript" src="static/voxweb3d/demos/webgpuunittest.js"></script> -->
 	<script type="text/javascript">
 		console.log("navigator: ", navigator);
 		console.log("navigator.gpu: ", navigator.gpu);
-		const adapter = await navigator.gpu.requestAdapter();
-  		const device = await adapter.requestDevice();
 	</script>
 </body>
 
