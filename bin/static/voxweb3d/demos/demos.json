@@ -176,6 +176,10 @@
         {
             "name": "modelEditTransform",
             "info": "3D模型缩放旋转平移操作(model transformation editing)"
+        },
+        {
+            "name": "webgpuunittest",
+            "info": "WebGPU engine 测试集(WebbGPU engine unit test)"
         }
     ]
 }
