@@ -29,10 +29,8 @@
 		async function initModule() {
 			console.log("page initModule() ...");
 
-			console.log("bbb navigator: ", navigator);
-			console.log("bbb navigator.gpu: ", navigator.gpu);
-			const adapter = await navigator.gpu.requestAdapter();
-			const device = await adapter.requestDevice();
+			console.log("navigator: ", navigator);
+			console.log("navigator.gpu: ", navigator.gpu);
 		}
 		function pageOnload() {
 			console.log("page onload() ...");
@@ -42,12 +40,7 @@
 </head>
 
 <body onload="pageOnload()">
-	<!-- <script type="text/javascript" src="static/voxweb3d/demos/webgpuunittest.js"></script> -->
-	<script type="text/javascript">
-		console.log("navigator: ", navigator);
-		console.log("navigator.gpu: ", navigator.gpu);
-	</script>
+	<script type="text/javascript" src="static/voxweb3d/demos/webgpuunittest.js"></script>
 </body>
-
 </html>
 {{ end }}
