@@ -1831,6 +1831,7 @@ const WGRBufferVisibility_1 = __webpack_require__("dc4d");
 
 class WGRBufferValue extends WGRBufferView_1.WGRBufferView {
   constructor(param) {
+    console.log("WGRBufferValue::constructor() ...");
     super();
     WGRBufferValueParam_1.applyParamToBufferData(this, param);
     this.upate();
@@ -1921,9 +1922,8 @@ class WGRBufferValue extends WGRBufferView_1.WGRBufferView {
 
 exports.WGRBufferValue = WGRBufferValue;
 
-const __$ubv = new WGRBufferValue({
-  data: new Float32Array(4)
-});
+let __$ubv; // = new WGRBufferValue({data: new Float32Array(4)});
+
 
 function getVisibility(str, value) {
   switch (str) {
@@ -1956,6 +1956,13 @@ function applyLayout(layout, vi, type) {
   let visi = layout.visibility !== undefined ? layout.visibility : 'vert_frag';
   let vs = visi.split('_');
   let v = 0;
+
+  if (!__$ubv) {
+    __$ubv = new WGRBufferValue({
+      data: new Float32Array(4)
+    });
+  }
+
   let bv = __$ubv.visibility;
 
   for (let i = 0; i < vs.length; ++i) {
@@ -2002,6 +2009,12 @@ function applyLayout(layout, vi, type) {
 function bufferDataFilter(d) {
   if (!d) {
     return d;
+  }
+
+  if (!__$ubv) {
+    __$ubv = new WGRBufferValue({
+      data: new Float32Array(4)
+    });
   }
 
   const v = __$ubv;
@@ -5145,7 +5158,13 @@ class VertColorTriangle {
   }
 
   initialize() {
+    console.log('VertColorTriangle::initialize() ...');
     const renderer = this.renderer;
+    renderer.initialize({
+      camera: {
+        enabled: false
+      }
+    });
     const shdSrc = {
       vert: {
         code: vertWGSL
@@ -12842,7 +12861,6 @@ class WGRenderer {
     this.mRPBlocks = [];
     this.mROBuilder = new WGRObjBuilder_1.WGRObjBuilder();
     this.mEntityMana = new WGEntityNodeMana_1.WGEntityNodeMana();
-    this.camera = new Camera_1.default();
     this.enabled = true;
 
     if (config) {
@@ -12853,9 +12871,14 @@ class WGRenderer {
   initCamera(width, height) {
     let p = this.mConfig.camera;
     if (!p) p = {};
-    p.viewWidth = width;
-    p.viewHeight = height;
-    this.camera.initialize(p);
+
+    if (!(p.enabled === false)) {
+      let selfT = this;
+      selfT.camera = new Camera_1.default();
+      p.viewWidth = width;
+      p.viewHeight = height;
+      this.camera.initialize(p);
+    }
   }
 
   get uid() {
