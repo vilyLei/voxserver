@@ -26,11 +26,20 @@
 		function __$$vvf() {this.isEnabled = function(){return true;}}
 		let pwin = window;pwin["VoxVerify"] = new __$$vvf();
 		initPageST();
+		function pageOnload() {
+			console.log("page onload() ...");
+		}
 	</script>
 </head>
 
-<body>	
-	<script type="text/javascript" src="static/voxweb3d/demos/webgpuunittest.js"></script>
+<body onload="">	
+	<!-- <script type="text/javascript" src="static/voxweb3d/demos/webgpuunittest.js"></script> -->
+	<script type="text/javascript">
+		console.log("navigator: ", navigator);
+		console.log("navigator.gpu: ", navigator.gpu);
+		const adapter = await navigator.gpu.requestAdapter();
+  		const device = await adapter.requestDevice();
+	</script>
 </body>
 
 </html>
