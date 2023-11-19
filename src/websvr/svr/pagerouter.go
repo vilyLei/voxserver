@@ -35,6 +35,8 @@ func InitPages(router *gin.Engine) {
 
 	router.GET("/dsrdiffusion", DSRDiffusionPage)
 
+	router.GET("/webgpu", WebGPUPage)
+
 	router.GET("/updatePageInsStatus", UpdatePageInsStatusInfo)
 
 	router.GET("/renderingTask", RenderingTask)
@@ -132,6 +134,20 @@ func DSRDiffusionPage(g *gin.Context) {
 	fmt.Println("req DSRDiffusionPage info ...viewsTotalStr: ", viewsTotalStr)
 	g.HTML(http.StatusOK, "dsrdiffusion/index.tmpl", gin.H{
 		"title":      "dsr-diffusion",
+		"viewsTotal": viewsTotalStr,
+	})
+}
+
+func WebGPUPage(g *gin.Context) {
+	ns := "website-webgpu"
+	// viewsTotalStr := strconv.Itoa(database.GetPageViewCountByName(ns) + 1)
+	viewsTotalStr := getPageViewCountStrByName(ns)
+	defer func() {
+		increasePageViewCountByName(ns)
+	}()
+	fmt.Println("req WebGPUPage info ...viewsTotalStr: ", viewsTotalStr)
+	g.HTML(http.StatusOK, "webgpu/index.tmpl", gin.H{
+		"title":      "Vox WebGPU",
 		"viewsTotal": viewsTotalStr,
 	})
 }

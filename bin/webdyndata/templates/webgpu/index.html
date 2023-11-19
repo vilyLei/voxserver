@@ -1,0 +1,37 @@
+{{ define "webgpu/index.tmpl" }}
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+	<title>{{ .title }}</title>
+	<script>
+
+		let isLZHCN = navigator.language == "zh-CN";
+		var stils = [];
+		var CURR_PAGE_ST_INFO_LIST = stils;
+		function initPageST() {
+			let info2 = "Number of views"
+			let info1 = "Contacts with me";
+			if (isLZHCN) {
+				info2 = "浏览次数";
+				info1 = "联系我们";
+			}
+			info1 += "(vily313@126.com)";
+			info2 += "({{ .viewsTotal }})";
+			stils.push(info1, info2);
+		}
+		function __$$vvf() {this.isEnabled = function(){return true;}}
+		let pwin = window;pwin["VoxVerify"] = new __$$vvf();
+		initPageST();
+	</script>
+</head>
+
+<body>	
+	<script type="text/javascript" src="static/voxweb3d/demos/webgpuunittest.js"></script>
+</body>
+
+</html>
+{{ end }}
